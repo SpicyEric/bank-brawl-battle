@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useBattleGame } from '@/hooks/useBattleGame';
+import { useMultiplayerGame } from '@/hooks/useMultiplayerGame';
 import { BattleGrid } from '@/components/battle/BattleGrid';
 import { UnitPicker } from '@/components/battle/UnitPicker';
 import { BattleLog } from '@/components/battle/BattleLog';
@@ -15,7 +16,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-// Horizontal score dots
 function ScoreDots({ score, max, color }: { score: number; max: number; color: 'success' | 'danger' }) {
   return (
     <div className="flex gap-[3px] items-center">
@@ -33,8 +33,17 @@ function ScoreDots({ score, max, color }: { score: number; max: number; color: '
   );
 }
 
-const Index = () => {
+function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | 'player2' }) {
+  const game = useMultiplayerGame({ roomId, role });
+  return <GameUI game={game} isMultiplayer />;
+}
+
+function SinglePlayerGame() {
   const game = useBattleGame();
+  return <GameUI game={game} isMultiplayer={false} />;
+}
+
+function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[] }; isMultiplayer: boolean }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic();
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
@@ -43,7 +52,6 @@ const Index = () => {
   const [overlaySubtext, setOverlaySubtext] = useState<string | null>(null);
   const prevPhase = useRef(game.phase);
 
-  // Phase overlay trigger
   useEffect(() => {
     if (game.phase === prevPhase.current) return;
     prevPhase.current = game.phase;
@@ -51,12 +59,8 @@ const Index = () => {
     let text: string | null = null;
     let sub: string | null = null;
 
-    if (game.phase === 'place_player' && game.playerStarts) {
+    if (game.phase === 'place_player') {
       text = 'Platziere!';
-      if (game.playerMaxUnits > 5) sub = `+${game.playerMaxUnits - 5} Comeback-Bonus`;
-    } else if (game.phase === 'place_player' && !game.playerStarts) {
-      text = 'Konter!';
-      if (game.playerMaxUnits > 5) sub = `+${game.playerMaxUnits - 5} Comeback-Bonus`;
     } else if (game.phase === 'place_enemy') {
       text = 'Bereit?';
     } else if (game.phase === 'battle') {
@@ -72,35 +76,26 @@ const Index = () => {
     if (text) {
       setPhaseOverlay(text);
       setOverlaySubtext(sub);
-      setTimeout(() => {
-        setPhaseOverlay(null);
-        setOverlaySubtext(null);
-      }, 1400);
+      setTimeout(() => { setPhaseOverlay(null); setOverlaySubtext(null); }, 1400);
     }
-  }, [game.phase, game.playerStarts, game.playerMaxUnits]);
+  }, [game.phase]);
 
   return (
     <div className="min-h-[100dvh] max-h-[100dvh] bg-background flex flex-col max-w-md mx-auto overflow-hidden">
-      {/* Slim scoreboard bar */}
+      {/* Scoreboard */}
       <div className="mx-3 mt-2 mb-1.5 py-1.5 px-3 rounded-lg bg-card border border-border flex items-center justify-between">
-        {/* Player */}
         <div className="flex items-center gap-2">
           <p className="text-base font-bold font-mono text-success leading-none">{game.playerScore}</p>
           <ScoreDots score={game.playerScore} max={POINTS_TO_WIN} color="success" />
         </div>
-
-        {/* Round */}
         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
           Runde <span className="text-foreground font-bold">{game.roundNumber}</span>
+          {isMultiplayer && <span className="ml-1 text-primary">⚡</span>}
         </p>
-
-        {/* Enemy */}
         <div className="flex items-center gap-2">
           <ScoreDots score={game.enemyScore} max={POINTS_TO_WIN} color="danger" />
           <p className="text-base font-bold font-mono text-danger leading-none">{game.enemyScore}</p>
         </div>
-
-        {/* Settings gear */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className="ml-2 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
@@ -112,10 +107,12 @@ const Index = () => {
               {muted ? <Volume2 className="mr-2 h-4 w-4" /> : <VolumeX className="mr-2 h-4 w-4" />}
               {muted ? 'Ton an' : 'Ton aus'}
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={game.resetGame}>
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Spiel neustarten
-            </DropdownMenuItem>
+            {!isMultiplayer && (
+              <DropdownMenuItem onClick={game.resetGame}>
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Spiel neustarten
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={() => navigate('/')}>
               <Home className="mr-2 h-4 w-4" />
               Hauptmenü
@@ -124,7 +121,7 @@ const Index = () => {
         </DropdownMenu>
       </div>
 
-      {/* Grid with overlay */}
+      {/* Grid */}
       <div className="px-4 relative">
         <BattleGrid
           grid={game.grid}
@@ -132,7 +129,7 @@ const Index = () => {
           onCellClick={(row, col) => {
             if (game.phase === 'place_player') {
               const unit = game.grid[row][col].unit;
-              if (unit && unit.team === 'player') {
+              if (unit && unit.team === (isMultiplayer ? (game as any).myRows?.includes(unit.row) ? unit.team : null : 'player')) {
                 game.removeUnit(unit.id);
                 setLastPlaced(null);
                 return;
@@ -144,15 +141,12 @@ const Index = () => {
               return;
             }
             const unit = game.grid[row][col].unit;
-            if (unit) {
-              setInspectUnit(unit.type);
-            }
+            if (unit) setInspectUnit(unit.type);
           }}
           lastPlaced={lastPlaced}
           battleEvents={game.battleEvents}
         />
 
-        {/* Phase overlay text */}
         {phaseOverlay && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none phase-overlay-fade">
             <p className="text-4xl font-black text-foreground drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] tracking-tight">
@@ -169,7 +163,7 @@ const Index = () => {
 
       {/* Controls */}
       <div className="px-4 mt-3 flex-1">
-        {game.phase === 'place_player' && (
+        {game.phase === 'place_player' && !game.waitingForOpponent && (
           <div className="space-y-3">
             <UnitPicker
               selected={game.selectedUnit}
@@ -187,11 +181,16 @@ const Index = () => {
           </div>
         )}
 
-        {game.phase === 'place_enemy' && (
+        {game.phase === 'place_player' && game.waitingForOpponent && (
+          <div className="text-center py-8 space-y-3">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-sm text-muted-foreground">Warte auf Gegner...</p>
+          </div>
+        )}
+
+        {game.phase === 'place_enemy' && !isMultiplayer && (
           <div className="space-y-3 text-center">
-            <p className="text-sm text-muted-foreground">
-              Beide Seiten stehen – bereit zum Kampf?
-            </p>
+            <p className="text-sm text-muted-foreground">Beide Seiten stehen – bereit zum Kampf?</p>
             <button
               onClick={game.startBattle}
               className="w-full py-3.5 rounded-xl bg-warning text-warning-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
@@ -223,19 +222,16 @@ const Index = () => {
             <p className="text-sm text-muted-foreground">
               Stand: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>
             </p>
-            <p className="text-[11px] text-muted-foreground">
-              Nächste Runde: {!game.playerStarts ? 'Du platzierst zuerst' : 'Gegner platziert zuerst'}
-            </p>
             {game.gameOver ? (
               <div className="space-y-3">
                 <p className="text-xl font-bold text-foreground">
                   {game.gameWon ? '🎉 SPIEL GEWONNEN!' : '😢 SPIEL VERLOREN!'}
                 </p>
                 <button
-                  onClick={game.resetGame}
+                  onClick={() => navigate('/')}
                   className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
                 >
-                  🔄 Neues Spiel
+                  🏠 Hauptmenü
                 </button>
               </div>
             ) : (
@@ -253,10 +249,22 @@ const Index = () => {
       {inspectUnit && (
         <UnitInfoModal unitType={inspectUnit} onClose={() => setInspectUnit(null)} />
       )}
-
       <div className="h-6" />
     </div>
   );
+}
+
+const Index = () => {
+  const [searchParams] = useSearchParams();
+  const mode = searchParams.get('mode');
+  const roomId = searchParams.get('room');
+  const role = searchParams.get('role') as 'player1' | 'player2' | null;
+
+  if (mode === 'multi' && roomId && role) {
+    return <MultiplayerGame roomId={roomId} role={role} />;
+  }
+
+  return <SinglePlayerGame />;
 };
 
 export default Index;

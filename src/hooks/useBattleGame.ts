@@ -327,5 +327,6 @@ export function useBattleGame() {
     gameOver, gameWon,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
+    waitingForOpponent: false,
   };
 }
