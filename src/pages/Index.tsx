@@ -6,71 +6,125 @@ import { BattleLog } from '@/components/battle/BattleLog';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 import { POINTS_TO_WIN, UnitType } from '@/lib/battleGame';
 
+// Scoreboard dots
+function ScoreDots({ score, max, color }: { score: number; max: number; color: 'success' | 'danger' }) {
+  return (
+    <div className="flex flex-col-reverse gap-[3px] items-center">
+      {Array.from({ length: max }, (_, i) => (
+        <div
+          key={i}
+          className={`w-2 h-2 rounded-full transition-all duration-300 ${
+            i < score
+              ? color === 'success' ? 'bg-success shadow-[0_0_4px_hsl(var(--success))]' : 'bg-danger shadow-[0_0_4px_hsl(var(--danger))]'
+              : 'bg-muted/40'
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
 const Index = () => {
   const game = useBattleGame();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
   const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
+  const [phaseOverlay, setPhaseOverlay] = useState<string | null>(null);
+  const [overlaySubtext, setOverlaySubtext] = useState<string | null>(null);
+  const prevPhase = useRef(game.phase);
 
   useEffect(() => {
     const audio = new Audio('/music/background.mp3');
     audio.loop = true;
     audio.volume = 0.15;
     audioRef.current = audio;
-
     const playOnInteraction = () => {
       audio.play().catch(() => {});
       document.removeEventListener('click', playOnInteraction);
     };
     document.addEventListener('click', playOnInteraction);
-
     return () => {
       audio.pause();
       document.removeEventListener('click', playOnInteraction);
     };
   }, []);
 
-  const placingBlind = game.phase === 'place_player' && game.playerStarts;
-  const placingReactive = game.phase === 'place_player' && !game.playerStarts;
+  // Phase overlay trigger
+  useEffect(() => {
+    if (game.phase === prevPhase.current) return;
+    prevPhase.current = game.phase;
+
+    let text: string | null = null;
+    let sub: string | null = null;
+
+    if (game.phase === 'place_player' && game.playerStarts) {
+      text = 'Platziere!';
+      if (game.playerMaxUnits > 5) sub = `+${game.playerMaxUnits - 5} Comeback-Bonus`;
+    } else if (game.phase === 'place_player' && !game.playerStarts) {
+      text = 'Konter!';
+      if (game.playerMaxUnits > 5) sub = `+${game.playerMaxUnits - 5} Comeback-Bonus`;
+    } else if (game.phase === 'place_enemy') {
+      text = 'Bereit?';
+    } else if (game.phase === 'battle') {
+      text = 'Kampf!';
+    } else if (game.phase === 'round_won') {
+      text = '🏆 Gewonnen!';
+    } else if (game.phase === 'round_lost') {
+      text = '💀 Verloren!';
+    }
+
+    if (text) {
+      setPhaseOverlay(text);
+      setOverlaySubtext(sub);
+      setTimeout(() => {
+        setPhaseOverlay(null);
+        setOverlaySubtext(null);
+      }, 1400);
+    }
+  }, [game.phase, game.playerStarts, game.playerMaxUnits]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto">
-      {/* Header */}
-      <header className="px-4 pt-4 pb-2 flex items-center justify-between">
+      {/* Header - just logo */}
+      <header className="px-4 pt-3 pb-1 flex items-center justify-center">
         <div className="flex items-center gap-2">
           <span className="text-lg">⚔️</span>
           <span className="font-bold text-sm text-foreground tracking-tight">GridBattle</span>
         </div>
-        <div className="flex items-center gap-3 text-xs">
-          <span className="font-mono text-muted-foreground">R{game.roundNumber}</span>
-          <div className="flex items-center gap-1.5 font-mono">
-            <span className="text-success font-bold">{game.playerScore}</span>
-            <span className="text-muted-foreground">:</span>
-            <span className="text-danger font-bold">{game.enemyScore}</span>
-          </div>
-          <span className="text-[10px] text-muted-foreground">/ {POINTS_TO_WIN}</span>
-        </div>
       </header>
 
+      {/* Scoreboard */}
+      <div className="mx-4 mb-2 py-3 px-4 rounded-xl bg-card border border-border">
+        <div className="flex items-center justify-between">
+          {/* Player side */}
+          <div className="flex items-center gap-3">
+            <ScoreDots score={game.playerScore} max={POINTS_TO_WIN} color="success" />
+            <div className="text-center">
+              <p className="text-2xl font-bold font-mono text-success leading-none">{game.playerScore}</p>
+              <p className="text-[9px] text-muted-foreground mt-0.5 uppercase tracking-wider">Du</p>
+            </div>
+          </div>
 
-      {/* Phase banner */}
-      <div className={`mx-4 mb-2 py-2 px-3 rounded-lg text-center text-xs font-semibold ${
-        game.phase === 'place_player' ? 'bg-primary/10 text-primary border border-primary/20' :
-        game.phase === 'place_enemy' ? 'bg-warning/10 text-warning border border-warning/20' :
-        game.phase === 'battle' ? 'bg-warning/10 text-warning border border-warning/20' :
-        game.phase === 'round_won' ? 'bg-success/10 text-success border border-success/20' :
-        'bg-danger/10 text-danger border border-danger/20'
-      }`}>
-        {placingBlind && `📍 Platziere blind${game.playerMaxUnits > 5 ? ` (+${game.playerMaxUnits - 5} Comeback-Bonus!)` : ''} – Gegner sieht dich danach!`}
-        {placingReactive && `👁️ Gegner hat aufgestellt – reagiere mit deiner Aufstellung!${game.playerMaxUnits > 5 ? ` (+${game.playerMaxUnits - 5} Bonus!)` : ''}`}
-        {game.phase === 'place_enemy' && '⚔️ Beide Seiten stehen – bereit zum Kampf?'}
-        {game.phase === 'battle' && `⚔️ Kampf läuft... Zug ${game.turnCount}`}
-        {game.phase === 'round_won' && '🏆 Runde gewonnen!'}
-        {game.phase === 'round_lost' && '💀 Runde verloren!'}
+          {/* Center - Round */}
+          <div className="text-center">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Runde</p>
+            <p className="text-xl font-bold font-mono text-foreground leading-none mt-0.5">{game.roundNumber}</p>
+            <p className="text-[9px] text-muted-foreground mt-0.5">/ {POINTS_TO_WIN}</p>
+          </div>
+
+          {/* Enemy side */}
+          <div className="flex items-center gap-3">
+            <div className="text-center">
+              <p className="text-2xl font-bold font-mono text-danger leading-none">{game.enemyScore}</p>
+              <p className="text-[9px] text-muted-foreground mt-0.5 uppercase tracking-wider">Gegner</p>
+            </div>
+            <ScoreDots score={game.enemyScore} max={POINTS_TO_WIN} color="danger" />
+          </div>
+        </div>
       </div>
 
-      {/* Grid */}
-      <div className="px-4">
+      {/* Grid with overlay */}
+      <div className="px-4 relative">
         <BattleGrid
           grid={game.grid}
           phase={game.phase}
@@ -96,6 +150,20 @@ const Index = () => {
           lastPlaced={lastPlaced}
           battleEvents={game.battleEvents}
         />
+
+        {/* Phase overlay text */}
+        {phaseOverlay && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none phase-overlay-fade">
+            <p className="text-4xl font-black text-foreground drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] tracking-tight">
+              {phaseOverlay}
+            </p>
+            {overlaySubtext && (
+              <p className="text-sm font-semibold text-primary mt-1 drop-shadow-[0_1px_6px_rgba(0,0,0,0.6)]">
+                {overlaySubtext}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Controls */}
@@ -113,7 +181,7 @@ const Index = () => {
               disabled={game.playerUnits.length === 0}
               className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              ✅ Aufstellung bestätigen ({game.playerUnits.length}/{game.playerMaxUnits} Einheiten)
+              ✅ Aufstellung bestätigen ({game.playerUnits.length}/{game.playerMaxUnits})
             </button>
           </div>
         )}
@@ -121,10 +189,7 @@ const Index = () => {
         {game.phase === 'place_enemy' && (
           <div className="space-y-3 text-center">
             <p className="text-sm text-muted-foreground">
-              {game.playerStarts
-                ? <>Der Gegner hat <span className="text-danger font-bold">{game.enemyUnits.length}</span> Einheiten als Konter aufgestellt.</>
-                : <>Deine Aufstellung steht! Bereit zum Kampf?</>
-              }
+              Beide Seiten stehen – bereit zum Kampf?
             </p>
             <button
               onClick={game.startBattle}
@@ -151,15 +216,11 @@ const Index = () => {
 
         {(game.phase === 'round_won' || game.phase === 'round_lost') && (
           <div className="text-center space-y-4 py-4">
-            <div className="text-5xl">{game.phase === 'round_won' ? '🏆' : '💀'}</div>
-            <p className="text-lg font-bold text-foreground">
-              {game.phase === 'round_won' ? 'Runde gewonnen!' : 'Runde verloren!'}
-            </p>
             <p className="text-sm text-muted-foreground">
               Stand: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>
             </p>
             <p className="text-[11px] text-muted-foreground">
-              Nächste Runde: {!game.playerStarts ? 'Du platzierst zuerst (blind)' : 'Gegner platziert zuerst'}
+              Nächste Runde: {!game.playerStarts ? 'Du platzierst zuerst' : 'Gegner platziert zuerst'}
             </p>
             {game.gameOver ? (
               <div className="space-y-3">
