@@ -167,7 +167,7 @@ export const PLAYER_ROWS = [5, 6, 7];
 export const ENEMY_ROWS = [0, 1, 2];
 export const POINTS_TO_WIN = 13;
 
-export const COUNTER_MULTIPLIER = 1.5;
+export const COUNTER_MULTIPLIER = 1.3;
 export const WEAKNESS_MULTIPLIER = 0.7;
 
 export function createEmptyGrid(): Cell[][] {
@@ -258,7 +258,7 @@ export function moveToward(unit: Unit, target: Unit, grid: Cell[][]): Position {
 // Calculate damage with counter system
 export function calcDamage(attacker: Unit, defender: Unit): number {
   const aDef = UNIT_DEFS[attacker.type];
-  let dmg = attacker.attack * (0.8 + Math.random() * 0.4);
+  let dmg = attacker.attack * (0.95 + Math.random() * 0.1);
 
   if (aDef.strongVs.includes(defender.type)) {
     dmg *= COUNTER_MULTIPLIER;
