@@ -61,8 +61,8 @@ const Index = () => {
         game.phase === 'round_won' ? 'bg-success/10 text-success border border-success/20' :
         'bg-danger/10 text-danger border border-danger/20'
       }`}>
-        {placingBlind && '📍 Platziere blind – Gegner sieht dich danach!'}
-        {placingReactive && '👁️ Gegner hat aufgestellt – reagiere mit deiner Aufstellung!'}
+        {placingBlind && `📍 Platziere blind${game.playerMaxUnits > 5 ? ` (+${game.playerMaxUnits - 5} Comeback-Bonus!)` : ''} – Gegner sieht dich danach!`}
+        {placingReactive && `👁️ Gegner hat aufgestellt – reagiere mit deiner Aufstellung!${game.playerMaxUnits > 5 ? ` (+${game.playerMaxUnits - 5} Bonus!)` : ''}`}
         {game.phase === 'place_enemy' && '⚔️ Beide Seiten stehen – bereit zum Kampf?'}
         {game.phase === 'battle' && `⚔️ Kampf läuft... Zug ${game.turnCount}`}
         {game.phase === 'round_won' && '🏆 Runde gewonnen!'}
@@ -105,13 +105,14 @@ const Index = () => {
               selected={game.selectedUnit}
               onSelect={game.setSelectedUnit}
               placedCount={game.playerUnits.length}
+              maxUnits={game.playerMaxUnits}
             />
             <button
               onClick={game.confirmPlacement}
               disabled={game.playerUnits.length === 0}
               className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              ✅ Aufstellung bestätigen ({game.playerUnits.length} Einheiten)
+              ✅ Aufstellung bestätigen ({game.playerUnits.length}/{game.playerMaxUnits} Einheiten)
             </button>
           </div>
         )}
