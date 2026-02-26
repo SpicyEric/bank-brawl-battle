@@ -1,4 +1,5 @@
-import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup } from '@/lib/battleGame';
+import { useState, useEffect, useRef } from 'react';
+import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType } from '@/lib/battleGame';
 
 const COLOR_DOT: Record<ColorGroup, string> = {
   red: 'bg-unit-red',
@@ -10,10 +11,46 @@ interface BattleGridProps {
   grid: Cell[][];
   phase: Phase;
   onCellClick: (row: number, col: number) => void;
+  selectedUnit?: UnitType | null;
 }
 
-export function BattleGrid({ grid, phase, onCellClick }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, selectedUnit }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
+  const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Track placed units count to detect new placements
+  const prevCountRef = useRef(0);
+  useEffect(() => {
+    if (!isPlacing) return;
+
+    const playerUnitsOnGrid: { row: number; col: number; type: UnitType }[] = [];
+    for (const row of grid) {
+      for (const cell of row) {
+        if (cell.unit && cell.unit.team === 'player') {
+          playerUnitsOnGrid.push({ row: cell.unit.row, col: cell.unit.col, type: cell.unit.type });
+        }
+      }
+    }
+
+    if (playerUnitsOnGrid.length > prevCountRef.current && playerUnitsOnGrid.length > 0) {
+      // New unit placed - flash its attack cells
+      const newest = playerUnitsOnGrid[playerUnitsOnGrid.length - 1];
+      const def = UNIT_DEFS[newest.type];
+      const cells = new Set<string>();
+      for (const p of def.attackPattern) {
+        const r = newest.row + p.row;
+        const c = newest.col + p.col;
+        if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+          cells.add(`${r}-${c}`);
+        }
+      }
+      setFlashCells(cells);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setFlashCells(new Set()), 800);
+    }
+    prevCountRef.current = playerUnitsOnGrid.length;
+  }, [grid, isPlacing]);
 
   return (
     <div className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto">
@@ -26,6 +63,7 @@ export function BattleGrid({ grid, phase, onCellClick }: BattleGridProps) {
           const colorGroup = unit ? UNIT_COLOR_GROUPS[unit.type] : null;
           const hpPercent = unit ? (unit.hp / unit.maxHp) * 100 : 0;
           const isLow = unit ? unit.hp / unit.maxHp < 0.3 : false;
+          const isFlashing = flashCells.has(`${cell.row}-${cell.col}`);
 
           return (
             <button
@@ -37,6 +75,7 @@ export function BattleGrid({ grid, phase, onCellClick }: BattleGridProps) {
                 ${!isPlayerZone && !isEnemyZone ? 'bg-card' : ''}
                 ${isPlayerZone && isPlacing && !unit ? 'cursor-pointer' : ''}
                 ${unit ? '' : 'bg-card'}
+                ${isFlashing ? 'flash-attack' : ''}
               `}
             >
               {unit && (
@@ -52,11 +91,9 @@ export function BattleGrid({ grid, phase, onCellClick }: BattleGridProps) {
                       style={{ width: `${hpPercent}%` }}
                     />
                   </div>
-                  {/* Color group dot */}
                   {colorGroup && (
                     <div className={`absolute top-0.5 left-0.5 w-2 h-2 rounded-full ${COLOR_DOT[colorGroup]}`} />
                   )}
-                  {/* Team dot */}
                   <div className={`absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${
                     unit.team === 'player' ? 'bg-success' : 'bg-danger'
                   }`} />

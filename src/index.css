@@ -108,3 +108,13 @@
     background-color: hsl(var(--warning) / 0.1);
   }
 }
+
+@keyframes flash-attack-anim {
+  0% { background-color: transparent; }
+  30% { background-color: hsl(var(--danger) / 0.35); }
+  100% { background-color: transparent; }
+}
+
+.flash-attack {
+  animation: flash-attack-anim 0.8s ease-out;
+}
