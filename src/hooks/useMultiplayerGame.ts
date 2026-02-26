@@ -14,7 +14,8 @@ interface MultiplayerConfig {
   role: 'player1' | 'player2';
 }
 
-// Serialize unit for DB/broadcast (strip functions, keep data)
+const PLACE_TIME_LIMIT = 10; // seconds for each player to place
+
 function serializeUnit(u: Unit) {
   return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, stuckTurns: u.stuckTurns };
 }
@@ -45,10 +46,48 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
   const [waitingForOpponent, setWaitingForOpponent] = useState(false);
+
+  // Alternating placement state
+  const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(1); // who places first this round
+  const [placingPhase, setPlacingPhase] = useState<'first' | 'second' | 'done'>('first');
+  const [placeTimer, setPlaceTimer] = useState(PLACE_TIME_LIMIT);
+  const [isMyTurnToPlace, setIsMyTurnToPlace] = useState(false);
+  const [opponentUnitsVisible, setOpponentUnitsVisible] = useState<Unit[]>([]);
+
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const placeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const terrainSeedRef = useRef<string | null>(null);
+  const placingPhaseRef = useRef(placingPhase);
+  const playerUnitsRef = useRef(playerUnits);
+  const isMyTurnRef = useRef(isMyTurnToPlace);
+
+  // Keep refs in sync
+  useEffect(() => { placingPhaseRef.current = placingPhase; }, [placingPhase]);
+  useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
+  useEffect(() => { isMyTurnRef.current = isMyTurnToPlace; }, [isMyTurnToPlace]);
+
+  // Determine if it's my turn
+  useEffect(() => {
+    if (phase !== 'place_player') {
+      setIsMyTurnToPlace(false);
+      return;
+    }
+    const myPlayerNum = isHost ? 1 : 2;
+    if (placingPhase === 'first') {
+      setIsMyTurnToPlace(myPlayerNum === placingPlayer);
+    } else if (placingPhase === 'second') {
+      setIsMyTurnToPlace(myPlayerNum !== placingPlayer);
+    } else {
+      setIsMyTurnToPlace(false);
+    }
+  }, [phase, placingPhase, placingPlayer, isHost]);
+
+  // Waiting state: it's placement phase but not my turn
+  useEffect(() => {
+    if (phase === 'place_player') {
+      setWaitingForOpponent(!isMyTurnToPlace && placingPhase !== 'done');
+    }
+  }, [phase, isMyTurnToPlace, placingPhase]);
 
   // Setup broadcast channel
   useEffect(() => {
@@ -60,13 +99,46 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       const { action, data } = payload;
 
       if (action === 'terrain') {
-        // Received terrain from host
-        const newGrid = data.grid as Cell[][];
-        setGrid(newGrid);
+        setGrid(data.grid as Cell[][]);
+        setPlacingPlayer(data.placingPlayer);
+        setPlacingPhase('first');
+        setPlaceTimer(PLACE_TIME_LIMIT);
+      }
+
+      if (action === 'first_placement_done') {
+        // First player finished placing — show their units and let second player place
+        const firstUnits = (data.units as any[]).map((u: any) => ({ ...u } as Unit));
+        setOpponentUnitsVisible(firstUnits);
+        // Add opponent units to grid
+        setGrid(prev => {
+          const next = prev.map(r => r.map(c => ({ ...c })));
+          for (const u of firstUnits) {
+            next[u.row][u.col] = { ...next[u.row][u.col], unit: u };
+          }
+          return next;
+        });
+        setPlacingPhase('second');
+        setPlaceTimer(PLACE_TIME_LIMIT);
+      }
+
+      if (action === 'first_placement_forfeit') {
+        // First player placed nothing → they lose the round
+        // The scores are already updated by the sender (host handles scoring)
+        setPlayerScore(data.myScore);
+        setEnemyScore(data.opponentScore);
+        setPhase(data.myPhase);
+        setPlacingPhase('done');
+      }
+
+      if (action === 'battle_start') {
+        setGrid(data.grid as Cell[][]);
+        setPhase('battle');
+        setBattleTimer(ROUND_TIME_LIMIT);
+        setPlacingPhase('done');
+        setOpponentUnitsVisible([]);
       }
 
       if (action === 'battle_tick') {
-        // Guest receives tick from host
         if (!isHost) {
           setGrid(data.grid as Cell[][]);
           setBattleLog(data.logs);
@@ -76,12 +148,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           setEnemyUnits(data.enemyUnits || []);
           setTurnCount(data.turnCount);
         }
-      }
-
-      if (action === 'battle_start') {
-        setGrid(data.grid as Cell[][]);
-        setPhase('battle');
-        setBattleTimer(ROUND_TIME_LIMIT);
       }
 
       if (action === 'round_end') {
@@ -97,6 +163,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setRoundNumber(data.roundNumber);
         setPlayerScore(data.playerScore);
         setEnemyScore(data.enemyScore);
+        setPlacingPlayer(data.placingPlayer);
+        setPlacingPhase('first');
+        setPlaceTimer(PLACE_TIME_LIMIT);
         setPlayerUnits([]);
         setEnemyUnits([]);
         setBattleLog([]);
@@ -104,11 +173,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setSelectedUnit('warrior');
         setBattleTimer(ROUND_TIME_LIMIT);
         setWaitingForOpponent(false);
-      }
-
-      if (action === 'opponent_ready') {
-        // Other player placed their units
-        checkBothReady();
+        setOpponentUnitsVisible([]);
       }
     });
 
@@ -118,25 +183,59 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [roomId]);
+  }, [roomId, isHost]);
 
-  // Host generates and shares terrain
+  // Host generates terrain and decides who places first
   useEffect(() => {
-    if (isHost && phase === 'place_player') {
-      // Share current grid terrain with opponent
+    if (isHost && phase === 'place_player' && placingPhase === 'first') {
+      const whoFirst = Math.random() < 0.5 ? 1 : 2;
+      setPlacingPlayer(whoFirst as 1 | 2);
+
       setTimeout(() => {
         channelRef.current?.send({
           type: 'broadcast',
           event: 'game_sync',
-          payload: { action: 'terrain', data: { grid: serializeGrid(grid) } },
+          payload: { action: 'terrain', data: { grid: serializeGrid(grid), placingPlayer: whoFirst } },
         });
       }, 500);
     }
-  }, [isHost, phase, roundNumber]);
+  }, [isHost, roundNumber]); // only on round change
+
+  // Placement timer countdown
+  useEffect(() => {
+    if (phase !== 'place_player' || placingPhase === 'done') {
+      if (placeTimerRef.current) clearInterval(placeTimerRef.current);
+      return;
+    }
+
+    setPlaceTimer(PLACE_TIME_LIMIT);
+    placeTimerRef.current = setInterval(() => {
+      setPlaceTimer(prev => {
+        if (prev <= 1) {
+          // Timer expired — auto-confirm
+          if (placeTimerRef.current) clearInterval(placeTimerRef.current);
+          // Use setTimeout to avoid state update during render
+          setTimeout(() => autoConfirmPlacement(), 0);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => {
+      if (placeTimerRef.current) clearInterval(placeTimerRef.current);
+    };
+  }, [phase, placingPhase]);
+
+  // Auto-confirm when timer runs out (or player clicks bereit)
+  const autoConfirmPlacement = useCallback(() => {
+    if (!isMyTurnRef.current) return; // only the active placer triggers this
+    confirmPlacement();
+  }, []);
 
   // Place unit on my side
   const placeUnit = useCallback((row: number, col: number) => {
-    if (phase !== 'place_player' || !selectedUnit) return;
+    if (phase !== 'place_player' || !isMyTurnToPlace || !selectedUnit) return;
     if (!myRows.includes(row)) return;
     if (playerUnits.length >= BASE_UNITS) return;
     if (grid[row][col].unit) return;
@@ -149,11 +248,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
-  }, [phase, selectedUnit, playerUnits, grid, myRows, myTeam]);
+  }, [phase, isMyTurnToPlace, selectedUnit, playerUnits, grid, myRows, myTeam]);
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
-    if (phase !== 'place_player') return;
+    if (phase !== 'place_player' || !isMyTurnToPlace) return;
     setPlayerUnits(prev => {
       const unit = prev.find(u => u.id === unitId);
       if (!unit) return prev;
@@ -164,81 +263,145 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       });
       return prev.filter(u => u.id !== unitId);
     });
-  }, [phase]);
+  }, [phase, isMyTurnToPlace]);
 
-  // Confirm placement → save to DB and wait for opponent
+  // Confirm placement
   const confirmPlacement = useCallback(async () => {
-    if (playerUnits.length === 0) return;
+    if (!isMyTurnRef.current) return;
 
-    const unitData = playerUnits.map(serializeUnit);
-    const field = isHost ? 'player1_units' : 'player2_units';
-    const readyField = isHost ? 'player1_ready' : 'player2_ready';
+    const currentPlacingPhase = placingPhaseRef.current;
+    const units = playerUnitsRef.current;
 
-    await updateRoom(roomId, {
-      [field]: unitData,
-      [readyField]: true,
-    });
+    if (currentPlacingPhase === 'first') {
+      // First player done placing
+      if (units.length === 0) {
+        // No units placed → forfeit! Opponent gets the point
+        handleForfeit();
+        return;
+      }
 
-    setWaitingForOpponent(true);
+      const unitData = units.map(serializeUnit);
+      const field = isHost ? 'player1_units' : 'player2_units';
+      await updateRoom(roomId, { [field]: unitData });
 
-    // Notify opponent
+      // Broadcast to opponent: show units, start their turn
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'game_sync',
+        payload: { action: 'first_placement_done', data: { units: unitData } },
+      });
+
+      // For the first placer, switch to waiting
+      setPlacingPhase('second');
+      setWaitingForOpponent(true);
+      setPlaceTimer(PLACE_TIME_LIMIT);
+
+    } else if (currentPlacingPhase === 'second') {
+      // Second player done placing
+      if (units.length === 0) {
+        // No units → forfeit
+        handleForfeit();
+        return;
+      }
+
+      const unitData = units.map(serializeUnit);
+      const field = isHost ? 'player1_units' : 'player2_units';
+      await updateRoom(roomId, { [field]: unitData });
+
+      // Both players have placed → start battle
+      await startBattleFromPlacements();
+    }
+  }, [roomId, isHost]);
+
+  // Handle forfeit (no units placed)
+  const handleForfeit = useCallback(async () => {
+    const myPlayerNum = isHost ? 1 : 2;
+    const currentPhase = placingPhaseRef.current;
+
+    // Who forfeited? The current placer
+    const forfeitedPlayerNum = currentPhase === 'first' ? placingPlayer : (placingPlayer === 1 ? 2 : 1);
+    const iForfeited = forfeitedPlayerNum === myPlayerNum;
+
+    let newPScore = playerScore;
+    let newEScore = enemyScore;
+    let myPhase: Phase;
+    let opponentPhase: Phase;
+
+    if (iForfeited) {
+      // I forfeited → opponent gets point
+      newEScore += 1;
+      myPhase = 'round_lost';
+      opponentPhase = 'round_won';
+    } else {
+      // Opponent forfeited → I get point
+      newPScore += 1;
+      myPhase = 'round_won';
+      opponentPhase = 'round_lost';
+    }
+
+    setPlayerScore(newPScore);
+    setEnemyScore(newEScore);
+    setPhase(myPhase);
+    setPlacingPhase('done');
+
     channelRef.current?.send({
       type: 'broadcast',
       event: 'game_sync',
-      payload: { action: 'opponent_ready', data: {} },
+      payload: {
+        action: 'first_placement_forfeit',
+        data: {
+          myScore: newEScore, // swapped for opponent
+          opponentScore: newPScore,
+          myPhase: opponentPhase,
+        },
+      },
     });
+  }, [isHost, placingPlayer, playerScore, enemyScore]);
 
-    // Check if opponent is already ready
-    checkBothReady();
-  }, [playerUnits, roomId, isHost]);
-
-  // Check if both players are ready → start battle
-  const checkBothReady = useCallback(async () => {
+  // Start battle after both placed
+  const startBattleFromPlacements = useCallback(async () => {
     const { data: room } = await supabase
       .from('game_rooms')
       .select('*')
       .eq('id', roomId)
       .single();
 
-    if (!room || !room.player1_ready || !room.player2_ready) return;
-    if (!room.player1_units || !room.player2_units) return;
+    if (!room || !room.player1_units || !room.player2_units) return;
 
-    // Build full grid with both players' units
-    setGrid(prevGrid => {
-      const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: null as Unit | null })));
-
-      // Place player1 units (always on PLAYER_ROWS / 'player' team)
-      for (const u of room.player1_units as any[]) {
-        const unit: Unit = { ...u, team: 'player' };
-        newGrid[unit.row][unit.col].unit = unit;
+    // Build full grid
+    const newGrid = grid.map(r => r.map(c => ({ ...c, unit: null as Unit | null })));
+    // Preserve terrain
+    for (let r = 0; r < GRID_SIZE; r++) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        newGrid[r][c].terrain = grid[r][c].terrain;
       }
-      // Place player2 units (always on ENEMY_ROWS / 'enemy' team)
-      for (const u of room.player2_units as any[]) {
-        const unit: Unit = { ...u, team: 'enemy' };
-        newGrid[unit.row][unit.col].unit = unit;
-      }
+    }
 
-      // Broadcast the full grid to start battle
-      if (isHost) {
-        setTimeout(() => {
-          channelRef.current?.send({
-            type: 'broadcast',
-            event: 'game_sync',
-            payload: { action: 'battle_start', data: { grid: serializeGrid(newGrid) } },
-          });
-        }, 100);
-      }
+    for (const u of room.player1_units as any[]) {
+      const unit: Unit = { ...u, team: 'player' };
+      newGrid[unit.row][unit.col].unit = unit;
+    }
+    for (const u of room.player2_units as any[]) {
+      const unit: Unit = { ...u, team: 'enemy' };
+      newGrid[unit.row][unit.col].unit = unit;
+    }
 
-      return newGrid;
-    });
-
-    setWaitingForOpponent(false);
+    setGrid(newGrid);
     setPhase('battle');
     setBattleTimer(ROUND_TIME_LIMIT);
+    setPlacingPhase('done');
+    setOpponentUnitsVisible([]);
+    setWaitingForOpponent(false);
 
-    // Reset ready flags
-    await updateRoom(roomId, { player1_ready: false, player2_ready: false, status: 'playing' });
-  }, [roomId, isHost]);
+    // Broadcast battle start
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'game_sync',
+      payload: { action: 'battle_start', data: { grid: serializeGrid(newGrid) } },
+    });
+
+    await updateRoom(roomId, { status: 'playing' });
+  }, [roomId, grid]);
 
   // Battle tick - only host runs this
   const battleTick = useCallback(() => {
@@ -336,10 +499,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       const newTurn = turnCount + 1;
       setTurnCount(newTurn);
 
-      // Broadcast tick to guest
       setBattleTimer(prev => {
         const newTimer = prev - 1;
-
         channelRef.current?.send({
           type: 'broadcast',
           event: 'game_sync',
@@ -347,7 +508,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             action: 'battle_tick',
             data: {
               grid: serializeGrid(newGrid),
-              logs: [...logs, ...[]].slice(0, 40),
+              logs: [...logs].slice(0, 40),
               events,
               timer: newTimer,
               playerUnits: pAlive.map(serializeUnit),
@@ -356,33 +517,24 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             },
           },
         });
-
         return newTimer;
       });
 
-      // Check win/loss
       if (eAlive.length === 0 || pAlive.length === 0 || battleTimer <= 1) {
         let newPhase: Phase;
         let pScore = playerScore;
         let eScore = enemyScore;
 
-        if (eAlive.length === 0) {
-          pScore += 1; newPhase = 'round_won';
-        } else if (pAlive.length === 0) {
-          eScore += 1; newPhase = 'round_lost';
-        } else if (pAlive.length > eAlive.length) {
-          pScore += 1; newPhase = 'round_won';
-        } else if (eAlive.length > pAlive.length) {
-          eScore += 1; newPhase = 'round_lost';
-        } else {
-          pScore += 1; eScore += 1; newPhase = 'round_draw';
-        }
+        if (eAlive.length === 0) { pScore += 1; newPhase = 'round_won'; }
+        else if (pAlive.length === 0) { eScore += 1; newPhase = 'round_lost'; }
+        else if (pAlive.length > eAlive.length) { pScore += 1; newPhase = 'round_won'; }
+        else if (eAlive.length > pAlive.length) { eScore += 1; newPhase = 'round_lost'; }
+        else { pScore += 1; eScore += 1; newPhase = 'round_draw'; }
 
         setPlayerScore(pScore);
         setEnemyScore(eScore);
         setPhase(newPhase);
 
-        // For player2, swap won/lost perspective
         const guestPhase = newPhase === 'round_won' ? 'round_lost' : newPhase === 'round_lost' ? 'round_won' : newPhase;
 
         channelRef.current?.send({
@@ -390,12 +542,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           event: 'game_sync',
           payload: {
             action: 'round_end',
-            data: {
-              phase: guestPhase,
-              playerScore: eScore, // swapped for guest
-              enemyScore: pScore,
-              grid: serializeGrid(newGrid),
-            },
+            data: { phase: guestPhase, playerScore: eScore, enemyScore: pScore, grid: serializeGrid(newGrid) },
           },
         });
       }
@@ -421,6 +568,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const nextRound = useCallback(async () => {
     const newRound = roundNumber + 1;
     const newGrid = generateTerrain(createEmptyGrid());
+    const whoFirst = Math.random() < 0.5 ? 1 : 2;
 
     setRoundNumber(newRound);
     setPlayerUnits([]);
@@ -432,6 +580,10 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setPhase('place_player');
     setBattleTimer(ROUND_TIME_LIMIT);
     setWaitingForOpponent(false);
+    setPlacingPlayer(whoFirst as 1 | 2);
+    setPlacingPhase('first');
+    setPlaceTimer(PLACE_TIME_LIMIT);
+    setOpponentUnitsVisible([]);
 
     await updateRoom(roomId, {
       player1_units: null, player2_units: null,
@@ -440,7 +592,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     });
 
     if (isHost) {
-      // Share new terrain with guest (swap scores for their perspective)
       setTimeout(() => {
         channelRef.current?.send({
           type: 'broadcast',
@@ -450,8 +601,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             data: {
               grid: serializeGrid(newGrid),
               roundNumber: newRound,
-              playerScore: enemyScore, // swapped
+              playerScore: enemyScore,
               enemyScore: playerScore,
+              placingPlayer: whoFirst === 1 ? 2 : 1, // swap perspective for guest
             },
           },
         });
@@ -459,13 +611,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     }
   }, [roundNumber, roomId, isHost, playerScore, enemyScore]);
 
-  const resetGame = useCallback(() => {
-    // In multiplayer, reset goes back to lobby
-  }, []);
-
-  const startBattle = useCallback(() => {
-    // Not used in multiplayer - battle starts when both ready
-  }, []);
+  const resetGame = useCallback(() => {}, []);
+  const startBattle = useCallback(() => {}, []);
 
   return {
     grid, phase, selectedUnit, setSelectedUnit,
@@ -480,5 +627,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     waitingForOpponent,
     isHost,
     myRows,
+    // New placement state
+    placeTimer,
+    isMyTurnToPlace,
+    placingPhase,
   };
 }
