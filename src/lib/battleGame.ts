@@ -1,4 +1,4 @@
-export type UnitType = 'warrior' | 'lancer' | 'archer' | 'assassin' | 'mage' | 'tank';
+export type UnitType = 'warrior' | 'lancer' | 'archer' | 'assassin' | 'mage' | 'tank' | 'dragon' | 'healer' | 'frost';
 export type Team = 'player' | 'enemy';
 export type Phase = 'place_player' | 'place_enemy' | 'battle' | 'round_won' | 'round_lost';
 
@@ -16,6 +16,7 @@ export interface Unit {
   cooldown: number;
   maxCooldown: number;
   dead?: boolean;
+  frozen?: number; // turns remaining frozen (can't act)
 }
 
 export interface Cell {
@@ -56,10 +57,13 @@ export type ColorGroup = 'red' | 'blue' | 'green';
 export const UNIT_COLOR_GROUPS: Record<UnitType, ColorGroup> = {
   warrior: 'red',
   assassin: 'red',
+  dragon: 'red',
   lancer: 'blue',
   archer: 'blue',
+  frost: 'blue',
   tank: 'green',
   mage: 'green',
+  healer: 'green',
 };
 
 // Red > Green > Blue > Red (rock-paper-scissors)
@@ -159,9 +163,54 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: ['lancer', 'archer'],
     weakVs: ['warrior', 'assassin'],
   },
+  dragon: {
+    label: 'Drache',
+    emoji: '🐉',
+    hp: 90,
+    attack: 30,
+    cooldown: 3,
+    description: 'Fliegt über Hindernisse. Flächenangriff im 3x3-Bereich. Ignoriert Blockaden.',
+    movePattern: [
+      ...ALL_ADJACENT,
+      { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
+    ],
+    attackPattern: [
+      ...ALL_ADJACENT,
+      { row: 0, col: 0 }, // hits own cell too (AoE center)
+    ],
+    strongVs: ['tank', 'mage', 'healer'],
+    weakVs: ['lancer', 'archer', 'frost'],
+  },
+  healer: {
+    label: 'Heiler',
+    emoji: '🧙',
+    hp: 50,
+    attack: 0,
+    cooldown: 2,
+    description: 'Heilt Verbündete im Umkreis statt anzugreifen. Kein eigener Schaden.',
+    movePattern: ALL_ADJACENT,
+    attackPattern: ALL_ADJACENT, // heal range
+    strongVs: ['lancer', 'archer', 'frost'],
+    weakVs: ['warrior', 'assassin', 'dragon'],
+  },
+  frost: {
+    label: 'Frost',
+    emoji: '❄️',
+    hp: 75,
+    attack: 18,
+    cooldown: 2,
+    description: 'Friert Gegner für 1 Runde ein (können nicht agieren). Greift orthogonal bis 2 Felder an.',
+    movePattern: ALL_ADJACENT,
+    attackPattern: [
+      ...ORTHOGONAL,
+      { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
+    ],
+    strongVs: ['warrior', 'assassin', 'dragon'],
+    weakVs: ['tank', 'mage', 'healer'],
+  },
 };
 
-export const UNIT_TYPES: UnitType[] = ['warrior', 'lancer', 'archer', 'assassin', 'mage', 'tank'];
+export const UNIT_TYPES: UnitType[] = ['warrior', 'lancer', 'archer', 'assassin', 'mage', 'tank', 'dragon', 'healer', 'frost'];
 export const BASE_UNITS = 5;
 export const MAX_UNITS = 7; // absolute cap
 
@@ -221,12 +270,13 @@ export function getAttackCells(unit: Unit): Position[] {
 // Get all cells a unit can move to
 export function getMoveCells(unit: Unit, grid: Cell[][]): Position[] {
   const def = UNIT_DEFS[unit.type];
+  const canFly = unit.type === 'dragon';
   return def.movePattern
     .map(p => ({ row: unit.row + p.row, col: unit.col + p.col }))
     .filter(p =>
       p.row >= 0 && p.row < GRID_SIZE && p.col >= 0 && p.col < GRID_SIZE &&
       (!grid[p.row][p.col].unit || grid[p.row][p.col].unit!.id === unit.id) &&
-      !grid[p.row][p.col].unit?.dead
+      (canFly || !grid[p.row][p.col].unit?.dead)
     );
 }
 
