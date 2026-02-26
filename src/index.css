@@ -114,7 +114,26 @@
   30% { background-color: hsl(var(--danger) / 0.35); }
   100% { background-color: transparent; }
 }
-
 .flash-attack {
   animation: flash-attack-anim 0.8s ease-out;
+}
+
+@keyframes shake-hit-anim {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+.shake-hit {
+  animation: shake-hit-anim 0.35s ease-out;
+}
+
+@keyframes dmg-popup-anim {
+  0% { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+  70% { opacity: 1; transform: translate(-50%, -50%) translateY(-14px); }
+  100% { opacity: 0; transform: translate(-50%, -50%) translateY(-20px); }
+}
+.dmg-popup {
+  animation: dmg-popup-anim 0.65s ease-out forwards;
 }

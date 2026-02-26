@@ -5,6 +5,7 @@ import {
   generateAIPlacement, getMaxUnits,
   GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS,
 } from '@/lib/battleGame';
+import { BattleEvent } from '@/lib/battleEvents';
 
 export function useBattleGame() {
   const [grid, setGrid] = useState<Cell[][]>(() => createEmptyGrid());
@@ -19,6 +20,7 @@ export function useBattleGame() {
   const [roundNumber, setRoundNumber] = useState(1);
   const [playerStarts, setPlayerStarts] = useState(true);
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
 
   // Full reset
   const resetGame = useCallback(() => {
@@ -104,6 +106,7 @@ export function useBattleGame() {
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0) allUnits.push(cell.unit);
 
       const logs: string[] = [];
+      const events: BattleEvent[] = [];
       const acting = allUnits.filter(u => u.hp > 0).sort((a, b) => a.maxCooldown - b.maxCooldown);
 
       for (const unit of acting) {
@@ -134,6 +137,14 @@ export function useBattleGame() {
           const isWeak = def.weakVs.includes(target.type);
           const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
           logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.hp <= 0 ? ' ☠️' : ''}`);
+          events.push({
+            type: target.hp <= 0 ? 'kill' : 'hit',
+            targetId: target.id,
+            targetRow: target.row,
+            targetCol: target.col,
+            damage: dmg,
+            isStrong, isWeak,
+          });
 
           if (target.hp <= 0) {
             newGrid[target.row][target.col].unit = null;
@@ -143,6 +154,9 @@ export function useBattleGame() {
 
       if (logs.length > 0) {
         setBattleLog(prev => [...logs, ...prev].slice(0, 40));
+      }
+      if (events.length > 0) {
+        setBattleEvents(events);
       }
 
       const alive = allUnits.filter(u => u.hp > 0);
@@ -204,7 +218,7 @@ export function useBattleGame() {
 
   return {
     grid, phase, selectedUnit, setSelectedUnit,
-    playerUnits, enemyUnits, turnCount, battleLog,
+    playerUnits, enemyUnits, turnCount, battleLog, battleEvents,
     playerScore, enemyScore, roundNumber, playerStarts,
     playerMaxUnits, enemyMaxUnits,
     gameOver, gameWon,
