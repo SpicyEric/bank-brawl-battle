@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType } from '@/lib/battleGame';
+import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType, Position } from '@/lib/battleGame';
 
 const COLOR_DOT: Record<ColorGroup, string> = {
   red: 'bg-unit-red',
@@ -11,46 +11,29 @@ interface BattleGridProps {
   grid: Cell[][];
   phase: Phase;
   onCellClick: (row: number, col: number) => void;
-  selectedUnit?: UnitType | null;
+  lastPlaced?: { row: number; col: number; type: UnitType } | null;
 }
 
-export function BattleGrid({ grid, phase, onCellClick, selectedUnit }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Track placed units count to detect new placements
-  const prevCountRef = useRef(0);
   useEffect(() => {
-    if (!isPlacing) return;
-
-    const playerUnitsOnGrid: { row: number; col: number; type: UnitType }[] = [];
-    for (const row of grid) {
-      for (const cell of row) {
-        if (cell.unit && cell.unit.team === 'player') {
-          playerUnitsOnGrid.push({ row: cell.unit.row, col: cell.unit.col, type: cell.unit.type });
-        }
+    if (!lastPlaced) return;
+    const def = UNIT_DEFS[lastPlaced.type];
+    const cells = new Set<string>();
+    for (const p of def.attackPattern) {
+      const r = lastPlaced.row + p.row;
+      const c = lastPlaced.col + p.col;
+      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+        cells.add(`${r}-${c}`);
       }
     }
-
-    if (playerUnitsOnGrid.length > prevCountRef.current && playerUnitsOnGrid.length > 0) {
-      // New unit placed - flash its attack cells
-      const newest = playerUnitsOnGrid[playerUnitsOnGrid.length - 1];
-      const def = UNIT_DEFS[newest.type];
-      const cells = new Set<string>();
-      for (const p of def.attackPattern) {
-        const r = newest.row + p.row;
-        const c = newest.col + p.col;
-        if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
-          cells.add(`${r}-${c}`);
-        }
-      }
-      setFlashCells(cells);
-      if (flashTimer.current) clearTimeout(flashTimer.current);
-      flashTimer.current = setTimeout(() => setFlashCells(new Set()), 800);
-    }
-    prevCountRef.current = playerUnitsOnGrid.length;
-  }, [grid, isPlacing]);
+    setFlashCells(cells);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlashCells(new Set()), 800);
+  }, [lastPlaced]);
 
   return (
     <div className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto">
