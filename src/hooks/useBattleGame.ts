@@ -131,7 +131,7 @@ export function useBattleGame() {
                 const healAmt = Math.min(15, ally.maxHp - ally.hp);
                 ally.hp += healAmt;
                 if (!healed) {
-                  logs.push(`🧙 ${unit.team === 'player' ? '👤' : '💀'} Heiler → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
+                  logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
                   healed = true;
                   unit.cooldown = unit.maxCooldown;
                 }
