@@ -128,6 +128,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isShaking = shakeCells.has(`${cell.row}-${cell.col}`);
           const isDead = unit?.dead;
           const isFrozen = unit ? (unit.frozen ?? 0) > 0 : false;
+          const isInactive = unit && !isDead && unit.activationTurn !== undefined && unit.activationTurn > 0 && phase === 'place_player';
           const cellKey = `${cell.row}-${cell.col}`;
           const terrain = cell.terrain || 'none';
           const hasTerrain = terrain !== 'none' && TERRAIN_DEFS[terrain];
@@ -143,7 +144,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               key={cellKey}
               onClick={() => onCellClick(cell.row, cell.col)}
               className={`aspect-square flex flex-col items-center justify-center relative overflow-visible
-                ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'bg-primary/5 hover:bg-primary/15 cursor-pointer' : ''}
+                ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'bg-primary/5 hover:bg-primary/15 cursor-pointer' : isPlayerZone && isPlacing && terrain === 'water' ? 'cursor-not-allowed' : ''}
                 ${isEnemyZone && !unit ? 'bg-danger/5' : ''}
                 ${!unit && !hasTerrain ? 'bg-card' : ''}
                 ${!unit && terrain === 'forest' ? 'bg-[hsl(145,30%,15%)]' : ''}

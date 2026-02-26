@@ -18,6 +18,8 @@ export interface Unit {
   dead?: boolean;
   frozen?: number; // turns remaining frozen (can't act)
   stuckTurns?: number; // turns without attacking – used for anti-stalemate
+  activationTurn?: number; // turn number when this unit becomes active (staggered rows)
+  startRow?: number; // the row the unit was originally placed on
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -252,11 +254,11 @@ export function createEmptyGrid(): Cell[][] {
 export function generateTerrain(grid: Cell[][]): Cell[][] {
   const newGrid = grid.map(r => r.map(c => ({ ...c, terrain: 'none' as TerrainType })));
   const terrainTypes: TerrainType[] = ['forest', 'hill', 'water'];
-  // Place 4-7 terrain tiles in the middle area (rows 2-5) to affect both sides
-  const count = 4 + Math.floor(Math.random() * 4);
+  // Place 4-7 terrain tiles in the middle area (rows 2-5)
+  const middleCount = 4 + Math.floor(Math.random() * 4);
   const used = new Set<string>();
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < middleCount; i++) {
     let row: number, col: number;
     let attempts = 0;
     do {
@@ -267,11 +269,45 @@ export function generateTerrain(grid: Cell[][]): Cell[][] {
 
     if (attempts >= 20) continue;
     used.add(`${row},${col}`);
-    // Water less common (30% chance for water, rest split between forest and hill)
     const terrain = Math.random() < 0.3 ? 'water' : terrainTypes[Math.floor(Math.random() * 2)];
     newGrid[row][col].terrain = terrain;
   }
+
+  // Occasionally place 1-3 terrain tiles on player-side rows (5-7 and 0-2)
+  const sideCount = Math.floor(Math.random() * 4); // 0-3 tiles
+  const sideRows = [0, 1, 5, 6, 7]; // row 2 already covered by middle
+  for (let i = 0; i < sideCount; i++) {
+    let row: number, col: number;
+    let attempts = 0;
+    do {
+      row = sideRows[Math.floor(Math.random() * sideRows.length)];
+      col = Math.floor(Math.random() * GRID_SIZE);
+      attempts++;
+    } while (used.has(`${row},${col}`) && attempts < 20);
+
+    if (attempts >= 20) continue;
+    used.add(`${row},${col}`);
+    // No water on player rows to avoid blocking too much, only forest/hill
+    const terrain = Math.random() < 0.5 ? 'forest' : 'hill';
+    newGrid[row][col].terrain = terrain;
+  }
+
   return newGrid;
+}
+
+// Calculate activation turn based on row distance from center
+// Player rows: 5 (front, turn 0), 6 (mid, turn 3), 7 (back, turn 5)
+// Enemy rows: 2 (front, turn 0), 1 (mid, turn 3), 0 (back, turn 5)
+export function getActivationTurn(row: number, team: Team): number {
+  if (team === 'player') {
+    if (row === 5) return 0; // front row – active immediately
+    if (row === 6) return 3; // middle row – activates turn 3
+    return 5; // row 7 – activates turn 5
+  } else {
+    if (row === 2) return 0;
+    if (row === 1) return 3;
+    return 5; // row 0
+  }
 }
 
 export function createUnit(type: UnitType, team: Team, row: number, col: number): Unit {
@@ -282,6 +318,8 @@ export function createUnit(type: UnitType, team: Team, row: number, col: number)
     hp: def.hp, maxHp: def.hp,
     attack: def.attack,
     cooldown: 0, maxCooldown: def.cooldown,
+    activationTurn: getActivationTurn(row, team),
+    startRow: row,
   };
 }
 
@@ -319,7 +357,7 @@ export function getMoveCells(unit: Unit, grid: Cell[][]): Position[] {
     );
 }
 
-// Find best target: frontline mechanic + tank taunt
+// Find best target: column priority + frontline mechanic + tank taunt
 export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
@@ -331,23 +369,37 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     return nearbyTanks[0];
   }
 
-  // Frontline mechanic: prefer targeting enemies in the front rows (closest to attacker's side)
-  // For player units (rows 5-7), enemy front = highest row number
-  // For enemy units (rows 0-2), player front = lowest row number
+  // Column-based targeting: enemies in the same column get priority (~70% of the time)
+  const sameColEnemies = enemies.filter(e => e.col === unit.col);
+  const nearColEnemies = enemies.filter(e => Math.abs(e.col - unit.col) === 1);
+  const columnEnemies = [...sameColEnemies, ...nearColEnemies];
+
+  // 70% chance to pick from same/adjacent column if available
+  if (columnEnemies.length > 0 && Math.random() < 0.7) {
+    // Among column enemies, prefer same column over adjacent
+    columnEnemies.sort((a, b) => {
+      const aColDist = Math.abs(a.col - unit.col);
+      const bColDist = Math.abs(b.col - unit.col);
+      if (aColDist !== bColDist) return aColDist - bColDist;
+      return distance(unit, a) - distance(unit, b);
+    });
+    return columnEnemies[0];
+  }
+
+  // Frontline mechanic for melee
   const isMelee = UNIT_DEFS[unit.type].attackPattern.every(p => Math.abs(p.row) <= 1 && Math.abs(p.col) <= 1);
 
   if (isMelee) {
-    // Sort enemies by frontline priority: closest row to the attacker's side first
     const frontlineSorted = [...enemies].sort((a, b) => {
-      const aFront = unit.team === 'player' ? a.row : -a.row; // higher row = more front for player
+      const aFront = unit.team === 'player' ? a.row : -a.row;
       const bFront = unit.team === 'player' ? b.row : -b.row;
-      if (aFront !== bFront) return bFront - aFront; // front first
-      return distance(unit, a) - distance(unit, b); // then closest
+      if (aFront !== bFront) return bFront - aFront;
+      return distance(unit, a) - distance(unit, b);
     });
     return frontlineSorted[0];
   }
 
-  // Ranged units: target closest enemy (unchanged)
+  // Ranged units: target closest enemy
   enemies.sort((a, b) => distance(unit, a) - distance(unit, b));
   return enemies[0];
 }
@@ -516,7 +568,7 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
 }
 
 // Light AI: tries to counter the player's composition
-export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE_UNITS): { type: UnitType; row: number; col: number }[] {
+export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE_UNITS, currentGrid?: Cell[][]): { type: UnitType; row: number; col: number }[] {
   const placements: { type: UnitType; row: number; col: number }[] = [];
   const usedCells = new Set<string>();
   const count = maxCount;
@@ -550,10 +602,13 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
     }
 
     let row: number, col: number;
+    let attempts = 0;
     do {
       row = Math.floor(Math.random() * 3); // rows 0-2
       col = Math.floor(Math.random() * GRID_SIZE);
-    } while (usedCells.has(`${row},${col}`));
+      attempts++;
+    } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row] && currentGrid[row][col] && currentGrid[row][col].terrain === 'water')) && attempts < 30);
+    if (attempts >= 30) continue;
     usedCells.add(`${row},${col}`);
     placements.push({ type, row, col });
   }
