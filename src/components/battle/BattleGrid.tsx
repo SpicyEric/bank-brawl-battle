@@ -1,4 +1,10 @@
-import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, Phase } from '@/lib/battleGame';
+import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup } from '@/lib/battleGame';
+
+const COLOR_DOT: Record<ColorGroup, string> = {
+  red: 'bg-unit-red',
+  blue: 'bg-unit-blue',
+  green: 'bg-unit-green',
+};
 
 interface BattleGridProps {
   grid: Cell[][];
@@ -17,6 +23,7 @@ export function BattleGrid({ grid, phase, onCellClick }: BattleGridProps) {
           const isEnemyZone = cell.row < 3;
           const unit = cell.unit;
           const def = unit ? UNIT_DEFS[unit.type] : null;
+          const colorGroup = unit ? UNIT_COLOR_GROUPS[unit.type] : null;
           const hpPercent = unit ? (unit.hp / unit.maxHp) * 100 : 0;
           const isLow = unit ? unit.hp / unit.maxHp < 0.3 : false;
 
@@ -45,6 +52,11 @@ export function BattleGrid({ grid, phase, onCellClick }: BattleGridProps) {
                       style={{ width: `${hpPercent}%` }}
                     />
                   </div>
+                  {/* Color group dot */}
+                  {colorGroup && (
+                    <div className={`absolute top-0.5 left-0.5 w-2 h-2 rounded-full ${COLOR_DOT[colorGroup]}`} />
+                  )}
+                  {/* Team dot */}
                   <div className={`absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${
                     unit.team === 'player' ? 'bg-success' : 'bg-danger'
                   }`} />

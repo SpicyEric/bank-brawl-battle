@@ -43,6 +43,10 @@
     --danger: 0 72% 55%;
     --danger-foreground: 210 40% 98%;
 
+    --unit-red: 0 75% 58%;
+    --unit-blue: 210 80% 55%;
+    --unit-green: 145 65% 45%;
+
     --sidebar-background: 228 12% 8%;
     --sidebar-foreground: 210 20% 95%;
     --sidebar-primary: 152 60% 48%;

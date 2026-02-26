@@ -1,4 +1,10 @@
-import { UnitType, UNIT_DEFS, UNIT_TYPES, getPatternDisplay } from '@/lib/battleGame';
+import { UnitType, UNIT_DEFS, UNIT_COLOR_GROUPS, COLOR_BEATS, ColorGroup, getPatternDisplay } from '@/lib/battleGame';
+
+const COLOR_LABEL: Record<ColorGroup, string> = {
+  red: '🔴 Rot',
+  blue: '🔵 Blau',
+  green: '🟢 Grün',
+};
 
 interface UnitInfoModalProps {
   unitType: UnitType;
@@ -7,6 +13,9 @@ interface UnitInfoModalProps {
 
 export function UnitInfoModal({ unitType, onClose }: UnitInfoModalProps) {
   const def = UNIT_DEFS[unitType];
+  const colorGroup = UNIT_COLOR_GROUPS[unitType];
+  const beats = COLOR_BEATS[colorGroup];
+  const losesTo = (Object.entries(COLOR_BEATS) as [ColorGroup, ColorGroup][]).find(([, v]) => v === colorGroup)?.[0] as ColorGroup;
   const moveGrid = getPatternDisplay(def.movePattern, 7);
   const attackGrid = getPatternDisplay(def.attackPattern, 7);
   const center = 3;
@@ -18,7 +27,13 @@ export function UnitInfoModal({ unitType, onClose }: UnitInfoModalProps) {
         <div className="flex items-center gap-3">
           <span className="text-3xl">{def.emoji}</span>
           <div>
-            <h2 className="font-bold text-foreground text-lg">{def.label}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-bold text-foreground text-lg">{def.label}</h2>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                backgroundColor: `hsl(var(--unit-${colorGroup}) / 0.2)`,
+                color: `hsl(var(--unit-${colorGroup}))`,
+              }}>{COLOR_LABEL[colorGroup]}</span>
+            </div>
             <p className="text-xs text-muted-foreground">{def.description}</p>
           </div>
         </div>
@@ -45,24 +60,16 @@ export function UnitInfoModal({ unitType, onClose }: UnitInfoModalProps) {
           <PatternGrid title="Angriff" grid={attackGrid} center={center} color="bg-danger" />
         </div>
 
-        {/* Counter info */}
+        {/* Color counter info */}
         <div className="space-y-1.5">
-          {def.strongVs.length > 0 && (
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-success font-semibold">💪 Stark gegen:</span>
-              <span className="text-foreground">
-                {def.strongVs.map(t => `${UNIT_DEFS[t].emoji} ${UNIT_DEFS[t].label}`).join(', ')}
-              </span>
-            </div>
-          )}
-          {def.weakVs.length > 0 && (
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-danger font-semibold">😰 Schwach gegen:</span>
-              <span className="text-foreground">
-                {def.weakVs.map(t => `${UNIT_DEFS[t].emoji} ${UNIT_DEFS[t].label}`).join(', ')}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-semibold" style={{ color: `hsl(var(--unit-${colorGroup}))` }}>💪 Stark gegen:</span>
+            <span className="text-foreground">{COLOR_LABEL[beats]}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-semibold" style={{ color: `hsl(var(--unit-${losesTo}))` }}>😰 Schwach gegen:</span>
+            <span className="text-foreground">{COLOR_LABEL[losesTo]}</span>
+          </div>
         </div>
 
         <button
