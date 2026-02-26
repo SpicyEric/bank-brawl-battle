@@ -7,6 +7,8 @@ interface BattleGridProps {
 }
 
 export function BattleGrid({ grid, phase, onCellClick }: BattleGridProps) {
+  const isPlacing = phase === 'place_player';
+
   return (
     <div className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto">
       <div className="grid grid-cols-8 gap-[2px] w-full h-full bg-border rounded-xl overflow-hidden border border-border">
@@ -23,21 +25,18 @@ export function BattleGrid({ grid, phase, onCellClick }: BattleGridProps) {
               key={`${cell.row}-${cell.col}`}
               onClick={() => onCellClick(cell.row, cell.col)}
               className={`aspect-square flex flex-col items-center justify-center relative transition-all duration-200
-                ${isPlayerZone && phase === 'place' ? 'bg-primary/5 hover:bg-primary/15' : ''}
+                ${isPlayerZone && isPlacing ? 'bg-primary/5 hover:bg-primary/15' : ''}
                 ${isEnemyZone ? 'bg-danger/5' : ''}
                 ${!isPlayerZone && !isEnemyZone ? 'bg-card' : ''}
-                ${isPlayerZone && phase === 'place' && !unit ? 'cursor-pointer' : ''}
+                ${isPlayerZone && isPlacing && !unit ? 'cursor-pointer' : ''}
                 ${unit ? '' : 'bg-card'}
               `}
             >
               {unit && (
                 <>
-                  <span className={`text-base sm:text-lg leading-none ${
-                    unit.team === 'enemy' ? 'grayscale-0' : ''
-                  } ${unit.hp <= 0 ? 'opacity-30' : ''}`}>
+                  <span className={`text-base sm:text-lg leading-none ${unit.hp <= 0 ? 'opacity-30' : ''}`}>
                     {def?.emoji}
                   </span>
-                  {/* HP bar */}
                   <div className="absolute bottom-0.5 left-0.5 right-0.5 h-[3px] rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
@@ -46,7 +45,6 @@ export function BattleGrid({ grid, phase, onCellClick }: BattleGridProps) {
                       style={{ width: `${hpPercent}%` }}
                     />
                   </div>
-                  {/* Team indicator */}
                   <div className={`absolute top-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${
                     unit.team === 'player' ? 'bg-success' : 'bg-danger'
                   }`} />
