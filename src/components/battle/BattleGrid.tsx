@@ -92,7 +92,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           id: `proj-${projCounter.current}`,
           fromRow: evt.attackerRow, fromCol: evt.attackerCol,
           toRow: evt.targetRow, toCol: evt.targetCol,
-          emoji: evt.attackerEmoji === '🏹' ? '➴' : evt.attackerEmoji === '🔮' ? '✦' : evt.attackerEmoji === '🔱' ? '⟟' : evt.attackerEmoji === '❄️' ? '❄' : evt.attackerEmoji === '🐉' ? '🔥' : '⚡',
+          emoji: evt.attackerEmoji === '🏹' ? '➴' : evt.attackerEmoji === '🔮' ? '✦' : evt.attackerEmoji === '🥶' ? '❄' : evt.attackerEmoji === '🐉' ? '🔥' : evt.attackerEmoji === '🏇' ? '⚡' : '⚡',
         });
       }
     }
