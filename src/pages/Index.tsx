@@ -4,7 +4,7 @@ import { BattleGrid } from '@/components/battle/BattleGrid';
 import { UnitPicker } from '@/components/battle/UnitPicker';
 import { BattleLog } from '@/components/battle/BattleLog';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
-import { POINTS_TO_WIN, UnitType } from '@/lib/battleGame';
+import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -79,6 +79,8 @@ const Index = () => {
       text = '🏆 Gewonnen!';
     } else if (game.phase === 'round_lost') {
       text = '💀 Verloren!';
+    } else if (game.phase === 'round_draw') {
+      text = '⚖️ Gleichstand!';
     }
 
     if (text) {
@@ -223,7 +225,10 @@ const Index = () => {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Kampflog</p>
-              <div className="flex items-center gap-2 text-[11px]">
+              <div className="flex items-center gap-3 text-[11px]">
+                <span className={`font-mono font-bold ${game.battleTimer <= 10 ? 'text-danger animate-pulse' : 'text-muted-foreground'}`}>
+                  ⏱ {game.battleTimer}s
+                </span>
                 <span className="text-success">👤 {game.playerUnits.length}</span>
                 <span className="text-muted-foreground">vs</span>
                 <span className="text-danger">💀 {game.enemyUnits.length}</span>
@@ -233,7 +238,7 @@ const Index = () => {
           </div>
         )}
 
-        {(game.phase === 'round_won' || game.phase === 'round_lost') && (
+        {(game.phase === 'round_won' || game.phase === 'round_lost' || game.phase === 'round_draw') && (
           <div className="text-center space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
               Stand: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>

@@ -3,7 +3,7 @@ import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateAIPlacement, getMaxUnits, generateTerrain,
-  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS,
+  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 
@@ -21,6 +21,8 @@ export function useBattleGame() {
   const [playerStarts, setPlayerStarts] = useState(true);
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
+  const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Full reset
   const resetGame = useCallback(() => {
@@ -98,6 +100,7 @@ export function useBattleGame() {
     setPhase('battle');
     setBattleLog([]);
     setTurnCount(0);
+    setBattleTimer(ROUND_TIME_LIMIT);
   }, []);
 
   // Run one battle tick
@@ -237,11 +240,51 @@ export function useBattleGame() {
   useEffect(() => {
     if (phase !== 'battle') {
       if (battleRef.current) clearInterval(battleRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
     battleRef.current = setInterval(battleTick, 800);
-    return () => { if (battleRef.current) clearInterval(battleRef.current); };
+    timerRef.current = setInterval(() => {
+      setBattleTimer(prev => {
+        if (prev <= 1) {
+          // Time's up - resolve by unit count
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (battleRef.current) clearInterval(battleRef.current);
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, [phase, battleTick]);
+
+  // Handle timer expiry
+  useEffect(() => {
+    if (phase !== 'battle' || battleTimer > 0) return;
+    // Stop the battle
+    if (battleRef.current) clearInterval(battleRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    const pAlive = playerUnits.filter(u => u.hp > 0 && !u.dead);
+    const eAlive = enemyUnits.filter(u => u.hp > 0 && !u.dead);
+
+    if (pAlive.length > eAlive.length) {
+      setPlayerScore(prev => prev + 1);
+      setPhase('round_won');
+      setBattleLog(prev => ['⏰ Zeit abgelaufen! Du hast mehr Einheiten übrig!', ...prev]);
+    } else if (eAlive.length > pAlive.length) {
+      setEnemyScore(prev => prev + 1);
+      setPhase('round_lost');
+      setBattleLog(prev => ['⏰ Zeit abgelaufen! Der Gegner hat mehr Einheiten!', ...prev]);
+    } else {
+      // Draw: both get a point
+      setPlayerScore(prev => prev + 1);
+      setEnemyScore(prev => prev + 1);
+      setPhase('round_draw');
+      setBattleLog(prev => ['⏰ Zeit abgelaufen! Gleichstand – beide erhalten einen Punkt!', ...prev]);
+    }
+  }, [battleTimer, phase, playerUnits, enemyUnits]);
 
   const gameOver = playerScore >= POINTS_TO_WIN || enemyScore >= POINTS_TO_WIN;
   const gameWon = playerScore >= POINTS_TO_WIN;
@@ -273,7 +316,7 @@ export function useBattleGame() {
 
   return {
     grid, phase, selectedUnit, setSelectedUnit,
-    playerUnits, enemyUnits, turnCount, battleLog, battleEvents,
+    playerUnits, enemyUnits, turnCount, battleLog, battleEvents, battleTimer,
     playerScore, enemyScore, roundNumber, playerStarts,
     playerMaxUnits, enemyMaxUnits,
     gameOver, gameWon,
