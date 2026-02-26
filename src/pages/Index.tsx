@@ -34,6 +34,8 @@ function ScoreDots({ score, max, color }: { score: number; max: number; color: '
 const Index = () => {
   const game = useBattleGame();
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const trackIndexRef = useRef(0);
+  const tracks = ['/music/background.mp3', '/music/stoischer-ringkampf.mp3'];
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
   const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
   const [muted, setMuted] = useState(false);
@@ -42,18 +44,27 @@ const Index = () => {
   const prevPhase = useRef(game.phase);
 
   useEffect(() => {
-    const audio = new Audio('/music/background.mp3');
-    audio.loop = true;
-    audio.volume = 0.15;
-    audioRef.current = audio;
-    const playOnInteraction = () => {
+    const playTrack = (index: number) => {
+      const audio = new Audio(tracks[index]);
+      audio.volume = 0.15;
+      audio.loop = false;
+      if (muted) audio.muted = true;
+      audioRef.current = audio;
+      audio.addEventListener('ended', () => {
+        trackIndexRef.current = (trackIndexRef.current + 1) % tracks.length;
+        playTrack(trackIndexRef.current);
+      });
       audio.play().catch(() => {});
-      document.removeEventListener('click', playOnInteraction);
     };
-    document.addEventListener('click', playOnInteraction);
+
+    const startOnInteraction = () => {
+      playTrack(trackIndexRef.current);
+      document.removeEventListener('click', startOnInteraction);
+    };
+    document.addEventListener('click', startOnInteraction);
     return () => {
-      audio.pause();
-      document.removeEventListener('click', playOnInteraction);
+      if (audioRef.current) audioRef.current.pause();
+      document.removeEventListener('click', startOnInteraction);
     };
   }, []);
 
