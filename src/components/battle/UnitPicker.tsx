@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { UnitType, UNIT_DEFS, UNIT_TYPES, MAX_UNITS, UNIT_COLOR_GROUPS, ColorGroup } from '@/lib/battleGame';
+import { UnitType, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, ColorGroup } from '@/lib/battleGame';
 import { UnitInfoModal } from './UnitInfoModal';
 
 const COLOR_BORDER: Record<ColorGroup, string> = {
@@ -17,9 +17,10 @@ interface UnitPickerProps {
   selected: UnitType | null;
   onSelect: (type: UnitType) => void;
   placedCount: number;
+  maxUnits: number;
 }
 
-export function UnitPicker({ selected, onSelect, placedCount }: UnitPickerProps) {
+export function UnitPicker({ selected, onSelect, placedCount, maxUnits }: UnitPickerProps) {
   const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
 
   return (
@@ -27,7 +28,7 @@ export function UnitPicker({ selected, onSelect, placedCount }: UnitPickerProps)
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Einheit wählen</p>
-          <p className="text-xs text-muted-foreground">{placedCount}/{MAX_UNITS} platziert</p>
+          <p className="text-xs text-muted-foreground">{placedCount}/{maxUnits} platziert</p>
         </div>
         <div className="grid grid-cols-3 gap-2">
           {UNIT_TYPES.map(type => {

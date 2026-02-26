@@ -161,7 +161,17 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
 };
 
 export const UNIT_TYPES: UnitType[] = ['warrior', 'lancer', 'archer', 'assassin', 'mage', 'tank'];
-export const MAX_UNITS = 5;
+export const BASE_UNITS = 5;
+export const MAX_UNITS = 7; // absolute cap
+
+// Comeback mechanic: behind by 2+ → +1, behind by 4+ → +2
+export function getMaxUnits(myScore: number, opponentScore: number): number {
+  const deficit = opponentScore - myScore;
+  let bonus = 0;
+  if (deficit >= 4) bonus = 2;
+  else if (deficit >= 2) bonus = 1;
+  return Math.min(BASE_UNITS + bonus, MAX_UNITS);
+}
 export const GRID_SIZE = 8;
 export const PLAYER_ROWS = [5, 6, 7];
 export const ENEMY_ROWS = [0, 1, 2];
@@ -297,10 +307,10 @@ export function calcDamage(attacker: Unit, defender: Unit): number {
 }
 
 // Light AI: tries to counter the player's composition
-export function generateAIPlacement(playerUnits: Unit[]): { type: UnitType; row: number; col: number }[] {
+export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE_UNITS): { type: UnitType; row: number; col: number }[] {
   const placements: { type: UnitType; row: number; col: number }[] = [];
   const usedCells = new Set<string>();
-  const count = MAX_UNITS;
+  const count = maxCount;
 
   // Count player unit types
   const playerTypes: Record<string, number> = {};

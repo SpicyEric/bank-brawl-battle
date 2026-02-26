@@ -2,8 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
-  generateAIPlacement,
-  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN,
+  generateAIPlacement, getMaxUnits,
+  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS,
 } from '@/lib/battleGame';
 
 export function useBattleGame() {
@@ -35,11 +35,14 @@ export function useBattleGame() {
     setPlayerStarts(true);
   }, []);
 
+  const playerMaxUnits = getMaxUnits(playerScore, enemyScore);
+  const enemyMaxUnits = getMaxUnits(enemyScore, playerScore);
+
   // Place unit
   const placeUnit = useCallback((row: number, col: number) => {
     if (phase !== 'place_player' || !selectedUnit) return;
     if (!PLAYER_ROWS.includes(row)) return;
-    if (playerUnits.length >= MAX_UNITS) return;
+    if (playerUnits.length >= playerMaxUnits) return;
     if (grid[row][col].unit) return;
 
     const unit = createUnit(selectedUnit, 'player', row, col);
@@ -49,7 +52,7 @@ export function useBattleGame() {
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
-  }, [phase, selectedUnit, playerUnits, grid]);
+  }, [phase, selectedUnit, playerUnits, grid, playerMaxUnits]);
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
@@ -73,7 +76,7 @@ export function useBattleGame() {
     const pUnits = playerUnits.map(u => ({ ...u }));
     setPlayerUnits(pUnits);
 
-    const aiPlacements = generateAIPlacement(pUnits);
+    const aiPlacements = generateAIPlacement(pUnits, enemyMaxUnits);
     const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
     setEnemyUnits(enemies);
 
@@ -189,7 +192,8 @@ export function useBattleGame() {
       setPhase('place_player');
     } else {
       const emptyGrid = createEmptyGrid();
-      const aiPlacements = generateAIPlacement([]);
+      const aiMax = getMaxUnits(enemyScore, playerScore);
+      const aiPlacements = generateAIPlacement([], aiMax);
       const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
       for (const e of enemies) emptyGrid[e.row][e.col].unit = e;
       setGrid(emptyGrid);
@@ -202,6 +206,7 @@ export function useBattleGame() {
     grid, phase, selectedUnit, setSelectedUnit,
     playerUnits, enemyUnits, turnCount, battleLog,
     playerScore, enemyScore, roundNumber, playerStarts,
+    playerMaxUnits, enemyMaxUnits,
     gameOver, gameWon,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
