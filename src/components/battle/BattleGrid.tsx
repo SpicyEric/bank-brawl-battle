@@ -129,8 +129,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isDead = unit?.dead;
           const isFrozen = unit?.frozen && unit.frozen > 0;
           const cellKey = `${cell.row}-${cell.col}`;
-          const terrain = cell.terrain;
-          const hasTerrain = terrain !== 'none';
+          const terrain = cell.terrain || 'none';
+          const hasTerrain = terrain !== 'none' && TERRAIN_DEFS[terrain];
 
           // Slide offset
           const offset = unit && !isDead ? slideOffsets.get(unit.id) : null;
