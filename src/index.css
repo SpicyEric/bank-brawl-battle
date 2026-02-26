@@ -159,3 +159,14 @@
 .projectile-fly {
   animation: projectile-fly-anim 0.4s ease-in forwards;
 }
+
+@keyframes phase-overlay-anim {
+  0% { opacity: 0; transform: scale(0.7); }
+  15% { opacity: 1; transform: scale(1.05); }
+  25% { transform: scale(1); }
+  65% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.1); }
+}
+.phase-overlay-fade {
+  animation: phase-overlay-anim 1.4s ease-out forwards;
+}
