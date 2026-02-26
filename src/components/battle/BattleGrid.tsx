@@ -127,7 +127,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isFlashing = flashCells.has(`${cell.row}-${cell.col}`);
           const isShaking = shakeCells.has(`${cell.row}-${cell.col}`);
           const isDead = unit?.dead;
-          const isFrozen = unit?.frozen && unit.frozen > 0;
+          const isFrozen = unit ? (unit.frozen ?? 0) > 0 : false;
           const cellKey = `${cell.row}-${cell.col}`;
           const terrain = cell.terrain || 'none';
           const hasTerrain = terrain !== 'none' && TERRAIN_DEFS[terrain];
