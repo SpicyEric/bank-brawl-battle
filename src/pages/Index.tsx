@@ -94,6 +94,7 @@ const Index = () => {
             }
           }}
           lastPlaced={lastPlaced}
+          battleEvents={game.battleEvents}
         />
       </div>
 
