@@ -17,6 +17,7 @@ export interface Unit {
   maxCooldown: number;
   dead?: boolean;
   frozen?: number; // turns remaining frozen (can't act)
+  stuckTurns?: number; // turns without attacking – used for anti-stalemate
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -410,30 +411,64 @@ function bfsFirstStep(unit: Unit, target: Unit, grid: Cell[][]): Position | null
   return null;
 }
 
-// Move toward target: prioritize positions from which unit can attack
+// Terrain score for a position: forest = defensive bonus, hill = offensive bonus
+function terrainScore(pos: Position, grid: Cell[][]): number {
+  const t = grid[pos.row]?.[pos.col]?.terrain;
+  if (t === 'forest') return 2; // defensive cover
+  if (t === 'hill') return 1.5; // offensive bonus
+  return 0;
+}
+
+// Move toward target: terrain-aware with anti-stalemate
 export function moveToward(unit: Unit, target: Unit, grid: Cell[][]): Position {
   const possibleMoves = getMoveCells(unit, grid);
   if (possibleMoves.length === 0) return { row: unit.row, col: unit.col };
 
-  // If can already attack, don't move
-  if (canAttack(unit, target)) return { row: unit.row, col: unit.col };
+  // If can already attack, consider staying or moving to better terrain nearby
+  if (canAttack(unit, target)) {
+    // Only consider terrain moves if not stuck (anti-stalemate)
+    if ((unit.stuckTurns || 0) < 3) {
+      return { row: unit.row, col: unit.col };
+    }
+    // Stuck too long on terrain → keep attacking from here
+    return { row: unit.row, col: unit.col };
+  }
+
+  const isStuck = (unit.stuckTurns || 0) >= 3;
 
   // Priority 1: move to a cell from which we can attack
   const attackMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
   if (attackMoves.length > 0) {
-    attackMoves.sort((a, b) => distance(b, target) - distance(a, target));
+    // Among attack moves, prefer terrain tiles (but only if not stuck)
+    if (!isStuck) {
+      attackMoves.sort((a, b) => terrainScore(b, grid) - terrainScore(a, grid) || distance(b, target) - distance(a, target));
+    } else {
+      attackMoves.sort((a, b) => distance(a, target) - distance(b, target));
+    }
     return attackMoves[0];
   }
 
-  // Priority 2: BFS to find a path around obstacles
+  // Priority 2: if not stuck, consider moving to a nearby terrain tile that's still closer to target
+  if (!isStuck) {
+    const currentDist = distance(unit, target);
+    const terrainMoves = possibleMoves.filter(pos => {
+      const t = grid[pos.row][pos.col].terrain;
+      return (t === 'forest' || t === 'hill') && distance(pos, target) <= currentDist;
+    });
+    if (terrainMoves.length > 0) {
+      terrainMoves.sort((a, b) => terrainScore(b, grid) - terrainScore(a, grid));
+      return terrainMoves[0];
+    }
+  }
+
+  // Priority 3: BFS to find a path around obstacles
   const bfsStep = bfsFirstStep(unit, target, grid);
   if (bfsStep) {
-    // Verify BFS step is in our possible moves
     const validStep = possibleMoves.find(p => p.row === bfsStep.row && p.col === bfsStep.col);
     if (validStep) return validStep;
   }
 
-  // Priority 3: fallback - move closer by manhattan distance
+  // Priority 4: fallback - move closer by manhattan distance
   const def = UNIT_DEFS[unit.type];
   let best = { row: unit.row, col: unit.col };
   let bestScore = Infinity;

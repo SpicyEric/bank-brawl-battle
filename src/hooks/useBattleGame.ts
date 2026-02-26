@@ -163,6 +163,8 @@ export function useBattleGame() {
         if (!target) continue;
 
         if (!canAttack(unit, target)) {
+          // Track stuck turns for anti-stalemate
+          unit.stuckTurns = (unit.stuckTurns || 0) + 1;
           const newPos = moveToward(unit, target, newGrid);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             newGrid[unit.row][unit.col].unit = null;
@@ -170,6 +172,9 @@ export function useBattleGame() {
             unit.col = newPos.col;
             newGrid[unit.row][unit.col].unit = unit;
           }
+        } else {
+          // Can attack → reset stuck counter
+          unit.stuckTurns = 0;
         }
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
