@@ -120,38 +120,38 @@ export function useBattleGame() {
 
         unit.cooldown = Math.max(0, unit.cooldown - 1);
 
-        // Healer: heal allies instead of attacking
+        // Healer: heal allies first, attack only if no one to heal
         if (unit.type === 'healer') {
-          if (unit.cooldown <= 0) {
-            const allies = allUnits.filter(u => u.team === unit.team && u.id !== unit.id && u.hp > 0 && !u.dead);
-            const def = UNIT_DEFS[unit.type];
+          const allies = allUnits.filter(u => u.team === unit.team && u.id !== unit.id && u.hp > 0 && !u.dead);
+          const healable = allies.filter(a => a.hp < a.maxHp);
+
+          if (healable.length > 0 && unit.cooldown <= 0) {
+            // Try to heal someone in range
             let healed = false;
-            for (const ally of allies) {
-              if (canAttack(unit, ally) && ally.hp < ally.maxHp) {
+            for (const ally of healable) {
+              if (canAttack(unit, ally)) {
                 const healAmt = Math.min(15, ally.maxHp - ally.hp);
                 ally.hp += healAmt;
-                if (!healed) {
-                  logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
-                  healed = true;
-                  unit.cooldown = unit.maxCooldown;
-                }
+                logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
+                healed = true;
+                unit.cooldown = unit.maxCooldown;
+                break;
               }
             }
             if (!healed) {
               // Move toward lowest HP ally
-              const injured = allies.filter(a => a.hp < a.maxHp).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
-              if (injured.length > 0) {
-                const newPos = moveToward(unit, injured[0], newGrid);
-                if (newPos.row !== unit.row || newPos.col !== unit.col) {
-                  newGrid[unit.row][unit.col].unit = null;
-                  unit.row = newPos.row;
-                  unit.col = newPos.col;
-                  newGrid[unit.row][unit.col].unit = unit;
-                }
+              healable.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
+              const newPos = moveToward(unit, healable[0], newGrid);
+              if (newPos.row !== unit.row || newPos.col !== unit.col) {
+                newGrid[unit.row][unit.col].unit = null;
+                unit.row = newPos.row;
+                unit.col = newPos.col;
+                newGrid[unit.row][unit.col].unit = unit;
               }
             }
+            continue;
           }
-          continue;
+          // No allies to heal → fall through to normal attack logic below
         }
 
         const target = findTarget(unit, allUnits);
