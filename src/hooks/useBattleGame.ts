@@ -172,8 +172,8 @@ export function useBattleGame() {
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
 
-          // Frost: freeze the target for 1 turn
-          if (unit.type === 'frost' && target.hp > 0) {
+          // Frost: 50% chance to freeze the target for 1 turn
+          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
             target.frozen = 1;
           }
 
