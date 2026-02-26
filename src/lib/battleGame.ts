@@ -239,8 +239,8 @@ export const ENEMY_ROWS = [0, 1, 2];
 export const POINTS_TO_WIN = 13;
 export const ROUND_TIME_LIMIT = 45; // seconds
 
-export const COUNTER_MULTIPLIER = 1.3;
-export const WEAKNESS_MULTIPLIER = 0.7;
+export const COUNTER_MULTIPLIER = 1.5;
+export const WEAKNESS_MULTIPLIER = 0.5;
 
 export function createEmptyGrid(): Cell[][] {
   return Array.from({ length: GRID_SIZE }, (_, row) =>
