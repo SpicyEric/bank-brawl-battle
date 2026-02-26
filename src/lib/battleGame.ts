@@ -1,6 +1,6 @@
 export type UnitType = 'warrior' | 'rider' | 'archer' | 'assassin' | 'mage' | 'tank' | 'dragon' | 'healer' | 'frost';
 export type Team = 'player' | 'enemy';
-export type Phase = 'place_player' | 'place_enemy' | 'battle' | 'round_won' | 'round_lost';
+export type Phase = 'place_player' | 'place_enemy' | 'battle' | 'round_won' | 'round_lost' | 'round_draw';
 
 export interface Position { row: number; col: number }
 
@@ -236,6 +236,7 @@ export const GRID_SIZE = 8;
 export const PLAYER_ROWS = [5, 6, 7];
 export const ENEMY_ROWS = [0, 1, 2];
 export const POINTS_TO_WIN = 13;
+export const ROUND_TIME_LIMIT = 45; // seconds
 
 export const COUNTER_MULTIPLIER = 1.3;
 export const WEAKNESS_MULTIPLIER = 0.7;
@@ -358,6 +359,57 @@ function couldAttackFrom(pos: Position, unitType: UnitType, target: Position): b
   return def.attackPattern.some(p => p.row === dr && p.col === dc);
 }
 
+// BFS to find shortest path to any cell from which unit can attack target
+function bfsFirstStep(unit: Unit, target: Unit, grid: Cell[][]): Position | null {
+  const canFly = unit.type === 'dragon';
+  const start = `${unit.row},${unit.col}`;
+  const visited = new Set<string>([start]);
+  // Queue: [row, col, firstStepRow, firstStepCol]
+  const queue: [number, number, number, number][] = [];
+
+  // Seed with immediate move options
+  const def = UNIT_DEFS[unit.type];
+  for (const m of def.movePattern) {
+    const nr = unit.row + m.row;
+    const nc = unit.col + m.col;
+    if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
+    const cell = grid[nr][nc];
+    if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) continue;
+    if (!canFly && cell.terrain === 'water') continue;
+    if (!canFly && cell.unit?.dead) continue;
+    const key = `${nr},${nc}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+    queue.push([nr, nc, nr, nc]);
+  }
+
+  // BFS up to ~60 nodes to keep it fast
+  let idx = 0;
+  while (idx < queue.length && idx < 60) {
+    const [r, c, fr, fc] = queue[idx++];
+    // Check if we can attack from here
+    if (couldAttackFrom({ row: r, col: c }, unit.type, target)) {
+      return { row: fr, col: fc };
+    }
+    // Expand using single-step orthogonal+diagonal moves for BFS (regardless of unit type)
+    for (const d of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 },
+                      { row: -1, col: -1 }, { row: -1, col: 1 }, { row: 1, col: -1 }, { row: 1, col: 1 }]) {
+      const nr = r + d.row;
+      const nc = c + d.col;
+      if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
+      const key = `${nr},${nc}`;
+      if (visited.has(key)) continue;
+      const cell = grid[nr][nc];
+      if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) continue;
+      if (!canFly && cell.terrain === 'water') continue;
+      if (!canFly && cell.unit?.dead) continue;
+      visited.add(key);
+      queue.push([nr, nc, fr, fc]);
+    }
+  }
+  return null;
+}
+
 // Move toward target: prioritize positions from which unit can attack
 export function moveToward(unit: Unit, target: Unit, grid: Cell[][]): Position {
   const possibleMoves = getMoveCells(unit, grid);
@@ -369,18 +421,24 @@ export function moveToward(unit: Unit, target: Unit, grid: Cell[][]): Position {
   // Priority 1: move to a cell from which we can attack
   const attackMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
   if (attackMoves.length > 0) {
-    // Pick the one furthest from the target (stay at range if possible)
     attackMoves.sort((a, b) => distance(b, target) - distance(a, target));
     return attackMoves[0];
   }
 
-  // Priority 2: move closer to the nearest cell from which we could attack
+  // Priority 2: BFS to find a path around obstacles
+  const bfsStep = bfsFirstStep(unit, target, grid);
+  if (bfsStep) {
+    // Verify BFS step is in our possible moves
+    const validStep = possibleMoves.find(p => p.row === bfsStep.row && p.col === bfsStep.col);
+    if (validStep) return validStep;
+  }
+
+  // Priority 3: fallback - move closer by manhattan distance
   const def = UNIT_DEFS[unit.type];
   let best = { row: unit.row, col: unit.col };
   let bestScore = Infinity;
 
   for (const pos of possibleMoves) {
-    // Find minimum distance from this pos to any theoretical attack position
     let minAttackDist = Infinity;
     for (const p of def.attackPattern) {
       const attackFromRow = target.row - p.row;
