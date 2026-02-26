@@ -43,7 +43,7 @@ function SinglePlayerGame() {
   return <GameUI game={game} isMultiplayer={false} />;
 }
 
-function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[] }; isMultiplayer: boolean }) {
+function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string }; isMultiplayer: boolean }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic();
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
@@ -163,8 +163,18 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
 
       {/* Controls */}
       <div className="px-4 mt-3 flex-1">
-        {game.phase === 'place_player' && !game.waitingForOpponent && (
+        {game.phase === 'place_player' && !game.waitingForOpponent && (!isMultiplayer || game.isMyTurnToPlace) && (
           <div className="space-y-3">
+            {isMultiplayer && game.placeTimer !== undefined && (
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-xs text-muted-foreground">
+                  {game.placingPhase === 'first' ? '🎲 Du platzierst zuerst (blind)' : '👀 Du siehst die Aufstellung – reagiere!'}
+                </p>
+                <span className={`text-sm font-mono font-bold ${game.placeTimer <= 3 ? 'text-danger animate-pulse' : 'text-warning'}`}>
+                  ⏱ {game.placeTimer}s
+                </span>
+              </div>
+            )}
             <UnitPicker
               selected={game.selectedUnit}
               onSelect={game.setSelectedUnit}
@@ -173,10 +183,10 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
             />
             <button
               onClick={game.confirmPlacement}
-              disabled={game.playerUnits.length < game.playerMaxUnits}
+              disabled={!isMultiplayer && game.playerUnits.length < game.playerMaxUnits}
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              ✅ Bereit
+              ✅ Bereit {isMultiplayer && game.playerUnits.length === 0 ? '(Aufgeben)' : ''}
             </button>
           </div>
         )}
@@ -184,7 +194,12 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
         {game.phase === 'place_player' && game.waitingForOpponent && (
           <div className="text-center py-8 space-y-3">
             <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-sm text-muted-foreground">Warte auf Gegner...</p>
+            <p className="text-sm text-muted-foreground">
+              {isMultiplayer ? 'Gegner platziert seine Einheiten...' : 'Warte auf Gegner...'}
+            </p>
+            {isMultiplayer && game.placeTimer !== undefined && (
+              <span className="text-xs font-mono text-muted-foreground">⏱ {game.placeTimer}s</span>
+            )}
           </div>
         )}
 
