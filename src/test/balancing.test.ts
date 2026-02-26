@@ -89,7 +89,7 @@ function simulateBattle(playerTeam: UnitType[], enemyTeam: UnitType[]): 'player'
         target.hp = Math.max(0, target.hp - dmg);
         unit.cooldown = unit.maxCooldown;
 
-        if (unit.type === 'frost' && target.hp > 0) {
+        if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
           target.frozen = 1;
         }
 
