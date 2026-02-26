@@ -51,12 +51,6 @@ const Index = () => {
         </div>
       </header>
 
-      {/* Color legend */}
-      <div className="mx-4 mb-1 flex items-center justify-center gap-3 text-[10px]">
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-unit-red inline-block" /> Rot &gt; Grün</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-unit-green inline-block" /> Grün &gt; Blau</span>
-        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-unit-blue inline-block" /> Blau &gt; Rot</span>
-      </div>
 
       {/* Phase banner */}
       <div className={`mx-4 mb-2 py-2 px-3 rounded-lg text-center text-xs font-semibold ${
