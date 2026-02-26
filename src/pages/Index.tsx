@@ -78,15 +78,17 @@ const Index = () => {
               const unit = game.grid[row][col].unit;
               if (unit && unit.team === 'player') {
                 game.removeUnit(unit.id);
-              } else {
-                game.placeUnit(row, col);
+                return;
               }
+              game.placeUnit(row, col);
+              return;
             }
             const unit = game.grid[row][col].unit;
             if (unit) {
               setInspectUnit(unit.type);
             }
           }}
+          selectedUnit={game.selectedUnit}
         />
       </div>
 

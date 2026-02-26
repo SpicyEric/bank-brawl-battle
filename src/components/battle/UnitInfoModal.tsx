@@ -56,8 +56,8 @@ export function UnitInfoModal({ unitType, onClose }: UnitInfoModalProps) {
 
         {/* Patterns */}
         <div className="grid grid-cols-2 gap-3">
-          <PatternGrid title="Bewegung" grid={moveGrid} center={center} color="bg-primary" />
-          <PatternGrid title="Angriff" grid={attackGrid} center={center} color="bg-danger" />
+          <PatternGrid title="Bewegung" grid={moveGrid} center={center} color="bg-primary/60" />
+          <PatternGrid title="Angriff" grid={attackGrid} center={center} color="bg-danger/60" />
         </div>
 
         {/* Color counter info */}
@@ -96,7 +96,7 @@ function PatternGrid({ title, grid, center, color }: { title: string; grid: bool
                 key={`${r}-${c}`}
                 className={`w-4 h-4 rounded-sm ${
                   isCenter ? 'bg-primary/60 border border-primary' :
-                  active ? `${color}/60` : 'bg-muted/40'
+                  active ? `${color}` : 'bg-muted/40'
                 }`}
               />
             );
