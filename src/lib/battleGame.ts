@@ -200,9 +200,9 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     label: 'Schamane',
     emoji: '🌿',
     hp: 50,
-    attack: 0,
+    attack: 5,
     cooldown: 2,
-    description: 'Heilt Verbündete im Umkreis statt anzugreifen. Kein eigener Schaden.',
+    description: 'Heilt Verbündete im Umkreis. Greift nur an, wenn niemand mehr zu heilen ist.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: ['rider', 'archer', 'frost'],
@@ -210,7 +210,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
 };
 
-export const UNIT_TYPES: UnitType[] = ['warrior', 'rider', 'archer', 'assassin', 'mage', 'tank', 'dragon', 'healer', 'frost'];
+export const UNIT_TYPES: UnitType[] = ['warrior', 'assassin', 'dragon', 'tank', 'mage', 'healer', 'rider', 'archer', 'frost'];
 export const BASE_UNITS = 5;
 export const MAX_UNITS = 7; // absolute cap
 
