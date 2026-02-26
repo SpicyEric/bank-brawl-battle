@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { useBattleGame } from '@/hooks/useBattleGame';
 import { BattleGrid } from '@/components/battle/BattleGrid';
 import { UnitPicker } from '@/components/battle/UnitPicker';
@@ -6,6 +7,25 @@ import { UNIT_DEFS } from '@/lib/battleGame';
 
 const Index = () => {
   const game = useBattleGame();
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    const audio = new Audio('/music/background.mp3');
+    audio.loop = true;
+    audio.volume = 0.15;
+    audioRef.current = audio;
+
+    const playOnInteraction = () => {
+      audio.play().catch(() => {});
+      document.removeEventListener('click', playOnInteraction);
+    };
+    document.addEventListener('click', playOnInteraction);
+
+    return () => {
+      audio.pause();
+      document.removeEventListener('click', playOnInteraction);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto">
