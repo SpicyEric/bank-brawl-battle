@@ -111,7 +111,48 @@ export function useBattleGame() {
 
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
+
+        // Frozen units can't act, just tick down
+        if (unit.frozen && unit.frozen > 0) {
+          unit.frozen -= 1;
+          continue;
+        }
+
         unit.cooldown = Math.max(0, unit.cooldown - 1);
+
+        // Healer: heal allies instead of attacking
+        if (unit.type === 'healer') {
+          if (unit.cooldown <= 0) {
+            const allies = allUnits.filter(u => u.team === unit.team && u.id !== unit.id && u.hp > 0 && !u.dead);
+            const def = UNIT_DEFS[unit.type];
+            let healed = false;
+            for (const ally of allies) {
+              if (canAttack(unit, ally) && ally.hp < ally.maxHp) {
+                const healAmt = Math.min(15, ally.maxHp - ally.hp);
+                ally.hp += healAmt;
+                if (!healed) {
+                  logs.push(`🧙 ${unit.team === 'player' ? '👤' : '💀'} Heiler → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
+                  healed = true;
+                  unit.cooldown = unit.maxCooldown;
+                }
+              }
+            }
+            if (!healed) {
+              // Move toward lowest HP ally
+              const injured = allies.filter(a => a.hp < a.maxHp).sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
+              if (injured.length > 0) {
+                const newPos = moveToward(unit, injured[0], newGrid);
+                if (newPos.row !== unit.row || newPos.col !== unit.col) {
+                  newGrid[unit.row][unit.col].unit = null;
+                  unit.row = newPos.row;
+                  unit.col = newPos.col;
+                  newGrid[unit.row][unit.col].unit = unit;
+                }
+              }
+            }
+          }
+          continue;
+        }
 
         const target = findTarget(unit, allUnits);
         if (!target) continue;
@@ -131,13 +172,18 @@ export function useBattleGame() {
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
 
+          // Frost: freeze the target for 1 turn
+          if (unit.type === 'frost' && target.hp > 0) {
+            target.frozen = 1;
+          }
+
           const def = UNIT_DEFS[unit.type];
           const tDef = UNIT_DEFS[target.type];
           const isStrong = def.strongVs.includes(target.type);
           const isWeak = def.weakVs.includes(target.type);
           const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
           const dist = Math.abs(unit.row - target.row) + Math.abs(unit.col - target.col);
-          logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.hp <= 0 ? ' ☠️' : ''}`);
+          logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.frozen ? ' 🧊' : ''}${target.hp <= 0 ? ' ☠️' : ''}`);
           events.push({
             type: target.hp <= 0 ? 'kill' : 'hit',
             attackerId: unit.id,
@@ -153,8 +199,7 @@ export function useBattleGame() {
           });
 
           if (target.hp <= 0) {
-            // Mark as dead skull - keep unit on grid but flagged
-            target.type = target.type; // keep type for reference
+            target.type = target.type;
             (target as any).dead = true;
           }
         }

@@ -92,7 +92,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           id: `proj-${projCounter.current}`,
           fromRow: evt.attackerRow, fromCol: evt.attackerCol,
           toRow: evt.targetRow, toCol: evt.targetCol,
-          emoji: evt.attackerEmoji === '🏹' ? '➴' : evt.attackerEmoji === '🔮' ? '✦' : evt.attackerEmoji === '🔱' ? '⟟' : '⚡',
+          emoji: evt.attackerEmoji === '🏹' ? '➴' : evt.attackerEmoji === '🔮' ? '✦' : evt.attackerEmoji === '🔱' ? '⟟' : evt.attackerEmoji === '❄️' ? '❄' : evt.attackerEmoji === '🐉' ? '🔥' : '⚡',
         });
       }
     }
@@ -127,6 +127,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isFlashing = flashCells.has(`${cell.row}-${cell.col}`);
           const isShaking = shakeCells.has(`${cell.row}-${cell.col}`);
           const isDead = unit?.dead;
+          const isFrozen = unit?.frozen && unit.frozen > 0;
           const cellKey = `${cell.row}-${cell.col}`;
 
           // Slide offset
@@ -161,14 +162,17 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   }}
                 >
                   <span
-                    className="text-base sm:text-lg leading-none select-none"
+                    className={`text-base sm:text-lg leading-none select-none ${isFrozen ? 'opacity-60' : ''}`}
                     style={{
-                      filter: unit.team === 'player'
-                        ? 'drop-shadow(0 0 4px hsl(152, 60%, 48%)) drop-shadow(0 0 8px hsl(152, 60%, 48%))'
-                        : 'drop-shadow(0 0 4px hsl(0, 72%, 55%)) drop-shadow(0 0 8px hsl(0, 72%, 55%))',
+                      filter: isFrozen
+                        ? 'drop-shadow(0 0 5px hsl(210, 80%, 60%)) drop-shadow(0 0 10px hsl(210, 80%, 60%))'
+                        : unit.team === 'player'
+                          ? 'drop-shadow(0 0 4px hsl(152, 60%, 48%)) drop-shadow(0 0 8px hsl(152, 60%, 48%))'
+                          : 'drop-shadow(0 0 4px hsl(0, 72%, 55%)) drop-shadow(0 0 8px hsl(0, 72%, 55%))',
                     }}
                   >
                     {def?.emoji}
+                    {isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🧊</span>}
                   </span>
                   <div className="absolute bottom-0.5 left-0.5 right-0.5 h-[3px] rounded-full bg-muted overflow-hidden">
                     <div
