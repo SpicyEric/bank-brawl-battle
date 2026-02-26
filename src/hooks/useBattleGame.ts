@@ -4,6 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateAIPlacement, getMaxUnits, generateTerrain,
   GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  getActivationTurn,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 
@@ -23,6 +24,7 @@ export function useBattleGame() {
   const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const turnCountRef = useRef(0);
 
   // Full reset
   const resetGame = useCallback(() => {
@@ -31,6 +33,7 @@ export function useBattleGame() {
     setEnemyUnits([]);
     setPhase('place_player');
     setTurnCount(0);
+    turnCountRef.current = 0;
     setBattleLog([]);
     setSelectedUnit('warrior');
     setPlayerScore(0);
@@ -48,6 +51,7 @@ export function useBattleGame() {
     if (!PLAYER_ROWS.includes(row)) return;
     if (playerUnits.length >= playerMaxUnits) return;
     if (grid[row][col].unit) return;
+    if (grid[row][col].terrain === 'water') return; // Can't place on water
 
     const unit = createUnit(selectedUnit, 'player', row, col);
     setPlayerUnits(prev => [...prev, unit]);
@@ -80,7 +84,7 @@ export function useBattleGame() {
     const pUnits = playerUnits.map(u => ({ ...u }));
     setPlayerUnits(pUnits);
 
-    const aiPlacements = generateAIPlacement(pUnits, enemyMaxUnits);
+    const aiPlacements = generateAIPlacement(pUnits, enemyMaxUnits, grid);
     const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
     setEnemyUnits(enemies);
 
@@ -100,6 +104,7 @@ export function useBattleGame() {
     setPhase('battle');
     setBattleLog([]);
     setTurnCount(0);
+    turnCountRef.current = 0;
     setBattleTimer(ROUND_TIME_LIMIT);
   }, []);
 
@@ -112,7 +117,13 @@ export function useBattleGame() {
 
       const logs: string[] = [];
       const events: BattleEvent[] = [];
-      const acting = allUnits.filter(u => u.hp > 0).sort((a, b) => a.maxCooldown - b.maxCooldown);
+      const currentTurn = turnCountRef.current;
+      const acting = allUnits.filter(u => {
+        if (u.hp <= 0) return false;
+        // Staggered activation: units don't act until their activation turn
+        if (u.activationTurn !== undefined && currentTurn < u.activationTurn) return false;
+        return true;
+      }).sort((a, b) => a.maxCooldown - b.maxCooldown);
 
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
@@ -236,7 +247,7 @@ export function useBattleGame() {
         setPhase('round_lost');
       }
 
-      setTurnCount(prev => prev + 1);
+      setTurnCount(prev => { turnCountRef.current = prev + 1; return prev + 1; });
       return newGrid;
     });
   }, []);
@@ -300,6 +311,7 @@ export function useBattleGame() {
     setPlayerStarts(newStarts);
     setPlayerUnits([]);
     setTurnCount(0);
+    turnCountRef.current = 0;
     setBattleLog([]);
     setSelectedUnit('warrior');
 
@@ -310,7 +322,7 @@ export function useBattleGame() {
     } else {
       const terrainGrid = generateTerrain(createEmptyGrid());
       const aiMax = getMaxUnits(enemyScore, playerScore);
-      const aiPlacements = generateAIPlacement([], aiMax);
+      const aiPlacements = generateAIPlacement([], aiMax, terrainGrid);
       const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
       for (const e of enemies) terrainGrid[e.row][e.col].unit = e;
       setGrid(terrainGrid);
