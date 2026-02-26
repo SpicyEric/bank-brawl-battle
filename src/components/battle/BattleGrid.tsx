@@ -1,12 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType } from '@/lib/battleGame';
+import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, Phase, UnitType } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
-
-const COLOR_DOT: Record<ColorGroup, string> = {
-  red: 'bg-unit-red',
-  blue: 'bg-unit-blue',
-  green: 'bg-unit-green',
-};
 
 interface BattleGridProps {
   grid: Cell[][];
@@ -18,6 +12,7 @@ interface BattleGridProps {
 
 interface UnitPos { row: number; col: number }
 interface DamagePopup { id: string; row: number; col: number; damage: number; isStrong: boolean; isWeak: boolean; isKill: boolean }
+interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [] }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
@@ -27,7 +22,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [slideOffsets, setSlideOffsets] = useState<Map<string, { dr: number; dc: number }>>(new Map());
   const [shakeCells, setShakeCells] = useState<Set<string>>(new Set());
   const [popups, setPopups] = useState<DamagePopup[]>([]);
+  const [projectiles, setProjectiles] = useState<Projectile[]>([]);
   const popupCounter = useRef(0);
+  const projCounter = useRef(0);
 
   // Flash effect for attack pattern on placement
   useEffect(() => {
@@ -52,7 +49,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     const currentPositions = new Map<string, UnitPos>();
     for (const row of grid) {
       for (const cell of row) {
-        if (cell.unit && cell.unit.hp > 0) {
+        if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) {
           const id = cell.unit.id;
           currentPositions.set(id, { row: cell.row, col: cell.col });
           const prev = prevPositions.current.get(id);
@@ -71,32 +68,49 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
   }, [grid]);
 
-  // Handle battle events: shake + damage popups
+  // Handle battle events: shake + damage popups + projectiles
   useEffect(() => {
     if (battleEvents.length === 0) return;
     const newShake = new Set<string>();
     const newPopups: DamagePopup[] = [];
+    const newProjs: Projectile[] = [];
+
     for (const evt of battleEvents) {
       const key = `${evt.targetRow}-${evt.targetCol}`;
       newShake.add(key);
       popupCounter.current += 1;
       newPopups.push({
         id: `pop-${popupCounter.current}`,
-        row: evt.targetRow,
-        col: evt.targetCol,
-        damage: evt.damage,
-        isStrong: evt.isStrong,
-        isWeak: evt.isWeak,
+        row: evt.targetRow, col: evt.targetCol,
+        damage: evt.damage, isStrong: evt.isStrong, isWeak: evt.isWeak,
         isKill: evt.type === 'kill',
       });
+
+      if (evt.isRanged) {
+        projCounter.current += 1;
+        newProjs.push({
+          id: `proj-${projCounter.current}`,
+          fromRow: evt.attackerRow, fromCol: evt.attackerCol,
+          toRow: evt.targetRow, toCol: evt.targetCol,
+          emoji: evt.attackerEmoji === '🏹' ? '➴' : evt.attackerEmoji === '🔮' ? '✦' : '⚡',
+        });
+      }
     }
+
     setShakeCells(newShake);
     setPopups(prev => [...prev, ...newPopups]);
+    setProjectiles(prev => [...prev, ...newProjs]);
+
     setTimeout(() => setShakeCells(new Set()), 400);
     setTimeout(() => {
       setPopups(prev => prev.filter(p => !newPopups.find(np => np.id === p.id)));
     }, 700);
+    setTimeout(() => {
+      setProjectiles(prev => prev.filter(p => !newProjs.find(np => np.id === p.id)));
+    }, 450);
   }, [battleEvents]);
+
+  const cellSize = 100 / GRID_SIZE;
 
   return (
     <div className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto relative">
@@ -106,42 +120,37 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isEnemyZone = cell.row < 3;
           const unit = cell.unit;
           const def = unit ? UNIT_DEFS[unit.type] : null;
-          const colorGroup = unit ? UNIT_COLOR_GROUPS[unit.type] : null;
-          const hpPercent = unit ? (unit.hp / unit.maxHp) * 100 : 0;
-          const isLow = unit ? unit.hp / unit.maxHp < 0.3 : false;
+          const hpPercent = unit && !unit.dead ? (unit.hp / unit.maxHp) * 100 : 0;
+          const isLow = unit && !unit.dead ? unit.hp / unit.maxHp < 0.3 : false;
           const isFlashing = flashCells.has(`${cell.row}-${cell.col}`);
           const isShaking = shakeCells.has(`${cell.row}-${cell.col}`);
+          const isDead = unit?.dead;
           const cellKey = `${cell.row}-${cell.col}`;
 
           // Slide offset
-          const offset = unit ? slideOffsets.get(unit.id) : null;
+          const offset = unit && !isDead ? slideOffsets.get(unit.id) : null;
           const slideStyle = offset
             ? { transform: `translate(${offset.dc * 100}%, ${offset.dr * 100}%)` }
             : undefined;
-
-          // Team glow background
-          const teamGlow = unit
-            ? unit.team === 'player'
-              ? 'bg-success/12'
-              : 'bg-danger/12'
-            : '';
 
           return (
             <button
               key={cellKey}
               onClick={() => onCellClick(cell.row, cell.col)}
               className={`aspect-square flex flex-col items-center justify-center relative overflow-visible
-                ${isPlayerZone && isPlacing ? 'bg-primary/5 hover:bg-primary/15' : ''}
+                ${isPlayerZone && isPlacing && !unit ? 'bg-primary/5 hover:bg-primary/15 cursor-pointer' : ''}
                 ${isEnemyZone && !unit ? 'bg-danger/5' : ''}
-                ${!isPlayerZone && !isEnemyZone && !unit ? 'bg-card' : ''}
-                ${unit ? teamGlow : 'bg-card'}
-                ${isPlayerZone && isPlacing && !unit ? 'cursor-pointer' : ''}
+                ${!unit ? 'bg-card' : ''}
+                ${isDead ? 'bg-muted/40' : ''}
                 ${isFlashing ? 'flash-attack' : ''}
                 ${isShaking ? 'shake-hit' : ''}
                 transition-colors duration-200
               `}
             >
-              {unit && (
+              {isDead && (
+                <span className="text-sm opacity-40 select-none">💀</span>
+              )}
+              {unit && !isDead && (
                 <div
                   className="absolute inset-0 flex flex-col items-center justify-center z-10"
                   style={{
@@ -149,7 +158,14 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     transition: offset ? 'none' : 'transform 350ms ease-out',
                   }}
                 >
-                  <span className={`text-base sm:text-lg leading-none ${unit.hp <= 0 ? 'opacity-30' : ''}`}>
+                  <span
+                    className="text-base sm:text-lg leading-none select-none"
+                    style={{
+                      filter: unit.team === 'player'
+                        ? 'drop-shadow(0 0 4px hsl(152, 60%, 48%)) drop-shadow(0 0 8px hsl(152, 60%, 48%))'
+                        : 'drop-shadow(0 0 4px hsl(0, 72%, 55%)) drop-shadow(0 0 8px hsl(0, 72%, 55%))',
+                    }}
+                  >
                     {def?.emoji}
                   </span>
                   <div className="absolute bottom-0.5 left-0.5 right-0.5 h-[3px] rounded-full bg-muted overflow-hidden">
@@ -160,9 +176,6 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                       style={{ width: `${hpPercent}%` }}
                     />
                   </div>
-                  {colorGroup && (
-                    <div className={`absolute top-0.5 left-0.5 w-2 h-2 rounded-full ${COLOR_DOT[colorGroup]}`} />
-                  )}
                 </div>
               )}
             </button>
@@ -170,9 +183,30 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         })}
       </div>
 
+      {/* Projectile animations */}
+      {projectiles.map(p => {
+        const fromX = p.fromCol * cellSize + cellSize / 2;
+        const fromY = p.fromRow * cellSize + cellSize / 2;
+        const toX = p.toCol * cellSize + cellSize / 2;
+        const toY = p.toRow * cellSize + cellSize / 2;
+        return (
+          <div
+            key={p.id}
+            className="absolute pointer-events-none z-30 projectile-fly"
+            style={{
+              '--from-x': `${fromX}%`,
+              '--from-y': `${fromY}%`,
+              '--to-x': `${toX}%`,
+              '--to-y': `${toY}%`,
+            } as React.CSSProperties}
+          >
+            <span className="text-xs drop-shadow-lg">{p.emoji}</span>
+          </div>
+        );
+      })}
+
       {/* Damage popups overlay */}
       {popups.map(p => {
-        const cellSize = 100 / GRID_SIZE;
         const left = p.col * cellSize + cellSize / 2;
         const top = p.row * cellSize + cellSize / 4;
         return (
