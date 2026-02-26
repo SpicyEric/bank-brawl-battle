@@ -50,6 +50,24 @@ const DIAGONAL: Position[] = [
 
 const ALL_ADJACENT: Position[] = [...ORTHOGONAL, ...DIAGONAL];
 
+export type ColorGroup = 'red' | 'blue' | 'green';
+
+export const UNIT_COLOR_GROUPS: Record<UnitType, ColorGroup> = {
+  warrior: 'red',
+  assassin: 'red',
+  lancer: 'blue',
+  archer: 'blue',
+  tank: 'green',
+  mage: 'green',
+};
+
+// Red > Green > Blue > Red (rock-paper-scissors)
+export const COLOR_BEATS: Record<ColorGroup, ColorGroup> = {
+  red: 'green',
+  green: 'blue',
+  blue: 'red',
+};
+
 export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   warrior: {
     label: 'Krieger',
@@ -57,43 +75,11 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 120,
     attack: 28,
     cooldown: 2,
-    description: 'Nahkämpfer. Bewegt sich orthogonal (1 Feld). Greift angrenzend an (4 Richtungen).',
+    description: 'Nahkämpfer. Bewegt sich orthogonal (1 Feld). Greift angrenzend an.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
-    strongVs: ['assassin'],
-    weakVs: ['lancer'],
-  },
-  lancer: {
-    label: 'Lanzen.',
-    emoji: '🔱',
-    hp: 100,
-    attack: 22,
-    cooldown: 2,
-    description: 'Bewegt sich orthogonal (1 Feld). Greift 2 Felder geradeaus an.',
-    movePattern: ORTHOGONAL,
-    attackPattern: [
-      { row: -2, col: 0 }, { row: 2, col: 0 },
-      { row: 0, col: -2 }, { row: 0, col: 2 },
-      ...ORTHOGONAL,
-    ],
-    strongVs: ['warrior'],
-    weakVs: ['archer'],
-  },
-  archer: {
-    label: 'Bogen.',
-    emoji: '🏹',
-    hp: 70,
-    attack: 20,
-    cooldown: 2,
-    description: 'Bewegt sich in alle Richtungen (1 Feld). Greift orthogonal bis 3 Felder an.',
-    movePattern: ALL_ADJACENT,
-    attackPattern: [
-      ...ORTHOGONAL,
-      { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
-      { row: -3, col: 0 }, { row: 3, col: 0 }, { row: 0, col: -3 }, { row: 0, col: 3 },
-    ],
-    strongVs: ['lancer'],
-    weakVs: ['assassin'],
+    strongVs: ['tank', 'mage'],
+    weakVs: ['lancer', 'archer'],
   },
   assassin: {
     label: 'Assass.',
@@ -108,8 +94,40 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
       { row: 2, col: -2 }, { row: 2, col: 2 },
     ],
     attackPattern: DIAGONAL,
-    strongVs: ['archer'],
-    weakVs: ['warrior'],
+    strongVs: ['tank', 'mage'],
+    weakVs: ['lancer', 'archer'],
+  },
+  lancer: {
+    label: 'Lanzen.',
+    emoji: '🔱',
+    hp: 100,
+    attack: 22,
+    cooldown: 2,
+    description: 'Bewegt sich orthogonal (1 Feld). Greift 2 Felder geradeaus an.',
+    movePattern: ORTHOGONAL,
+    attackPattern: [
+      { row: -2, col: 0 }, { row: 2, col: 0 },
+      { row: 0, col: -2 }, { row: 0, col: 2 },
+      ...ORTHOGONAL,
+    ],
+    strongVs: ['warrior', 'assassin'],
+    weakVs: ['tank', 'mage'],
+  },
+  archer: {
+    label: 'Bogen.',
+    emoji: '🏹',
+    hp: 70,
+    attack: 20,
+    cooldown: 2,
+    description: 'Bewegt sich in alle Richtungen (1 Feld). Greift orthogonal bis 3 Felder an.',
+    movePattern: ALL_ADJACENT,
+    attackPattern: [
+      ...ORTHOGONAL,
+      { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
+      { row: -3, col: 0 }, { row: 3, col: 0 }, { row: 0, col: -3 }, { row: 0, col: 3 },
+    ],
+    strongVs: ['warrior', 'assassin'],
+    weakVs: ['tank', 'mage'],
   },
   mage: {
     label: 'Magier',
@@ -125,8 +143,8 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
       { row: -3, col: -3 }, { row: -3, col: 3 },
       { row: 3, col: -3 }, { row: 3, col: 3 },
     ],
-    strongVs: ['tank'],
-    weakVs: ['warrior', 'lancer', 'assassin'],
+    strongVs: ['lancer', 'archer'],
+    weakVs: ['warrior', 'assassin'],
   },
   tank: {
     label: 'Schild',
@@ -134,11 +152,11 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 200,
     attack: 10,
     cooldown: 3,
-    description: 'Bewegt sich orthogonal (1 Feld). Greift angrenzend an. Zieht Feinde in der Nähe an.',
+    description: 'Bewegt sich orthogonal (1 Feld). Greift angrenzend an. Zieht Feinde an.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
-    strongVs: ['warrior', 'lancer', 'assassin'],
-    weakVs: ['mage'],
+    strongVs: ['lancer', 'archer'],
+    weakVs: ['warrior', 'assassin'],
   },
 };
 
@@ -294,167 +312,6 @@ export function generateAIPlacement(playerUnits: Unit[]): { type: UnitType; row:
     placements.push({ type, row, col });
   }
   return placements;
-}
-
-// === SYNERGY / FORMATION SYSTEM ===
-
-export interface Synergy {
-  id: string;
-  name: string;
-  emoji: string;
-  description: string;
-  check: (units: Unit[]) => boolean;
-  effect: (units: Unit[]) => void; // mutates units with buffs
-  counterOf?: string; // this synergy counters another
-}
-
-function unitsInRow(units: Unit[]): Map<number, Unit[]> {
-  const map = new Map<number, Unit[]>();
-  for (const u of units) {
-    if (!map.has(u.row)) map.set(u.row, []);
-    map.get(u.row)!.push(u);
-  }
-  return map;
-}
-
-function unitsInCol(units: Unit[]): Map<number, Unit[]> {
-  const map = new Map<number, Unit[]>();
-  for (const u of units) {
-    if (!map.has(u.col)) map.set(u.col, []);
-    map.get(u.col)!.push(u);
-  }
-  return map;
-}
-
-function areAdjacent(a: Unit, b: Unit): boolean {
-  return Math.abs(a.row - b.row) <= 1 && Math.abs(a.col - b.col) <= 1 && (a.row !== b.row || a.col !== b.col);
-}
-
-export const SYNERGIES: Synergy[] = [
-  {
-    id: 'phalanx',
-    name: 'Phalanx',
-    emoji: '🧱',
-    description: '3+ Einheiten in einer Reihe: +20% HP',
-    counterOf: 'sniper_line',
-    check: (units) => {
-      const rows = unitsInRow(units);
-      for (const [, row] of rows) if (row.length >= 3) return true;
-      return false;
-    },
-    effect: (units) => {
-      const rows = unitsInRow(units);
-      for (const [, row] of rows) {
-        if (row.length >= 3) {
-          for (const u of row) {
-            u.maxHp = Math.floor(u.maxHp * 1.2);
-            u.hp = Math.floor(u.hp * 1.2);
-          }
-        }
-      }
-    },
-  },
-  {
-    id: 'sniper_line',
-    name: 'Scharfschützen',
-    emoji: '🎯',
-    description: '2+ Fernkämpfer in einer Spalte: +30% Angriff für Fernkämpfer',
-    counterOf: 'flank',
-    check: (units) => {
-      const cols = unitsInCol(units);
-      const rangedTypes: UnitType[] = ['archer', 'mage'];
-      for (const [, col] of cols) {
-        const ranged = col.filter(u => rangedTypes.includes(u.type));
-        if (ranged.length >= 2) return true;
-      }
-      return false;
-    },
-    effect: (units) => {
-      const rangedTypes: UnitType[] = ['archer', 'mage'];
-      const cols = unitsInCol(units);
-      for (const [, col] of cols) {
-        const ranged = col.filter(u => rangedTypes.includes(u.type));
-        if (ranged.length >= 2) {
-          for (const u of ranged) u.attack = Math.floor(u.attack * 1.3);
-        }
-      }
-    },
-  },
-  {
-    id: 'flank',
-    name: 'Flanke',
-    emoji: '🔀',
-    description: 'Einheiten auf Spalte 0-1 UND 6-7: +25% Angriff für alle',
-    counterOf: 'fortress',
-    check: (units) => {
-      const hasLeft = units.some(u => u.col <= 1);
-      const hasRight = units.some(u => u.col >= 6);
-      return hasLeft && hasRight;
-    },
-    effect: (units) => {
-      for (const u of units) u.attack = Math.floor(u.attack * 1.25);
-    },
-  },
-  {
-    id: 'fortress',
-    name: 'Festung',
-    emoji: '🏰',
-    description: 'Tank vorne + 2+ Einheiten dahinter: Hintere +30% HP',
-    counterOf: 'phalanx',
-    check: (units) => {
-      const tanks = units.filter(u => u.type === 'tank');
-      for (const tank of tanks) {
-        const behind = units.filter(u => u.id !== tank.id && u.row > tank.row);
-        if (behind.length >= 2) return true;
-      }
-      return false;
-    },
-    effect: (units) => {
-      const tanks = units.filter(u => u.type === 'tank');
-      for (const tank of tanks) {
-        const behind = units.filter(u => u.id !== tank.id && u.row > tank.row);
-        if (behind.length >= 2) {
-          for (const u of behind) {
-            u.maxHp = Math.floor(u.maxHp * 1.3);
-            u.hp = Math.floor(u.hp * 1.3);
-          }
-        }
-      }
-    },
-  },
-  {
-    id: 'assassin_pack',
-    name: 'Schattenangriff',
-    emoji: '🌑',
-    description: '2+ Assassinen nebeneinander: +40% Angriff für Assassinen',
-    counterOf: 'phalanx',
-    check: (units) => {
-      const assassins = units.filter(u => u.type === 'assassin');
-      if (assassins.length < 2) return false;
-      for (let i = 0; i < assassins.length; i++) {
-        for (let j = i + 1; j < assassins.length; j++) {
-          if (areAdjacent(assassins[i], assassins[j])) return true;
-        }
-      }
-      return false;
-    },
-    effect: (units) => {
-      const assassins = units.filter(u => u.type === 'assassin');
-      for (const u of assassins) u.attack = Math.floor(u.attack * 1.4);
-    },
-  },
-];
-
-// Detect and apply synergies for a team
-export function detectSynergies(units: Unit[]): string[] {
-  const active: string[] = [];
-  for (const syn of SYNERGIES) {
-    if (syn.check(units)) {
-      syn.effect(units);
-      active.push(syn.id);
-    }
-  }
-  return active;
 }
 
 // For showing patterns in unit info (relative offsets)

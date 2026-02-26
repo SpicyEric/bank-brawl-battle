@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
-  generateAIPlacement, detectSynergies,
+  generateAIPlacement,
   GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN,
 } from '@/lib/battleGame';
 
@@ -18,8 +18,6 @@ export function useBattleGame() {
   const [enemyScore, setEnemyScore] = useState(0);
   const [roundNumber, setRoundNumber] = useState(1);
   const [playerStarts, setPlayerStarts] = useState(true);
-  const [playerSynergies, setPlayerSynergies] = useState<string[]>([]);
-  const [enemySynergies, setEnemySynergies] = useState<string[]>([]);
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Full reset
@@ -35,8 +33,6 @@ export function useBattleGame() {
     setEnemyScore(0);
     setRoundNumber(1);
     setPlayerStarts(true);
-    setPlayerSynergies([]);
-    setEnemySynergies([]);
   }, []);
 
   // Place unit
@@ -74,17 +70,11 @@ export function useBattleGame() {
   const confirmPlacement = useCallback(() => {
     if (playerUnits.length === 0) return;
 
-    // Deep copy player units for synergy mutation
     const pUnits = playerUnits.map(u => ({ ...u }));
-    const pSyn = detectSynergies(pUnits);
-    setPlayerSynergies(pSyn);
     setPlayerUnits(pUnits);
 
-    // AI generates counter-placement
     const aiPlacements = generateAIPlacement(pUnits);
     const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
-    const eSyn = detectSynergies(enemies);
-    setEnemySynergies(eSyn);
     setEnemyUnits(enemies);
 
     // Build full grid
@@ -192,24 +182,18 @@ export function useBattleGame() {
     setTurnCount(0);
     setBattleLog([]);
     setSelectedUnit('warrior');
-    setPlayerSynergies([]);
-    setEnemySynergies([]);
 
     if (newStarts) {
-      // Player places blind
       setGrid(createEmptyGrid());
       setEnemyUnits([]);
       setPhase('place_player');
     } else {
-      // Enemy places first, player reacts
       const emptyGrid = createEmptyGrid();
       const aiPlacements = generateAIPlacement([]);
       const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
-      const eSyn = detectSynergies(enemies);
       for (const e of enemies) emptyGrid[e.row][e.col].unit = e;
       setGrid(emptyGrid);
       setEnemyUnits(enemies);
-      setEnemySynergies(eSyn);
       setPhase('place_player');
     }
   }, [playerStarts]);
@@ -218,7 +202,6 @@ export function useBattleGame() {
     grid, phase, selectedUnit, setSelectedUnit,
     playerUnits, enemyUnits, turnCount, battleLog,
     playerScore, enemyScore, roundNumber, playerStarts,
-    playerSynergies, enemySynergies,
     gameOver, gameWon,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,

@@ -4,8 +4,7 @@ import { BattleGrid } from '@/components/battle/BattleGrid';
 import { UnitPicker } from '@/components/battle/UnitPicker';
 import { BattleLog } from '@/components/battle/BattleLog';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
-import { SynergyDisplay } from '@/components/battle/SynergyDisplay';
-import { POINTS_TO_WIN, UnitType, SYNERGIES } from '@/lib/battleGame';
+import { POINTS_TO_WIN, UnitType } from '@/lib/battleGame';
 
 const Index = () => {
   const game = useBattleGame();
@@ -52,6 +51,13 @@ const Index = () => {
         </div>
       </header>
 
+      {/* Color legend */}
+      <div className="mx-4 mb-1 flex items-center justify-center gap-3 text-[10px]">
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-unit-red inline-block" /> Rot &gt; Grün</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-unit-green inline-block" /> Grün &gt; Blau</span>
+        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-unit-blue inline-block" /> Blau &gt; Rot</span>
+      </div>
+
       {/* Phase banner */}
       <div className={`mx-4 mb-2 py-2 px-3 rounded-lg text-center text-xs font-semibold ${
         game.phase === 'place_player' ? 'bg-primary/10 text-primary border border-primary/20' :
@@ -89,18 +95,6 @@ const Index = () => {
           }}
         />
       </div>
-
-      {/* Synergies display */}
-      {(game.phase === 'place_enemy' || game.phase === 'battle') && (
-        <div className="px-4 mt-2 space-y-1">
-          {game.playerSynergies.length > 0 && (
-            <SynergyDisplay synergies={game.playerSynergies} team="player" />
-          )}
-          {game.enemySynergies.length > 0 && (
-            <SynergyDisplay synergies={game.enemySynergies} team="enemy" />
-          )}
-        </div>
-      )}
 
       {/* Controls */}
       <div className="px-4 mt-3 flex-1">
