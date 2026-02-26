@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useBattleGame } from '@/hooks/useBattleGame';
 import { BattleGrid } from '@/components/battle/BattleGrid';
 import { UnitPicker } from '@/components/battle/UnitPicker';
 import { BattleLog } from '@/components/battle/BattleLog';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
+import { useMusic } from '@/hooks/useMusic';
 import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
 import {
@@ -33,40 +35,13 @@ function ScoreDots({ score, max, color }: { score: number; max: number; color: '
 
 const Index = () => {
   const game = useBattleGame();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const trackIndexRef = useRef(0);
-  const tracks = ['/music/background.mp3', '/music/stoischer-ringkampf.mp3'];
+  const navigate = useNavigate();
+  const { muted, toggleMute } = useMusic();
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
   const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
-  const [muted, setMuted] = useState(false);
   const [phaseOverlay, setPhaseOverlay] = useState<string | null>(null);
   const [overlaySubtext, setOverlaySubtext] = useState<string | null>(null);
   const prevPhase = useRef(game.phase);
-
-  useEffect(() => {
-    const playTrack = (index: number) => {
-      const audio = new Audio(tracks[index]);
-      audio.volume = 0.15;
-      audio.loop = false;
-      if (muted) audio.muted = true;
-      audioRef.current = audio;
-      audio.addEventListener('ended', () => {
-        trackIndexRef.current = (trackIndexRef.current + 1) % tracks.length;
-        playTrack(trackIndexRef.current);
-      });
-      audio.play().catch(() => {});
-    };
-
-    const startOnInteraction = () => {
-      playTrack(trackIndexRef.current);
-      document.removeEventListener('click', startOnInteraction);
-    };
-    document.addEventListener('click', startOnInteraction);
-    return () => {
-      if (audioRef.current) audioRef.current.pause();
-      document.removeEventListener('click', startOnInteraction);
-    };
-  }, []);
 
   // Phase overlay trigger
   useEffect(() => {
@@ -133,13 +108,7 @@ const Index = () => {
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="min-w-[160px]">
-            <DropdownMenuItem onClick={() => {
-              setMuted(m => {
-                const next = !m;
-                if (audioRef.current) audioRef.current.muted = next;
-                return next;
-              });
-            }}>
+            <DropdownMenuItem onClick={toggleMute}>
               {muted ? <Volume2 className="mr-2 h-4 w-4" /> : <VolumeX className="mr-2 h-4 w-4" />}
               {muted ? 'Ton an' : 'Ton aus'}
             </DropdownMenuItem>
@@ -147,7 +116,7 @@ const Index = () => {
               <RotateCcw className="mr-2 h-4 w-4" />
               Spiel neustarten
             </DropdownMenuItem>
-            <DropdownMenuItem disabled>
+            <DropdownMenuItem onClick={() => navigate('/')}>
               <Home className="mr-2 h-4 w-4" />
               Hauptmenü
             </DropdownMenuItem>
