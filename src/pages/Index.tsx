@@ -10,6 +10,7 @@ const Index = () => {
   const game = useBattleGame();
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
+  const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
 
   useEffect(() => {
     const audio = new Audio('/music/background.mp3');
@@ -78,9 +79,13 @@ const Index = () => {
               const unit = game.grid[row][col].unit;
               if (unit && unit.team === 'player') {
                 game.removeUnit(unit.id);
+                setLastPlaced(null);
                 return;
               }
-              game.placeUnit(row, col);
+              if (game.selectedUnit) {
+                game.placeUnit(row, col);
+                setLastPlaced({ row, col, type: game.selectedUnit });
+              }
               return;
             }
             const unit = game.grid[row][col].unit;
@@ -88,7 +93,7 @@ const Index = () => {
               setInspectUnit(unit.type);
             }
           }}
-          selectedUnit={game.selectedUnit}
+          lastPlaced={lastPlaced}
         />
       </div>
 
