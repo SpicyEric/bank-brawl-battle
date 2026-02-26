@@ -2,7 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
-  generateAIPlacement, GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN,
+  generateAIPlacement, detectSynergies,
+  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN,
 } from '@/lib/battleGame';
 
 export function useBattleGame() {
@@ -16,36 +17,62 @@ export function useBattleGame() {
   const [playerScore, setPlayerScore] = useState(0);
   const [enemyScore, setEnemyScore] = useState(0);
   const [roundNumber, setRoundNumber] = useState(1);
-  const [playerStarts, setPlayerStarts] = useState(true); // alternating who places first
+  const [playerStarts, setPlayerStarts] = useState(true); // true = player places blind first
+  const [playerSynergies, setPlayerSynergies] = useState<string[]>([]);
+  const [enemySynergies, setEnemySynergies] = useState<string[]>([]);
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Reset for new round (keep scores)
-  const startNewRound = useCallback(() => {
-    setGrid(createEmptyGrid());
+  // Place AI units on the grid (used in both flows)
+  const placeAIUnits = useCallback((currentGrid: Cell[][], playerU: Unit[]) => {
+    const aiPlacements = generateAIPlacement(playerU);
+    const enemies: Unit[] = [];
+    const next = currentGrid.map(r => r.map(c => ({ ...c })));
+    for (const p of aiPlacements) {
+      const unit = createUnit(p.type, 'enemy', p.row, p.col);
+      enemies.push(unit);
+      next[p.row][p.col].unit = unit;
+    }
+    return { grid: next, enemies };
+  }, []);
+
+  // Initialize round based on who starts
+  const initRound = useCallback((pStarts: boolean) => {
+    if (pStarts) {
+      // Player places blind → then sees enemy
+      setGrid(createEmptyGrid());
+      setPhase('place_player');
+    } else {
+      // Enemy places first → player sees enemy, then places reactively
+      const emptyGrid = createEmptyGrid();
+      // AI places with empty player array (random placement)
+      const { grid: newGrid, enemies } = placeAIUnits(emptyGrid, []);
+      setGrid(newGrid);
+      setEnemyUnits(enemies);
+      // Detect enemy synergies
+      const eSyn = detectSynergies(enemies);
+      setEnemySynergies(eSyn);
+      setPhase('place_player'); // Player now sees enemy and places reactively
+    }
     setPlayerUnits([]);
-    setEnemyUnits([]);
     setTurnCount(0);
     setBattleLog([]);
     setSelectedUnit('warrior');
-    // Alternate: if player started last round, enemy "places first" now (i.e. player sees enemy first)
-    setPlayerStarts(prev => !prev);
-    setPhase('place_player');
-  }, []);
+    setPlayerSynergies([]);
+  }, [placeAIUnits]);
 
   // Full reset
   const resetGame = useCallback(() => {
-    setGrid(createEmptyGrid());
-    setPlayerUnits([]);
-    setEnemyUnits([]);
-    setPhase('place_player');
-    setTurnCount(0);
-    setBattleLog([]);
-    setSelectedUnit('warrior');
     setPlayerScore(0);
     setEnemyScore(0);
     setRoundNumber(1);
     setPlayerStarts(true);
-  }, []);
+    setEnemyUnits([]);
+    setEnemySynergies([]);
+    initRound(true);
+  }, [initRound]);
+
+  // Initialize on mount
+  useEffect(() => { resetGame(); }, [resetGame]);
 
   // Place unit
   const placeUnit = useCallback((row: number, col: number) => {
@@ -78,29 +105,60 @@ export function useBattleGame() {
     });
   }, [phase]);
 
-  // Confirm placement → AI places → show enemy → battle
+  // Confirm placement
   const confirmPlacement = useCallback(() => {
     if (playerUnits.length === 0) return;
 
-    // AI generates counter-placement
-    const aiPlacements = generateAIPlacement(playerUnits);
-    const enemies: Unit[] = [];
+    // Detect player synergies
+    const pUnits = [...playerUnits];
+    const pSyn = detectSynergies(pUnits);
+    setPlayerSynergies(pSyn);
+    // Update player units with synergy buffs
+    setPlayerUnits(pUnits);
 
-    setGrid(prev => {
-      const next = prev.map(r => r.map(c => ({ ...c })));
-      for (const p of aiPlacements) {
-        const unit = createUnit(p.type, 'enemy', p.row, p.col);
-        enemies.push(unit);
-        next[p.row][p.col].unit = unit;
-      }
-      return next;
-    });
+    if (playerStarts) {
+      // Player placed blind → now AI places seeing player units, then reveal
+      setGrid(prev => {
+        const next = prev.map(r => r.map(c => ({ ...c })));
+        // Update player units on grid with buffed stats
+        for (const u of pUnits) {
+          next[u.row][u.col].unit = u;
+        }
+        return next;
+      });
 
-    setEnemyUnits(enemies);
-    setPhase('place_enemy'); // Show enemy placement briefly
-  }, [playerUnits]);
+      const aiResult = placeAIUnits(grid, pUnits);
+      const eSyn = detectSynergies(aiResult.enemies);
+      setEnemySynergies(eSyn);
 
-  // Start battle after seeing enemy placement
+      setGrid(prev => {
+        const next = prev.map(r => r.map(c => ({ ...c })));
+        // Keep player units with buffs
+        for (const u of pUnits) {
+          next[u.row][u.col].unit = u;
+        }
+        // Add enemy units
+        for (const e of aiResult.enemies) {
+          next[e.row][e.col].unit = e;
+        }
+        return next;
+      });
+      setEnemyUnits(aiResult.enemies);
+    } else {
+      // Enemy already placed → just update grid with buffed player
+      setGrid(prev => {
+        const next = prev.map(r => r.map(c => ({ ...c })));
+        for (const u of pUnits) {
+          next[u.row][u.col].unit = u;
+        }
+        return next;
+      });
+    }
+
+    setPhase('place_enemy'); // Review phase before battle
+  }, [playerUnits, playerStarts, grid, placeAIUnits]);
+
+  // Start battle
   const startBattle = useCallback(() => {
     setPhase('battle');
     setBattleLog([]);
@@ -124,7 +182,6 @@ export function useBattleGame() {
         const target = findTarget(unit, allUnits);
         if (!target) continue;
 
-        // Move toward target if can't attack
         if (!canAttack(unit, target)) {
           const newPos = moveToward(unit, target, newGrid);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
@@ -135,7 +192,6 @@ export function useBattleGame() {
           }
         }
 
-        // Attack if in range and off cooldown
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           const dmg = calcDamage(unit, target);
           target.hp = Math.max(0, target.hp - dmg);
@@ -187,19 +243,23 @@ export function useBattleGame() {
     return () => { if (battleRef.current) clearInterval(battleRef.current); };
   }, [phase, battleTick]);
 
-  // Check for game over
   const gameOver = playerScore >= POINTS_TO_WIN || enemyScore >= POINTS_TO_WIN;
   const gameWon = playerScore >= POINTS_TO_WIN;
 
   const nextRound = useCallback(() => {
+    const newStarts = !playerStarts;
     setRoundNumber(prev => prev + 1);
-    startNewRound();
-  }, [startNewRound]);
+    setPlayerStarts(newStarts);
+    setEnemyUnits([]);
+    setEnemySynergies([]);
+    initRound(newStarts);
+  }, [playerStarts, initRound]);
 
   return {
     grid, phase, selectedUnit, setSelectedUnit,
     playerUnits, enemyUnits, turnCount, battleLog,
     playerScore, enemyScore, roundNumber, playerStarts,
+    playerSynergies, enemySynergies,
     gameOver, gameWon,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
