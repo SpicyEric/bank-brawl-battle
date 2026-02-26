@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, Phase, UnitType } from '@/lib/battleGame';
+import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 
 interface BattleGridProps {
@@ -92,7 +92,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           id: `proj-${projCounter.current}`,
           fromRow: evt.attackerRow, fromCol: evt.attackerCol,
           toRow: evt.targetRow, toCol: evt.targetCol,
-          emoji: evt.attackerEmoji === '🏹' ? '➴' : evt.attackerEmoji === '🔮' ? '✦' : '⚡',
+          emoji: evt.attackerEmoji === '🏹' ? '➴' : evt.attackerEmoji === '🔮' ? '✦' : evt.attackerEmoji === '🔱' ? '⟟' : '⚡',
         });
       }
     }
@@ -120,6 +120,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isEnemyZone = cell.row < 3;
           const unit = cell.unit;
           const def = unit ? UNIT_DEFS[unit.type] : null;
+          const colorGroup = unit && !unit.dead ? UNIT_COLOR_GROUPS[unit.type] : null;
+          const showColorDot = colorGroup && (phase === 'place_player' || phase === 'place_enemy');
           const hpPercent = unit && !unit.dead ? (unit.hp / unit.maxHp) * 100 : 0;
           const isLow = unit && !unit.dead ? unit.hp / unit.maxHp < 0.3 : false;
           const isFlashing = flashCells.has(`${cell.row}-${cell.col}`);
@@ -176,6 +178,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                       style={{ width: `${hpPercent}%` }}
                     />
                   </div>
+                  {showColorDot && (
+                    <div className={`absolute top-0.5 left-0.5 w-2 h-2 rounded-full ${
+                      colorGroup === 'red' ? 'bg-unit-red' : colorGroup === 'blue' ? 'bg-unit-blue' : 'bg-unit-green'
+                    }`} />
+                  )}
                 </div>
               )}
             </button>
