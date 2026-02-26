@@ -1,108 +1,106 @@
-import { useGame } from '@/hooks/useGame';
-import { BalanceCard } from '@/components/game/BalanceCard';
-import { ActionButton } from '@/components/game/ActionButton';
-import { TransactionFeed } from '@/components/game/TransactionFeed';
-import { GameOverScreen } from '@/components/game/GameOverScreen';
-import { MenuScreen } from '@/components/game/MenuScreen';
-import { EARN_ACTIONS, ATTACK_ACTIONS } from '@/lib/gameState';
-import { useState } from 'react';
+import { useBattleGame } from '@/hooks/useBattleGame';
+import { BattleGrid } from '@/components/battle/BattleGrid';
+import { UnitPicker } from '@/components/battle/UnitPicker';
+import { BattleLog } from '@/components/battle/BattleLog';
+import { UNIT_DEFS } from '@/lib/battleGame';
 
 const Index = () => {
-  const game = useGame();
-  const [tab, setTab] = useState<'earn' | 'attack'>('earn');
-
-  if (game.gameStatus === 'menu') {
-    return <MenuScreen onStart={game.startGame} />;
-  }
-
-  if (game.gameStatus === 'won' || game.gameStatus === 'lost') {
-    return (
-      <GameOverScreen
-        status={game.gameStatus}
-        playerBalance={game.playerBalance}
-        enemyBalance={game.enemyBalance}
-        onRestart={game.startGame}
-      />
-    );
-  }
+  const game = useBattleGame();
 
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto">
       {/* Header */}
       <header className="px-4 pt-4 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-            <span className="text-sm">🏦</span>
-          </div>
-          <span className="font-semibold text-sm text-foreground">BankBattle</span>
+          <span className="text-lg">⚔️</span>
+          <span className="font-bold text-sm text-foreground tracking-tight">GridBattle</span>
         </div>
-        <div className="flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-success animate-pulse-green" />
-          <span className="text-[11px] text-muted-foreground">Live</span>
+        <div className="flex items-center gap-3 text-xs">
+          {game.phase === 'battle' && (
+            <span className="text-muted-foreground font-mono">Runde {game.turnCount}</span>
+          )}
+          <div className="flex items-center gap-2">
+            <span className="text-success text-[11px]">👤 {game.playerUnits.length}</span>
+            <span className="text-muted-foreground">vs</span>
+            <span className="text-danger text-[11px]">💀 {game.enemyUnits.length}</span>
+          </div>
         </div>
       </header>
 
-      {/* Balances */}
-      <div className="px-4 space-y-2 mt-2">
-        <BalanceCard
-          balance={game.playerBalance}
-          label="Dein Konto"
-          isPlayer
-          isUnderAttack={!!game.lastAttack}
+      {/* Phase banner */}
+      <div className={`mx-4 mb-2 py-2 px-3 rounded-lg text-center text-xs font-semibold ${
+        game.phase === 'place' ? 'bg-primary/10 text-primary border border-primary/20' :
+        game.phase === 'battle' ? 'bg-warning/10 text-warning border border-warning/20' :
+        game.phase === 'won' ? 'bg-success/10 text-success border border-success/20' :
+        'bg-danger/10 text-danger border border-danger/20'
+      }`}>
+        {game.phase === 'place' && '📍 Platziere deine Einheiten auf den unteren 3 Reihen'}
+        {game.phase === 'battle' && '⚔️ Kampf läuft...'}
+        {game.phase === 'won' && '🏆 Sieg! Alle Feinde besiegt!'}
+        {game.phase === 'lost' && '💀 Niederlage! Alle Einheiten gefallen.'}
+      </div>
+
+      {/* Grid */}
+      <div className="px-4">
+        <BattleGrid
+          grid={game.grid}
+          phase={game.phase}
+          onCellClick={(row, col) => {
+            if (game.phase === 'place') {
+              const unit = game.grid[row][col].unit;
+              if (unit && unit.team === 'player') {
+                game.removeUnit(unit.id);
+              } else {
+                game.placeUnit(row, col);
+              }
+            }
+          }}
         />
-        <BalanceCard
-          balance={game.enemyBalance}
-          label="Gegner"
-        />
       </div>
 
-      {/* Attack notification */}
-      {game.lastAttack && (
-        <div className="mx-4 mt-2 p-2.5 rounded-lg bg-danger/10 border border-danger/20 animate-slide-up">
-          <p className="text-xs text-danger font-medium">⚠️ Angriff: {game.lastAttack}</p>
-        </div>
-      )}
+      {/* Controls */}
+      <div className="px-4 mt-3 flex-1">
+        {game.phase === 'place' && (
+          <div className="space-y-3">
+            <UnitPicker
+              selected={game.selectedUnit}
+              onSelect={game.setSelectedUnit}
+              placedCount={game.playerUnits.length}
+            />
+            <button
+              onClick={game.startBattle}
+              disabled={game.playerUnits.length === 0}
+              className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              ⚔️ Kampf starten ({game.playerUnits.length} Einheiten)
+            </button>
+          </div>
+        )}
 
-      {/* Action tabs */}
-      <div className="px-4 mt-4">
-        <div className="flex rounded-xl bg-muted p-1 gap-1">
-          <button
-            onClick={() => setTab('earn')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-              tab === 'earn' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-            }`}
-          >
-            💰 Verdienen
-          </button>
-          <button
-            onClick={() => setTab('attack')}
-            className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
-              tab === 'attack' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-            }`}
-          >
-            ⚔️ Angreifen
-          </button>
-        </div>
-      </div>
+        {game.phase === 'battle' && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Kampflog</p>
+            <BattleLog logs={game.battleLog} />
+          </div>
+        )}
 
-      {/* Actions */}
-      <div className="px-4 mt-3 space-y-2">
-        {(tab === 'earn' ? EARN_ACTIONS : ATTACK_ACTIONS).map(action => (
-          <ActionButton
-            key={action.id}
-            action={action}
-            cooldownEnd={game.cooldowns[action.id]}
-            onAction={game.performAction}
-          />
-        ))}
-      </div>
-
-      {/* Transaction history */}
-      <div className="px-4 mt-4 flex-1">
-        <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          Transaktionen
-        </h3>
-        <TransactionFeed transactions={game.transactions} />
+        {(game.phase === 'won' || game.phase === 'lost') && (
+          <div className="text-center space-y-4 py-4">
+            <div className="text-5xl">{game.phase === 'won' ? '🏆' : '💀'}</div>
+            <p className="text-lg font-bold text-foreground">
+              {game.phase === 'won' ? 'Sieg!' : 'Niederlage!'}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {game.turnCount} Runden gespielt
+            </p>
+            <button
+              onClick={game.resetGame}
+              className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
+            >
+              🔄 Neues Spiel
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="h-6" />
