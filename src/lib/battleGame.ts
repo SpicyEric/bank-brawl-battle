@@ -102,8 +102,8 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   assassin: {
     label: 'Assassine',
     emoji: '🗡️',
-    hp: 75,
-    attack: 32,
+    hp: 90,
+    attack: 30,
     cooldown: 2,
     description: 'Bewegt sich diagonal (2 Felder). Greift diagonal angrenzend an.',
     movePattern: [
@@ -195,9 +195,9 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   mage: {
     label: 'Magier',
     emoji: '🔮',
-    hp: 70,
+    hp: 85,
     attack: 30,
-    cooldown: 3,
+    cooldown: 2,
     description: 'Bewegt sich in alle Richtungen (1 Feld). Greift diagonal 2-3 Felder an.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
@@ -241,8 +241,8 @@ export const ENEMY_ROWS = [0, 1, 2];
 export const POINTS_TO_WIN = 13;
 export const ROUND_TIME_LIMIT = 45; // seconds
 
-export const COUNTER_MULTIPLIER = 1.5;
-export const WEAKNESS_MULTIPLIER = 0.5;
+export const COUNTER_MULTIPLIER = 1.4;
+export const WEAKNESS_MULTIPLIER = 0.6;
 
 export function createEmptyGrid(): Cell[][] {
   return Array.from({ length: GRID_SIZE }, (_, row) =>
@@ -300,17 +300,17 @@ export function generateTerrain(grid: Cell[][]): Cell[][] {
 }
 
 // Calculate activation turn based on row distance from center
-// Player rows: 5 (front, turn 0), 6 (mid, turn 3), 7 (back, turn 5)
-// Enemy rows: 2 (front, turn 0), 1 (mid, turn 3), 0 (back, turn 5)
+// Player rows: 5 (front, turn 0), 6 (mid, turn 2), 7 (back, turn 3)
+// Enemy rows: 2 (front, turn 0), 1 (mid, turn 2), 0 (back, turn 3)
 export function getActivationTurn(row: number, team: Team): number {
   if (team === 'player') {
-    if (row === 5) return 0; // front row – active immediately
-    if (row === 6) return 3; // middle row – activates turn 3
-    return 5; // row 7 – activates turn 5
+    if (row === 5) return 0;
+    if (row === 6) return 2;
+    return 3; // row 7
   } else {
     if (row === 2) return 0;
-    if (row === 1) return 3;
-    return 5; // row 0
+    if (row === 1) return 2;
+    return 3; // row 0
   }
 }
 
