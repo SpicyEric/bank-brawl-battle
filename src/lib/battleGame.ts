@@ -296,6 +296,167 @@ export function generateAIPlacement(playerUnits: Unit[]): { type: UnitType; row:
   return placements;
 }
 
+// === SYNERGY / FORMATION SYSTEM ===
+
+export interface Synergy {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  check: (units: Unit[]) => boolean;
+  effect: (units: Unit[]) => void; // mutates units with buffs
+  counterOf?: string; // this synergy counters another
+}
+
+function unitsInRow(units: Unit[]): Map<number, Unit[]> {
+  const map = new Map<number, Unit[]>();
+  for (const u of units) {
+    if (!map.has(u.row)) map.set(u.row, []);
+    map.get(u.row)!.push(u);
+  }
+  return map;
+}
+
+function unitsInCol(units: Unit[]): Map<number, Unit[]> {
+  const map = new Map<number, Unit[]>();
+  for (const u of units) {
+    if (!map.has(u.col)) map.set(u.col, []);
+    map.get(u.col)!.push(u);
+  }
+  return map;
+}
+
+function areAdjacent(a: Unit, b: Unit): boolean {
+  return Math.abs(a.row - b.row) <= 1 && Math.abs(a.col - b.col) <= 1 && (a.row !== b.row || a.col !== b.col);
+}
+
+export const SYNERGIES: Synergy[] = [
+  {
+    id: 'phalanx',
+    name: 'Phalanx',
+    emoji: '🧱',
+    description: '3+ Einheiten in einer Reihe: +20% HP',
+    counterOf: 'sniper_line',
+    check: (units) => {
+      const rows = unitsInRow(units);
+      for (const [, row] of rows) if (row.length >= 3) return true;
+      return false;
+    },
+    effect: (units) => {
+      const rows = unitsInRow(units);
+      for (const [, row] of rows) {
+        if (row.length >= 3) {
+          for (const u of row) {
+            u.maxHp = Math.floor(u.maxHp * 1.2);
+            u.hp = Math.floor(u.hp * 1.2);
+          }
+        }
+      }
+    },
+  },
+  {
+    id: 'sniper_line',
+    name: 'Scharfschützen',
+    emoji: '🎯',
+    description: '2+ Fernkämpfer in einer Spalte: +30% Angriff für Fernkämpfer',
+    counterOf: 'flank',
+    check: (units) => {
+      const cols = unitsInCol(units);
+      const rangedTypes: UnitType[] = ['archer', 'mage'];
+      for (const [, col] of cols) {
+        const ranged = col.filter(u => rangedTypes.includes(u.type));
+        if (ranged.length >= 2) return true;
+      }
+      return false;
+    },
+    effect: (units) => {
+      const rangedTypes: UnitType[] = ['archer', 'mage'];
+      const cols = unitsInCol(units);
+      for (const [, col] of cols) {
+        const ranged = col.filter(u => rangedTypes.includes(u.type));
+        if (ranged.length >= 2) {
+          for (const u of ranged) u.attack = Math.floor(u.attack * 1.3);
+        }
+      }
+    },
+  },
+  {
+    id: 'flank',
+    name: 'Flanke',
+    emoji: '🔀',
+    description: 'Einheiten auf Spalte 0-1 UND 6-7: +25% Angriff für alle',
+    counterOf: 'fortress',
+    check: (units) => {
+      const hasLeft = units.some(u => u.col <= 1);
+      const hasRight = units.some(u => u.col >= 6);
+      return hasLeft && hasRight;
+    },
+    effect: (units) => {
+      for (const u of units) u.attack = Math.floor(u.attack * 1.25);
+    },
+  },
+  {
+    id: 'fortress',
+    name: 'Festung',
+    emoji: '🏰',
+    description: 'Tank vorne + 2+ Einheiten dahinter: Hintere +30% HP',
+    counterOf: 'phalanx',
+    check: (units) => {
+      const tanks = units.filter(u => u.type === 'tank');
+      for (const tank of tanks) {
+        const behind = units.filter(u => u.id !== tank.id && u.row > tank.row);
+        if (behind.length >= 2) return true;
+      }
+      return false;
+    },
+    effect: (units) => {
+      const tanks = units.filter(u => u.type === 'tank');
+      for (const tank of tanks) {
+        const behind = units.filter(u => u.id !== tank.id && u.row > tank.row);
+        if (behind.length >= 2) {
+          for (const u of behind) {
+            u.maxHp = Math.floor(u.maxHp * 1.3);
+            u.hp = Math.floor(u.hp * 1.3);
+          }
+        }
+      }
+    },
+  },
+  {
+    id: 'assassin_pack',
+    name: 'Schattenangriff',
+    emoji: '🌑',
+    description: '2+ Assassinen nebeneinander: +40% Angriff für Assassinen',
+    counterOf: 'phalanx',
+    check: (units) => {
+      const assassins = units.filter(u => u.type === 'assassin');
+      if (assassins.length < 2) return false;
+      for (let i = 0; i < assassins.length; i++) {
+        for (let j = i + 1; j < assassins.length; j++) {
+          if (areAdjacent(assassins[i], assassins[j])) return true;
+        }
+      }
+      return false;
+    },
+    effect: (units) => {
+      const assassins = units.filter(u => u.type === 'assassin');
+      for (const u of assassins) u.attack = Math.floor(u.attack * 1.4);
+    },
+  },
+];
+
+// Detect and apply synergies for a team
+export function detectSynergies(units: Unit[]): string[] {
+  const active: string[] = [];
+  for (const syn of SYNERGIES) {
+    if (syn.check(units)) {
+      syn.effect(units);
+      active.push(syn.id);
+    }
+  }
+  return active;
+}
+
 // For showing patterns in unit info (relative offsets)
 export function getPatternDisplay(pattern: Position[], gridSize: number = 5): boolean[][] {
   const center = Math.floor(gridSize / 2);

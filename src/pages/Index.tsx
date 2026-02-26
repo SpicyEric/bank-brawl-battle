@@ -4,7 +4,8 @@ import { BattleGrid } from '@/components/battle/BattleGrid';
 import { UnitPicker } from '@/components/battle/UnitPicker';
 import { BattleLog } from '@/components/battle/BattleLog';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
-import { UNIT_DEFS, POINTS_TO_WIN, UnitType } from '@/lib/battleGame';
+import { SynergyDisplay } from '@/components/battle/SynergyDisplay';
+import { POINTS_TO_WIN, UnitType, SYNERGIES } from '@/lib/battleGame';
 
 const Index = () => {
   const game = useBattleGame();
@@ -28,6 +29,9 @@ const Index = () => {
       document.removeEventListener('click', playOnInteraction);
     };
   }, []);
+
+  const placingBlind = game.phase === 'place_player' && game.playerStarts;
+  const placingReactive = game.phase === 'place_player' && !game.playerStarts;
 
   return (
     <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto">
@@ -56,9 +60,10 @@ const Index = () => {
         game.phase === 'round_won' ? 'bg-success/10 text-success border border-success/20' :
         'bg-danger/10 text-danger border border-danger/20'
       }`}>
-        {game.phase === 'place_player' && '📍 Platziere deine Einheiten (untere 3 Reihen)'}
-        {game.phase === 'place_enemy' && '👁️ Gegner hat aufgestellt! Bereit zum Kampf?'}
-        {game.phase === 'battle' && `⚔️ Kampf läuft... Runde ${game.turnCount}`}
+        {placingBlind && '📍 Platziere blind – Gegner sieht dich danach!'}
+        {placingReactive && '👁️ Gegner hat aufgestellt – reagiere mit deiner Aufstellung!'}
+        {game.phase === 'place_enemy' && '⚔️ Beide Seiten stehen – bereit zum Kampf?'}
+        {game.phase === 'battle' && `⚔️ Kampf läuft... Zug ${game.turnCount}`}
         {game.phase === 'round_won' && '🏆 Runde gewonnen!'}
         {game.phase === 'round_lost' && '💀 Runde verloren!'}
       </div>
@@ -77,7 +82,6 @@ const Index = () => {
                 game.placeUnit(row, col);
               }
             }
-            // Click on any unit during battle/placement to inspect
             const unit = game.grid[row][col].unit;
             if (unit) {
               setInspectUnit(unit.type);
@@ -85,6 +89,18 @@ const Index = () => {
           }}
         />
       </div>
+
+      {/* Synergies display */}
+      {(game.phase === 'place_enemy' || game.phase === 'battle') && (
+        <div className="px-4 mt-2 space-y-1">
+          {game.playerSynergies.length > 0 && (
+            <SynergyDisplay synergies={game.playerSynergies} team="player" />
+          )}
+          {game.enemySynergies.length > 0 && (
+            <SynergyDisplay synergies={game.enemySynergies} team="enemy" />
+          )}
+        </div>
+      )}
 
       {/* Controls */}
       <div className="px-4 mt-3 flex-1">
@@ -108,8 +124,10 @@ const Index = () => {
         {game.phase === 'place_enemy' && (
           <div className="space-y-3 text-center">
             <p className="text-sm text-muted-foreground">
-              Der Gegner hat <span className="text-danger font-bold">{game.enemyUnits.length}</span> Einheiten aufgestellt.
-              Schau dir die Aufstellung an!
+              {game.playerStarts
+                ? <>Der Gegner hat <span className="text-danger font-bold">{game.enemyUnits.length}</span> Einheiten als Konter aufgestellt.</>
+                : <>Deine Aufstellung steht! Bereit zum Kampf?</>
+              }
             </p>
             <button
               onClick={game.startBattle}
@@ -143,9 +161,12 @@ const Index = () => {
             <p className="text-sm text-muted-foreground">
               Stand: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>
             </p>
+            <p className="text-[11px] text-muted-foreground">
+              Nächste Runde: {!game.playerStarts ? 'Du platzierst zuerst (blind)' : 'Gegner platziert zuerst'}
+            </p>
             {game.gameOver ? (
               <div className="space-y-3">
-                <p className="text-xl font-bold">
+                <p className="text-xl font-bold text-foreground">
                   {game.gameWon ? '🎉 SPIEL GEWONNEN!' : '😢 SPIEL VERLOREN!'}
                 </p>
                 <button
@@ -167,7 +188,6 @@ const Index = () => {
         )}
       </div>
 
-      {/* Unit inspect modal */}
       {inspectUnit && (
         <UnitInfoModal unitType={inspectUnit} onClose={() => setInspectUnit(null)} />
       )}
