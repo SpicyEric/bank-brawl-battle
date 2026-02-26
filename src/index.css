@@ -137,3 +137,25 @@
 .dmg-popup {
   animation: dmg-popup-anim 0.65s ease-out forwards;
 }
+
+@keyframes projectile-fly-anim {
+  0% {
+    left: var(--from-x);
+    top: var(--from-y);
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  80% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+  100% {
+    left: var(--to-x);
+    top: var(--to-y);
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+}
+.projectile-fly {
+  animation: projectile-fly-anim 0.4s ease-in forwards;
+}

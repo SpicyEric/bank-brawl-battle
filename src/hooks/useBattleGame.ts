@@ -103,7 +103,7 @@ export function useBattleGame() {
     setGrid(prevGrid => {
       const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
       const allUnits: Unit[] = [];
-      for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0) allUnits.push(cell.unit);
+      for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
 
       const logs: string[] = [];
       const events: BattleEvent[] = [];
@@ -136,18 +136,26 @@ export function useBattleGame() {
           const isStrong = def.strongVs.includes(target.type);
           const isWeak = def.weakVs.includes(target.type);
           const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
+          const dist = Math.abs(unit.row - target.row) + Math.abs(unit.col - target.col);
           logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.hp <= 0 ? ' ☠️' : ''}`);
           events.push({
             type: target.hp <= 0 ? 'kill' : 'hit',
+            attackerId: unit.id,
+            attackerRow: unit.row,
+            attackerCol: unit.col,
+            attackerEmoji: def.emoji,
             targetId: target.id,
             targetRow: target.row,
             targetCol: target.col,
             damage: dmg,
             isStrong, isWeak,
+            isRanged: dist > 1,
           });
 
           if (target.hp <= 0) {
-            newGrid[target.row][target.col].unit = null;
+            // Mark as dead skull - keep unit on grid but flagged
+            target.type = target.type; // keep type for reference
+            (target as any).dead = true;
           }
         }
       }

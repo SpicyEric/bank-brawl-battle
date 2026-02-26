@@ -15,6 +15,7 @@ export interface Unit {
   col: number;
   cooldown: number;
   maxCooldown: number;
+  dead?: boolean;
 }
 
 export interface Cell {
@@ -224,7 +225,8 @@ export function getMoveCells(unit: Unit, grid: Cell[][]): Position[] {
     .map(p => ({ row: unit.row + p.row, col: unit.col + p.col }))
     .filter(p =>
       p.row >= 0 && p.row < GRID_SIZE && p.col >= 0 && p.col < GRID_SIZE &&
-      (!grid[p.row][p.col].unit || grid[p.row][p.col].unit!.id === unit.id)
+      (!grid[p.row][p.col].unit || grid[p.row][p.col].unit!.id === unit.id) &&
+      !grid[p.row][p.col].unit?.dead
     );
 }
 
