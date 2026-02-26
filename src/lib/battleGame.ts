@@ -269,7 +269,11 @@ export function generateTerrain(grid: Cell[][]): Cell[][] {
 
     if (attempts >= 20) continue;
     used.add(`${row},${col}`);
-    const terrain = Math.random() < 0.3 ? 'water' : terrainTypes[Math.floor(Math.random() * 2)];
+    // No water on placement rows (row 2 = enemy front, row 5 = player front)
+    const isPlacementRow = PLAYER_ROWS.includes(row) || ENEMY_ROWS.includes(row);
+    const terrain = isPlacementRow
+      ? (Math.random() < 0.5 ? 'forest' : 'hill')
+      : (Math.random() < 0.3 ? 'water' : terrainTypes[Math.floor(Math.random() * 2)]);
     newGrid[row][col].terrain = terrain;
   }
 
