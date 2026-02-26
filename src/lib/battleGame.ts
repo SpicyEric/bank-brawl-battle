@@ -19,10 +19,20 @@ export interface Unit {
   frozen?: number; // turns remaining frozen (can't act)
 }
 
+export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
+
+export const TERRAIN_DEFS: Record<TerrainType, { emoji: string; label: string; description: string }> = {
+  none: { emoji: '', label: '', description: '' },
+  forest: { emoji: '🌲', label: 'Wald', description: '-20% erlittener Schaden' },
+  hill: { emoji: '⛰️', label: 'Hügel', description: '+15% verursachter Schaden' },
+  water: { emoji: '🌊', label: 'Wasser', description: 'Unpassierbar (Drache kann fliegen)' },
+};
+
 export interface Cell {
   row: number;
   col: number;
   unit: Unit | null;
+  terrain: TerrainType;
 }
 
 // Movement patterns: relative offsets the unit can move to per turn
@@ -232,8 +242,34 @@ export const WEAKNESS_MULTIPLIER = 0.7;
 
 export function createEmptyGrid(): Cell[][] {
   return Array.from({ length: GRID_SIZE }, (_, row) =>
-    Array.from({ length: GRID_SIZE }, (_, col) => ({ row, col, unit: null }))
+    Array.from({ length: GRID_SIZE }, (_, col) => ({ row, col, unit: null, terrain: 'none' as TerrainType }))
   );
+}
+
+// Generate random terrain for a new round
+export function generateTerrain(grid: Cell[][]): Cell[][] {
+  const newGrid = grid.map(r => r.map(c => ({ ...c, terrain: 'none' as TerrainType })));
+  const terrainTypes: TerrainType[] = ['forest', 'hill', 'water'];
+  // Place 4-7 terrain tiles in the middle area (rows 2-5) to affect both sides
+  const count = 4 + Math.floor(Math.random() * 4);
+  const used = new Set<string>();
+
+  for (let i = 0; i < count; i++) {
+    let row: number, col: number;
+    let attempts = 0;
+    do {
+      row = 2 + Math.floor(Math.random() * 4); // rows 2-5 (middle)
+      col = Math.floor(Math.random() * GRID_SIZE);
+      attempts++;
+    } while (used.has(`${row},${col}`) && attempts < 20);
+
+    if (attempts >= 20) continue;
+    used.add(`${row},${col}`);
+    // Water less common (30% chance for water, rest split between forest and hill)
+    const terrain = Math.random() < 0.3 ? 'water' : terrainTypes[Math.floor(Math.random() * 2)];
+    newGrid[row][col].terrain = terrain;
+  }
+  return newGrid;
 }
 
 export function createUnit(type: UnitType, team: Team, row: number, col: number): Unit {
@@ -276,11 +312,12 @@ export function getMoveCells(unit: Unit, grid: Cell[][]): Position[] {
     .filter(p =>
       p.row >= 0 && p.row < GRID_SIZE && p.col >= 0 && p.col < GRID_SIZE &&
       (!grid[p.row][p.col].unit || grid[p.row][p.col].unit!.id === unit.id) &&
+      (canFly || grid[p.row][p.col].terrain !== 'water') &&
       (canFly || !grid[p.row][p.col].unit?.dead)
     );
 }
 
-// Find best target considering tank taunt
+// Find best target: frontline mechanic + tank taunt
 export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
@@ -292,6 +329,23 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     return nearbyTanks[0];
   }
 
+  // Frontline mechanic: prefer targeting enemies in the front rows (closest to attacker's side)
+  // For player units (rows 5-7), enemy front = highest row number
+  // For enemy units (rows 0-2), player front = lowest row number
+  const isMelee = UNIT_DEFS[unit.type].attackPattern.every(p => Math.abs(p.row) <= 1 && Math.abs(p.col) <= 1);
+
+  if (isMelee) {
+    // Sort enemies by frontline priority: closest row to the attacker's side first
+    const frontlineSorted = [...enemies].sort((a, b) => {
+      const aFront = unit.team === 'player' ? a.row : -a.row; // higher row = more front for player
+      const bFront = unit.team === 'player' ? b.row : -b.row;
+      if (aFront !== bFront) return bFront - aFront; // front first
+      return distance(unit, a) - distance(unit, b); // then closest
+    });
+    return frontlineSorted[0];
+  }
+
+  // Ranged units: target closest enemy (unchanged)
   enemies.sort((a, b) => distance(unit, a) - distance(unit, b));
   return enemies[0];
 }
@@ -344,8 +398,8 @@ export function moveToward(unit: Unit, target: Unit, grid: Cell[][]): Position {
   return best;
 }
 
-// Calculate damage with counter system
-export function calcDamage(attacker: Unit, defender: Unit): number {
+// Calculate damage with counter system + terrain bonuses
+export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): number {
   const aDef = UNIT_DEFS[attacker.type];
   let dmg = attacker.attack * (0.95 + Math.random() * 0.1);
 
@@ -353,6 +407,16 @@ export function calcDamage(attacker: Unit, defender: Unit): number {
     dmg *= COUNTER_MULTIPLIER;
   } else if (aDef.weakVs.includes(defender.type)) {
     dmg *= WEAKNESS_MULTIPLIER;
+  }
+
+  // Hill bonus: attacker on hill deals +15% damage
+  if (grid && grid[attacker.row][attacker.col].terrain === 'hill') {
+    dmg *= 1.15;
+  }
+
+  // Forest bonus: defender in forest takes -20% damage
+  if (grid && grid[defender.row][defender.col].terrain === 'forest') {
+    dmg *= 0.8;
   }
 
   return Math.floor(dmg);

@@ -2,13 +2,13 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
-  generateAIPlacement, getMaxUnits,
+  generateAIPlacement, getMaxUnits, generateTerrain,
   GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 
 export function useBattleGame() {
-  const [grid, setGrid] = useState<Cell[][]>(() => createEmptyGrid());
+  const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
   const [selectedUnit, setSelectedUnit] = useState<UnitType | null>('warrior');
   const [playerUnits, setPlayerUnits] = useState<Unit[]>([]);
@@ -24,7 +24,7 @@ export function useBattleGame() {
 
   // Full reset
   const resetGame = useCallback(() => {
-    setGrid(createEmptyGrid());
+    setGrid(generateTerrain(createEmptyGrid()));
     setPlayerUnits([]);
     setEnemyUnits([]);
     setPhase('place_player');
@@ -82,11 +82,13 @@ export function useBattleGame() {
     const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
     setEnemyUnits(enemies);
 
-    // Build full grid
-    const newGrid = createEmptyGrid();
-    for (const u of pUnits) newGrid[u.row][u.col].unit = u;
-    for (const e of enemies) newGrid[e.row][e.col].unit = e;
-    setGrid(newGrid);
+    // Build full grid preserving terrain
+    setGrid(prev => {
+      const newGrid = prev.map(r => r.map(c => ({ ...c, unit: null as Unit | null })));
+      for (const u of pUnits) newGrid[u.row][u.col].unit = u;
+      for (const e of enemies) newGrid[e.row][e.col].unit = e;
+      return newGrid;
+    });
 
     setPhase('place_enemy');
   }, [playerUnits]);
@@ -168,7 +170,7 @@ export function useBattleGame() {
         }
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
-          const dmg = calcDamage(unit, target);
+          const dmg = calcDamage(unit, target, newGrid);
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
 
@@ -254,16 +256,16 @@ export function useBattleGame() {
     setSelectedUnit('warrior');
 
     if (newStarts) {
-      setGrid(createEmptyGrid());
+      setGrid(generateTerrain(createEmptyGrid()));
       setEnemyUnits([]);
       setPhase('place_player');
     } else {
-      const emptyGrid = createEmptyGrid();
+      const terrainGrid = generateTerrain(createEmptyGrid());
       const aiMax = getMaxUnits(enemyScore, playerScore);
       const aiPlacements = generateAIPlacement([], aiMax);
       const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
-      for (const e of enemies) emptyGrid[e.row][e.col].unit = e;
-      setGrid(emptyGrid);
+      for (const e of enemies) terrainGrid[e.row][e.col].unit = e;
+      setGrid(terrainGrid);
       setEnemyUnits(enemies);
       setPhase('place_player');
     }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType } from '@/lib/battleGame';
+import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType, TERRAIN_DEFS } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 
 interface BattleGridProps {
@@ -115,7 +115,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   return (
     <div className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto relative">
       <div className="grid grid-cols-8 gap-[2px] w-full h-full bg-border rounded-xl overflow-hidden border border-border">
-        {grid.flat().map((cell) => {
+         {grid.flat().map((cell) => {
           const isPlayerZone = PLAYER_ROWS.includes(cell.row);
           const isEnemyZone = cell.row < 3;
           const unit = cell.unit;
@@ -129,6 +129,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isDead = unit?.dead;
           const isFrozen = unit?.frozen && unit.frozen > 0;
           const cellKey = `${cell.row}-${cell.col}`;
+          const terrain = cell.terrain;
+          const hasTerrain = terrain !== 'none';
 
           // Slide offset
           const offset = unit && !isDead ? slideOffsets.get(unit.id) : null;
@@ -141,15 +143,22 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               key={cellKey}
               onClick={() => onCellClick(cell.row, cell.col)}
               className={`aspect-square flex flex-col items-center justify-center relative overflow-visible
-                ${isPlayerZone && isPlacing && !unit ? 'bg-primary/5 hover:bg-primary/15 cursor-pointer' : ''}
+                ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'bg-primary/5 hover:bg-primary/15 cursor-pointer' : ''}
                 ${isEnemyZone && !unit ? 'bg-danger/5' : ''}
-                ${!unit ? 'bg-card' : ''}
+                ${!unit && !hasTerrain ? 'bg-card' : ''}
+                ${!unit && terrain === 'forest' ? 'bg-[hsl(145,30%,15%)]' : ''}
+                ${!unit && terrain === 'hill' ? 'bg-[hsl(35,25%,18%)]' : ''}
+                ${!unit && terrain === 'water' ? 'bg-[hsl(210,40%,18%)]' : ''}
                 ${isDead ? 'bg-muted/40' : ''}
                 ${isFlashing ? 'flash-attack' : ''}
                 ${isShaking ? 'shake-hit' : ''}
                 transition-colors duration-200
               `}
             >
+              {/* Terrain emoji (show when no unit or unit is dead) */}
+              {hasTerrain && (!unit || isDead) && (
+                <span className="text-[10px] opacity-50 select-none">{TERRAIN_DEFS[terrain].emoji}</span>
+              )}
               {isDead && (
                 <span className="text-sm opacity-40 select-none">💀</span>
               )}
