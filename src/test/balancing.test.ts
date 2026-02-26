@@ -7,13 +7,13 @@ import { describe, it, expect } from 'vitest';
 import {
   UnitType, Unit, Cell, UNIT_DEFS, UNIT_TYPES, GRID_SIZE,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
-  PLAYER_ROWS, ENEMY_ROWS,
+  generateTerrain, PLAYER_ROWS, ENEMY_ROWS,
 } from '@/lib/battleGame';
 
 // --- Headless battle simulation ---
 
 function simulateBattle(playerTeam: UnitType[], enemyTeam: UnitType[]): 'player' | 'enemy' | 'draw' {
-  const grid = createEmptyGrid();
+  const grid = generateTerrain(createEmptyGrid());
   const allUnits: Unit[] = [];
 
   // Place player units spread across player rows
@@ -85,7 +85,7 @@ function simulateBattle(playerTeam: UnitType[], enemyTeam: UnitType[]): 'player'
       }
 
       if (canAttack(unit, target) && unit.cooldown <= 0) {
-        const dmg = calcDamage(unit, target);
+        const dmg = calcDamage(unit, target, grid);
         target.hp = Math.max(0, target.hp - dmg);
         unit.cooldown = unit.maxCooldown;
 
