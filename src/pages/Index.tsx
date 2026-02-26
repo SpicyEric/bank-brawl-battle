@@ -5,15 +5,22 @@ import { UnitPicker } from '@/components/battle/UnitPicker';
 import { BattleLog } from '@/components/battle/BattleLog';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 import { POINTS_TO_WIN, UnitType } from '@/lib/battleGame';
+import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
-// Scoreboard dots
+// Horizontal score dots
 function ScoreDots({ score, max, color }: { score: number; max: number; color: 'success' | 'danger' }) {
   return (
-    <div className="flex flex-col-reverse gap-[3px] items-center">
+    <div className="flex gap-[3px] items-center">
       {Array.from({ length: max }, (_, i) => (
         <div
           key={i}
-          className={`w-2 h-2 rounded-full transition-all duration-300 ${
+          className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
             i < score
               ? color === 'success' ? 'bg-success shadow-[0_0_4px_hsl(var(--success))]' : 'bg-danger shadow-[0_0_4px_hsl(var(--danger))]'
               : 'bg-muted/40'
@@ -29,6 +36,7 @@ const Index = () => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
   const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
+  const [muted, setMuted] = useState(false);
   const [phaseOverlay, setPhaseOverlay] = useState<string | null>(null);
   const [overlaySubtext, setOverlaySubtext] = useState<string | null>(null);
   const prevPhase = useRef(game.phase);
@@ -84,43 +92,54 @@ const Index = () => {
   }, [game.phase, game.playerStarts, game.playerMaxUnits]);
 
   return (
-    <div className="min-h-screen bg-background flex flex-col max-w-md mx-auto">
-      {/* Header - just logo */}
-      <header className="px-4 pt-3 pb-1 flex items-center justify-center">
+    <div className="min-h-[100dvh] max-h-[100dvh] bg-background flex flex-col max-w-md mx-auto overflow-hidden">
+      {/* Slim scoreboard bar */}
+      <div className="mx-3 mt-2 mb-1.5 py-1.5 px-3 rounded-lg bg-card border border-border flex items-center justify-between">
+        {/* Player */}
         <div className="flex items-center gap-2">
-          <span className="text-lg">⚔️</span>
-          <span className="font-bold text-sm text-foreground tracking-tight">GridBattle</span>
+          <p className="text-base font-bold font-mono text-success leading-none">{game.playerScore}</p>
+          <ScoreDots score={game.playerScore} max={POINTS_TO_WIN} color="success" />
         </div>
-      </header>
 
-      {/* Scoreboard */}
-      <div className="mx-4 mb-2 py-3 px-4 rounded-xl bg-card border border-border">
-        <div className="flex items-center justify-between">
-          {/* Player side */}
-          <div className="flex items-center gap-3">
-            <ScoreDots score={game.playerScore} max={POINTS_TO_WIN} color="success" />
-            <div className="text-center">
-              <p className="text-2xl font-bold font-mono text-success leading-none">{game.playerScore}</p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 uppercase tracking-wider">Du</p>
-            </div>
-          </div>
+        {/* Round */}
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
+          Runde <span className="text-foreground font-bold">{game.roundNumber}</span>
+        </p>
 
-          {/* Center - Round */}
-          <div className="text-center">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Runde</p>
-            <p className="text-xl font-bold font-mono text-foreground leading-none mt-0.5">{game.roundNumber}</p>
-            <p className="text-[9px] text-muted-foreground mt-0.5">/ {POINTS_TO_WIN}</p>
-          </div>
-
-          {/* Enemy side */}
-          <div className="flex items-center gap-3">
-            <div className="text-center">
-              <p className="text-2xl font-bold font-mono text-danger leading-none">{game.enemyScore}</p>
-              <p className="text-[9px] text-muted-foreground mt-0.5 uppercase tracking-wider">Gegner</p>
-            </div>
-            <ScoreDots score={game.enemyScore} max={POINTS_TO_WIN} color="danger" />
-          </div>
+        {/* Enemy */}
+        <div className="flex items-center gap-2">
+          <ScoreDots score={game.enemyScore} max={POINTS_TO_WIN} color="danger" />
+          <p className="text-base font-bold font-mono text-danger leading-none">{game.enemyScore}</p>
         </div>
+
+        {/* Settings gear */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="ml-2 p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+              <Settings size={16} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="min-w-[160px]">
+            <DropdownMenuItem onClick={() => {
+              setMuted(m => {
+                const next = !m;
+                if (audioRef.current) audioRef.current.muted = next;
+                return next;
+              });
+            }}>
+              {muted ? <Volume2 className="mr-2 h-4 w-4" /> : <VolumeX className="mr-2 h-4 w-4" />}
+              {muted ? 'Ton an' : 'Ton aus'}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={game.resetGame}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Spiel neustarten
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled>
+              <Home className="mr-2 h-4 w-4" />
+              Hauptmenü
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Grid with overlay */}
@@ -178,10 +197,10 @@ const Index = () => {
             />
             <button
               onClick={game.confirmPlacement}
-              disabled={game.playerUnits.length === 0}
-              className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              disabled={game.playerUnits.length < game.playerMaxUnits}
+              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
-              ✅ Aufstellung bestätigen ({game.playerUnits.length}/{game.playerMaxUnits})
+              ✅ Bereit
             </button>
           </div>
         )}

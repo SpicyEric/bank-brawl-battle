@@ -26,10 +26,7 @@ export function UnitPicker({ selected, onSelect, placedCount, maxUnits }: UnitPi
   return (
     <>
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Einheit wählen</p>
-          <p className="text-xs text-muted-foreground">{placedCount}/{maxUnits} platziert</p>
-        </div>
+        <p className="text-xs text-muted-foreground text-center">{placedCount}/{maxUnits} platziert</p>
         <div className="grid grid-cols-3 gap-2">
           {UNIT_TYPES.map(type => {
             const def = UNIT_DEFS[type];
