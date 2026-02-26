@@ -300,7 +300,7 @@ export function calcDamage(attacker: Unit, defender: Unit): number {
 export function generateAIPlacement(playerUnits: Unit[]): { type: UnitType; row: number; col: number }[] {
   const placements: { type: UnitType; row: number; col: number }[] = [];
   const usedCells = new Set<string>();
-  const count = Math.min(5, Math.max(3, playerUnits.length));
+  const count = playerUnits.length > 0 ? Math.min(5, Math.max(3, playerUnits.length)) : 5;
 
   // Count player unit types
   const playerTypes: Record<string, number> = {};
