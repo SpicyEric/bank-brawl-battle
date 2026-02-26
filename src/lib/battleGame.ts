@@ -234,7 +234,15 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   return enemies[0];
 }
 
-// Move toward target using movement pattern
+// Check if a unit at a given position could attack the target
+function couldAttackFrom(pos: Position, unitType: UnitType, target: Position): boolean {
+  const def = UNIT_DEFS[unitType];
+  const dr = target.row - pos.row;
+  const dc = target.col - pos.col;
+  return def.attackPattern.some(p => p.row === dr && p.col === dc);
+}
+
+// Move toward target: prioritize positions from which unit can attack
 export function moveToward(unit: Unit, target: Unit, grid: Cell[][]): Position {
   const possibleMoves = getMoveCells(unit, grid);
   if (possibleMoves.length === 0) return { row: unit.row, col: unit.col };
@@ -242,13 +250,32 @@ export function moveToward(unit: Unit, target: Unit, grid: Cell[][]): Position {
   // If can already attack, don't move
   if (canAttack(unit, target)) return { row: unit.row, col: unit.col };
 
+  // Priority 1: move to a cell from which we can attack
+  const attackMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
+  if (attackMoves.length > 0) {
+    // Pick the one furthest from the target (stay at range if possible)
+    attackMoves.sort((a, b) => distance(b, target) - distance(a, target));
+    return attackMoves[0];
+  }
+
+  // Priority 2: move closer to the nearest cell from which we could attack
+  const def = UNIT_DEFS[unit.type];
   let best = { row: unit.row, col: unit.col };
-  let bestDist = distance(unit, target);
+  let bestScore = Infinity;
 
   for (const pos of possibleMoves) {
-    const d = distance(pos, target);
-    if (d < bestDist) {
-      bestDist = d;
+    // Find minimum distance from this pos to any theoretical attack position
+    let minAttackDist = Infinity;
+    for (const p of def.attackPattern) {
+      const attackFromRow = target.row - p.row;
+      const attackFromCol = target.col - p.col;
+      if (attackFromRow >= 0 && attackFromRow < GRID_SIZE && attackFromCol >= 0 && attackFromCol < GRID_SIZE) {
+        const d = distance(pos, { row: attackFromRow, col: attackFromCol });
+        if (d < minAttackDist) minAttackDist = d;
+      }
+    }
+    if (minAttackDist < bestScore) {
+      bestScore = minAttackDist;
       best = pos;
     }
   }
