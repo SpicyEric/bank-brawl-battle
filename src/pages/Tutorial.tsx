@@ -133,7 +133,7 @@ const STEPS: TutorialStep[] = [
     id: 'abilities',
     title: '🔥 Fähigkeiten im Kampf',
     text: 'Während des Kampfes hast du 3 einmalige Fähigkeiten:\n\n🔥 Kriegsschrei — +25% Schaden für 3 Züge, danach -15% für 2 Züge\n🎯 Fokusfeuer — Alle greifen das schwächste Ziel an (4 Züge)\n💀 Opferritual — Opfere deine schwächste Einheit, heile alle anderen um 15%',
-    hint: 'Timing ist alles! Nutze den Kriegsschrei wenn viele deiner Einheiten am Leben sind.',
+    hint: '💡 Wann welche Fähigkeit?\n\n🔥 Kriegsschrei — Warte, bis ALLE deine Reihen aktiv sind (ab Zug 3). So profitieren alle Einheiten vom Bonus!\n\n🎯 Fokusfeuer — Am besten, wenn der Gegner einen gefährlichen Fernkämpfer oder Heiler hat, den du schnell ausschalten willst.\n\n💀 Opferritual — Behalte die HP deiner Einheiten im Blick! Wenn eine fast tot ist und sowieso im nächsten Zug stirbt, opfere sie rechtzeitig — so heilst du den Rest. Nicht zu früh (du opferst eine gesunde Einheit) und nicht zu spät (sie stirbt vorher)!',
     showAbilityPreview: true,
   },
   {
