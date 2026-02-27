@@ -17,9 +17,10 @@ interface BattleGridProps {
 interface UnitPos { row: number; col: number }
 interface DamagePopup { id: string; row: number; col: number; damage: number; isStrong: boolean; isWeak: boolean; isKill: boolean }
 interface HealPopup { id: string; row: number; col: number; healAmount: number }
-interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string }
+interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string; type?: 'arrow' | 'magic' | 'frost' | 'default' }
 interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
+interface FreezeEffect { id: string; row: number; col: number }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
@@ -33,10 +34,12 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [dragonFires, setDragonFires] = useState<DragonFire[]>([]);
   const [healGlows, setHealGlows] = useState<HealGlow[]>([]);
   const [healPopups, setHealPopups] = useState<HealPopup[]>([]);
+  const [freezeEffects, setFreezeEffects] = useState<FreezeEffect[]>([]);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
   const healCounter = useRef(0);
+  const freezeCounter = useRef(0);
   const [warCryFlash, setWarCryFlash] = useState(false);
   const [focusFlashAnim, setFocusFlashAnim] = useState(false);
   const [sacrificeAnim, setSacrificeAnim] = useState(false);
@@ -122,7 +125,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
   }, [grid]);
 
-  // Handle battle events: shake + damage popups + projectiles + heal glows
+  // Handle battle events: shake + damage popups + projectiles + heal glows + freeze
   useEffect(() => {
     if (battleEvents.length === 0) return;
     const newShake = new Set<string>();
@@ -131,6 +134,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     const newDragonFires: DragonFire[] = [];
     const newHealGlows: HealGlow[] = [];
     const newHealPopups: HealPopup[] = [];
+    const newFreezes: FreezeEffect[] = [];
 
     for (const evt of battleEvents) {
       // Heal events: green glow + heal popup
@@ -145,7 +149,6 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           row: evt.targetRow, col: evt.targetCol,
           healAmount: evt.healAmount || 0,
         });
-        // Also show projectile from healer to target
         if (evt.isRanged) {
           projCounter.current += 1;
           newProjs.push({
@@ -155,6 +158,16 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             emoji: '✨',
           });
         }
+        continue;
+      }
+
+      // Freeze events: ice spread animation
+      if (evt.type === 'freeze') {
+        freezeCounter.current += 1;
+        newFreezes.push({
+          id: `freeze-${freezeCounter.current}`,
+          row: evt.targetRow, col: evt.targetCol,
+        });
         continue;
       }
 
@@ -179,11 +192,16 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
 
       if (evt.isRanged) {
         projCounter.current += 1;
+        const projType: Projectile['type'] = evt.attackerEmoji === '🏹' ? 'arrow'
+          : evt.attackerEmoji === '🔮' ? 'magic'
+          : evt.attackerEmoji === '🥶' ? 'frost'
+          : 'default';
         newProjs.push({
           id: `proj-${projCounter.current}`,
           fromRow: evt.attackerRow, fromCol: evt.attackerCol,
           toRow: evt.targetRow, toCol: evt.targetCol,
-          emoji: evt.attackerEmoji === '🏹' ? '➴' : evt.attackerEmoji === '🔮' ? '✦' : evt.attackerEmoji === '🥶' ? '❄' : evt.attackerEmoji === '🐉' ? '🔥' : evt.attackerEmoji === '🏇' ? '⚡' : '⚡',
+          emoji: projType === 'arrow' ? '➴' : projType === 'magic' ? '✦' : projType === 'frost' ? '❄' : evt.attackerEmoji === '🐉' ? '🔥' : '⚡',
+          type: projType,
         });
       }
     }
@@ -197,6 +215,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     if (newHealGlows.length > 0) {
       setHealGlows(prev => [...prev, ...newHealGlows]);
       setHealPopups(prev => [...prev, ...newHealPopups]);
+    }
+    if (newFreezes.length > 0) {
+      setFreezeEffects(prev => [...prev, ...newFreezes]);
     }
 
     setTimeout(() => setShakeCells(new Set()), 400);
@@ -218,6 +239,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       setTimeout(() => {
         setHealPopups(prev => prev.filter(h => !newHealPopups.find(nh => nh.id === h.id)));
       }, 800);
+    }
+    if (newFreezes.length > 0) {
+      setTimeout(() => {
+        setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id)));
+      }, 1000);
     }
   }, [battleEvents]);
 
@@ -321,10 +347,14 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         const fromY = p.fromRow * cellSize + cellSize / 2;
         const toX = p.toCol * cellSize + cellSize / 2;
         const toY = p.toRow * cellSize + cellSize / 2;
+        const projClass = p.type === 'arrow' ? 'projectile-arrow'
+          : p.type === 'magic' ? 'projectile-magic'
+          : p.type === 'frost' ? 'projectile-frost'
+          : 'projectile-fly';
         return (
           <div
             key={p.id}
-            className="absolute pointer-events-none z-30 projectile-fly"
+            className={`absolute pointer-events-none z-30 ${projClass}`}
             style={{
               '--from-x': `${fromX}%`,
               '--from-y': `${fromY}%`,
@@ -332,7 +362,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               '--to-y': `${toY}%`,
             } as React.CSSProperties}
           >
-            <span className="text-xs drop-shadow-lg">{p.emoji}</span>
+            <span className={`text-xs drop-shadow-lg ${
+              p.type === 'magic' ? 'text-sm magic-proj-glow' :
+              p.type === 'frost' ? 'frost-proj-glow' :
+              p.type === 'arrow' ? 'arrow-proj-trail' : ''
+            }`}>{p.emoji}</span>
           </div>
         );
       })}
@@ -459,6 +493,27 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             <span className="text-xs font-bold font-mono drop-shadow-lg text-[hsl(145,65%,50%)]">
               +{h.healAmount} ❤️
             </span>
+          </div>
+        );
+      })}
+      {/* Freeze effect overlay */}
+      {freezeEffects.map(f => {
+        const left = f.col * cellSize;
+        const top = f.row * cellSize;
+        return (
+          <div
+            key={f.id}
+            className="absolute pointer-events-none z-25 freeze-cell"
+            style={{
+              left: `${left}%`,
+              top: `${top}%`,
+              width: `${cellSize}%`,
+              height: `${cellSize}%`,
+            }}
+          >
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-lg freeze-emoji">🧊</span>
+            </div>
           </div>
         );
       })}

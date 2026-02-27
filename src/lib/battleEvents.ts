@@ -1,6 +1,6 @@
 // Battle events emitted during combat for animations
 export interface BattleEvent {
-  type: 'hit' | 'kill' | 'heal';
+  type: 'hit' | 'kill' | 'heal' | 'freeze';
   attackerId: string;
   attackerRow: number;
   attackerCol: number;
@@ -15,4 +15,5 @@ export interface BattleEvent {
   isAoe?: boolean; // splash damage (dragon)
   aoeCells?: { row: number; col: number }[]; // all cells affected by AOE fire
   healAmount?: number; // healing done (shaman)
+  isFrozen?: boolean; // target got frozen by this attack
 }

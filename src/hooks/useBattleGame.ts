@@ -432,7 +432,7 @@ export function useBattleGame() {
             if (!healed) {
               // Move toward lowest HP ally
               healable.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
-              const newPos = moveToward(unit, healable[0], newGrid);
+              const newPos = moveToward(unit, healable[0], newGrid, allUnits);
               if (newPos.row !== unit.row || newPos.col !== unit.col) {
                 newGrid[unit.row][unit.col].unit = null;
                 unit.row = newPos.row;
@@ -454,7 +454,7 @@ export function useBattleGame() {
         if (!canAttack(unit, target)) {
           // Track stuck turns for anti-stalemate
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const newPos = moveToward(unit, target, newGrid);
+          const newPos = moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             newGrid[unit.row][unit.col].unit = null;
             unit.row = newPos.row;
@@ -462,8 +462,15 @@ export function useBattleGame() {
             newGrid[unit.row][unit.col].unit = unit;
           }
         } else {
-          // Can attack → reset stuck counter
+          // Can attack → reset stuck counter, but ranged kiters still reposition
           unit.stuckTurns = 0;
+          const kitePos = moveToward(unit, target, newGrid, allUnits);
+          if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
+            newGrid[unit.row][unit.col].unit = null;
+            unit.row = kitePos.row;
+            unit.col = kitePos.col;
+            newGrid[unit.row][unit.col].unit = unit;
+          }
         }
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
@@ -477,8 +484,10 @@ export function useBattleGame() {
           if (unit.type === 'rider') unit.lastAttackedId = target.id;
 
           // Frost: 50% chance to freeze the target for 1 turn
+          let didFreeze = false;
           if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
             target.frozen = 1;
+            didFreeze = true;
           }
 
           const def = UNIT_DEFS[unit.type];
@@ -546,7 +555,25 @@ export function useBattleGame() {
             isRanged: dist > 1,
             isAoe: unit.type === 'dragon',
             aoeCells: aoeCells,
+            isFrozen: didFreeze,
           });
+
+          // Emit freeze event for ice animation
+          if (didFreeze) {
+            events.push({
+              type: 'freeze',
+              attackerId: unit.id,
+              attackerRow: unit.row,
+              attackerCol: unit.col,
+              attackerEmoji: '🥶',
+              targetId: target.id,
+              targetRow: target.row,
+              targetCol: target.col,
+              damage: 0,
+              isStrong: false, isWeak: false,
+              isRanged: dist > 1,
+            });
+          }
 
           if (target.hp <= 0) {
             target.type = target.type;

@@ -505,18 +505,62 @@ function terrainScore(pos: Position, grid: Cell[][]): number {
   return 0;
 }
 
-// Move toward target: terrain-aware with anti-stalemate
-export function moveToward(unit: Unit, target: Unit, grid: Cell[][]): Position {
+// Ranged unit types that should kite (keep distance)
+const RANGED_KITERS: UnitType[] = ['archer', 'frost', 'mage'];
+
+// Check if a position is "behind" allies (further from enemies)
+function isBehindAllies(pos: Position, unit: Unit, allUnits: Unit[]): boolean {
+  const allies = allUnits.filter(u => u.team === unit.team && u.id !== unit.id && u.hp > 0 && !u.dead);
+  if (allies.length === 0) return false;
+  const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0 && !u.dead);
+  if (enemies.length === 0) return false;
+  const avgEnemyRow = enemies.reduce((s, e) => s + e.row, 0) / enemies.length;
+  const avgAllyRow = allies.reduce((s, a) => s + a.row, 0) / allies.length;
+  // "Behind" means further from enemies than the average ally
+  if (unit.team === 'player') {
+    return pos.row > avgAllyRow; // player units: higher row = further back
+  } else {
+    return pos.row < avgAllyRow; // enemy units: lower row = further back
+  }
+}
+
+// Move toward target: terrain-aware with anti-stalemate + kiting for ranged
+export function moveToward(unit: Unit, target: Unit, grid: Cell[][], allUnits?: Unit[]): Position {
   const possibleMoves = getMoveCells(unit, grid);
   if (possibleMoves.length === 0) return { row: unit.row, col: unit.col };
 
-  // If can already attack, consider staying or moving to better terrain nearby
+  const isRangedKiter = RANGED_KITERS.includes(unit.type);
+
+  // If can already attack, consider kiting or staying
   if (canAttack(unit, target)) {
-    // Only consider terrain moves if not stuck (anti-stalemate)
+    if (isRangedKiter && (unit.stuckTurns || 0) < 3) {
+      // Kiting: try to move to a position that's further from the target but still in attack range
+      const kiteMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
+      if (kiteMoves.length > 0) {
+        // Sort by distance from target (prefer far) and backline positioning for mage
+        kiteMoves.sort((a, b) => {
+          const distA = distance(a, target);
+          const distB = distance(b, target);
+          // Mage: prefer positions behind allies
+          if (unit.type === 'mage' && allUnits) {
+            const behindA = isBehindAllies(a, unit, allUnits) ? 2 : 0;
+            const behindB = isBehindAllies(b, unit, allUnits) ? 2 : 0;
+            if (behindA !== behindB) return behindB - behindA;
+          }
+          return distB - distA; // prefer further away
+        });
+        const bestKite = kiteMoves[0];
+        const currentDist = distance(unit, target);
+        // Only kite if the new position is at least as far or further
+        if (distance(bestKite, target) >= currentDist) {
+          return bestKite;
+        }
+      }
+      return { row: unit.row, col: unit.col };
+    }
     if ((unit.stuckTurns || 0) < 3) {
       return { row: unit.row, col: unit.col };
     }
-    // Stuck too long on terrain → keep attacking from here
     return { row: unit.row, col: unit.col };
   }
 
