@@ -68,9 +68,14 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Sacrifice Ritual state
   const [sacrificeUsed, setSacrificeUsed] = useState(false);
 
+  // Shield Wall state
+  const [shieldWallUsed, setShieldWallUsed] = useState(false);
+  const [shieldWallActive, setShieldWallActive] = useState(false);
+  const shieldWallTicksLeft = useRef(0);
+
   // Fatigue system: tracks how many consecutive rounds each unit type survived
   const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
-  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 2);
+  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 1);
 
   // Alternating placement state
   const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(1);
@@ -186,6 +191,10 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setBattleLog(prev => [`💀 GEGNER OPFERRITUAL! Einheit geopfert – alle anderen geheilt!`, ...prev]);
       }
 
+      if (action === 'shield_wall') {
+        setBattleLog(prev => ['🛡️ GEGNER SCHILDWALL! Rückzug zur Base!', ...prev]);
+      }
+
       if (action === 'round_end') {
         setPhase(data.phase);
         setPlayerScore(data.playerScore);
@@ -199,10 +208,10 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           const next = { ...prev };
           const survivingTypes = new Set(playerUnits.filter(u => u.hp > 0 && !u.dead).map(u => u.type));
           for (const t of UNIT_TYPES) {
-            if ((prev[t] || 0) >= 2) {
+            if ((prev[t] || 0) >= 1) {
               next[t] = 0; // rested this round
             } else if (survivingTypes.has(t)) {
-              next[t] = (next[t] || 0) + 1;
+              next[t] = 1; // survived → immediately banned next round
             } else {
               next[t] = 0;
             }
@@ -238,6 +247,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         focusFireTicksLeft.current = 0;
         opponentFocusFireTicksLeft.current = 0;
         setSacrificeUsed(false);
+        setShieldWallUsed(false);
+        setShieldWallActive(false);
+        shieldWallTicksLeft.current = 0;
       }
     });
 
@@ -550,6 +562,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     focusFireTicksLeft.current = 0;
     opponentFocusFireTicksLeft.current = 0;
     setSacrificeUsed(false);
+    setShieldWallUsed(false);
+    setShieldWallActive(false);
+    shieldWallTicksLeft.current = 0;
 
     // Broadcast battle start
     channelRef.current?.send({
@@ -649,6 +664,21 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     });
   }, [sacrificeUsed, phase, playerUnits, isHost, myTeam]);
 
+  // Activate shield wall
+  const activateShieldWall = useCallback(() => {
+    if (shieldWallUsed || phase !== 'battle') return;
+    setShieldWallUsed(true);
+    setShieldWallActive(true);
+    shieldWallTicksLeft.current = 3;
+    setBattleLog(prev => ['🛡️ SCHILDWALL! Rückzug zur Base – 50% Schadensreduktion für 3 Züge!', ...prev]);
+
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'game_sync',
+      payload: { action: 'shield_wall', data: { team: myTeam } },
+    });
+  }, [shieldWallUsed, phase, myTeam]);
+
   // Battle tick - only host runs this
   const battleTick = useCallback(() => {
     if (!isHost) return;
@@ -695,9 +725,33 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         opponentFocusFireTicksLeft.current -= 1;
       }
 
+      // Shield wall tick-down
+      if (shieldWallTicksLeft.current > 0) {
+        shieldWallTicksLeft.current -= 1;
+        if (shieldWallTicksLeft.current <= 0) {
+          setShieldWallActive(false);
+        }
+        // Retreat player (host) units toward base rows (5,6,7)
+        const playerAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
+        for (const unit of playerAlive) {
+          if (unit.row < 5) {
+            for (let step = 2; step >= 1; step--) {
+              const targetRow = Math.min(7, unit.row + step);
+              if (!newGrid[targetRow][unit.col].unit && newGrid[targetRow][unit.col].terrain !== 'water') {
+                newGrid[unit.row][unit.col].unit = null;
+                unit.row = targetRow;
+                newGrid[unit.row][unit.col].unit = unit;
+                break;
+              }
+            }
+          }
+        }
+      }
+
       // Damage modifiers: host's player = player1, host's enemy = player2
-      const playerDmgMod = moralePhase.current === 'buff' ? 1.25 : moralePhase.current === 'debuff' ? 0.85 : 1.0;
+      const playerDmgMod = shieldWallTicksLeft.current > 0 ? 0 : (moralePhase.current === 'buff' ? 1.25 : moralePhase.current === 'debuff' ? 0.85 : 1.0);
       const enemyDmgMod = opponentMoralePhase.current === 'buff' ? 1.25 : opponentMoralePhase.current === 'debuff' ? 0.85 : 1.0;
+      const shieldWallDefMod = shieldWallTicksLeft.current > 0 ? 0.5 : 1.0;
 
       // Focus fire targets
       const playerFocusTarget = focusFireTicksLeft.current > 0
@@ -783,9 +837,12 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           let dmg = calcDamage(unit, target, newGrid);
-          // Apply morale damage modifier
+          // Apply morale damage modifier + shield wall
           if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
-          else dmg = Math.round(dmg * enemyDmgMod);
+          else {
+            dmg = Math.round(dmg * enemyDmgMod);
+            if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
+          }
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
           // Warrior: track last attacked for lock-on behavior
@@ -959,9 +1016,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         if (playerBannedUnits.includes(t)) {
           next[t] = 0; // rested this round
         } else if (survivingTypes.has(t)) {
-          next[t] = (next[t] || 0) + 1;
+          next[t] = 1; // survived → immediately banned next round
         } else {
-          next[t] = 0; // died or wasn't used
+          next[t] = 0;
         }
       }
       return next;
@@ -1029,6 +1086,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     activateFocusFire,
     sacrificeUsed,
     activateSacrifice,
+    shieldWallUsed,
+    shieldWallActive,
+    activateShieldWall,
     opponentMoraleActive,
     waitingForOpponent,
     opponentLeft,
