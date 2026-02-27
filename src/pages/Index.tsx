@@ -36,7 +36,7 @@ function ScoreDots({ score, max, color }: { score: number; max: number; color: '
 
 function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | 'player2' }) {
   const game = useMultiplayerGame({ roomId, role });
-  return <GameUI game={game} isMultiplayer />;
+  return <GameUI game={game} isMultiplayer flipped={role === 'player2'} />;
 }
 
 function SinglePlayerGame() {
@@ -46,14 +46,16 @@ function SinglePlayerGame() {
   return <GameUI game={game} isMultiplayer={false} />;
 }
 
-function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null }; isMultiplayer: boolean }) {
+function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean }; isMultiplayer: boolean; flipped?: boolean }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
   const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
   const [phaseOverlay, setPhaseOverlay] = useState<string | null>(null);
   const [overlaySubtext, setOverlaySubtext] = useState<string | null>(null);
+  const [nextRoundCountdown, setNextRoundCountdown] = useState<number | null>(null);
   const prevPhase = useRef(game.phase);
+  const nextRoundTriggered = useRef(false);
 
   // Sync SFX mute with music mute
   useEffect(() => { setSfxMuted(muted); }, [muted]);
@@ -61,12 +63,14 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
   useEffect(() => {
     if (game.phase === prevPhase.current) return;
     prevPhase.current = game.phase;
+    nextRoundTriggered.current = false;
 
     let text: string | null = null;
     let sub: string | null = null;
 
     if (game.phase === 'place_player') {
       text = 'Platziere!';
+      setNextRoundCountdown(null);
     } else if (game.phase === 'place_enemy') {
       text = 'Bereit?';
     } else if (game.phase === 'battle') {
@@ -82,12 +86,34 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
       text = '⚖️ Gleichstand!';
     }
 
+    // Start auto-countdown for multiplayer round end (non-game-over)
+    if (isMultiplayer && !game.gameOver && (game.phase === 'round_won' || game.phase === 'round_lost' || game.phase === 'round_draw')) {
+      setNextRoundCountdown(3);
+    }
+
     if (text) {
       setPhaseOverlay(text);
       setOverlaySubtext(sub);
       setTimeout(() => { setPhaseOverlay(null); setOverlaySubtext(null); }, 1400);
     }
-  }, [game.phase]);
+  }, [game.phase, isMultiplayer, game.gameOver]);
+
+  // Auto-countdown for multiplayer next round
+  useEffect(() => {
+    if (nextRoundCountdown === null || nextRoundCountdown <= 0) return;
+    const timer = setTimeout(() => {
+      setNextRoundCountdown(prev => (prev !== null ? prev - 1 : null));
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [nextRoundCountdown]);
+
+  // Trigger next round when countdown hits 0 (host only)
+  useEffect(() => {
+    if (nextRoundCountdown === 0 && isMultiplayer && game.isHost && !nextRoundTriggered.current) {
+      nextRoundTriggered.current = true;
+      game.nextRound();
+    }
+  }, [nextRoundCountdown, isMultiplayer, game]);
 
   return (
     <div className="min-h-[100dvh] max-h-[100dvh] bg-background flex flex-col max-w-md mx-auto overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -139,6 +165,7 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
         <BattleGrid
           grid={game.grid}
           phase={game.phase}
+          flipped={flipped}
           onCellClick={(row, col) => {
             if (game.phase === 'place_player') {
               const unit = game.grid[row][col].unit;
@@ -377,6 +404,13 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
                 >
                   🏠 Hauptmenü
                 </button>
+              </div>
+            ) : isMultiplayer ? (
+              <div className="space-y-2">
+                <p className="text-2xl font-black text-foreground">
+                  {nextRoundCountdown !== null && nextRoundCountdown > 0 ? `${nextRoundCountdown}` : '⚔️'}
+                </p>
+                <p className="text-xs text-muted-foreground">Nächste Runde startet automatisch...</p>
               </div>
             ) : (
               <button
