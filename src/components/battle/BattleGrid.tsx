@@ -339,13 +339,13 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     }`} />
                   )}
                   {/* Shield aura indicator: show small shield icon if unit is next to friendly tank */}
-                  {unit.type !== 'tank' && phase === 'battle' && (() => {
-                    for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }]) {
+                  {phase === 'battle' && (() => {
+                    for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }, { row: -1, col: -1 }, { row: -1, col: 1 }, { row: 1, col: -1 }, { row: 1, col: 1 }]) {
                       const r = cell.row + offset.row;
                       const c = cell.col + offset.col;
                       if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
                         const neighbor = grid[r]?.[c];
-                        if (neighbor?.unit && neighbor.unit.type === 'tank' && neighbor.unit.team === unit.team && neighbor.unit.hp > 0 && !neighbor.unit.dead) {
+                        if (neighbor?.unit && neighbor.unit.type === 'tank' && neighbor.unit.team === unit.team && neighbor.unit.hp > 0 && !neighbor.unit.dead && neighbor.unit.id !== unit.id) {
                           return <span className="absolute top-0 right-0.5 text-[7px] opacity-70 select-none">🛡️</span>;
                         }
                       }
@@ -364,12 +364,12 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         const bonds: { tankRow: number; tankCol: number; unitRow: number; unitCol: number }[] = [];
         const tanks = grid.flat().filter(c => c.unit && !c.unit.dead && c.unit.type === 'tank' && c.unit.team === 'player');
         for (const tankCell of tanks) {
-          for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }]) {
+          for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }, { row: -1, col: -1 }, { row: -1, col: 1 }, { row: 1, col: -1 }, { row: 1, col: 1 }]) {
             const r = tankCell.row + offset.row;
             const c = tankCell.col + offset.col;
             if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
               const neighbor = grid[r][c];
-              if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === 'player' && neighbor.unit.type !== 'tank') {
+              if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === 'player' && neighbor.unit.id !== tankCell.unit!.id) {
                 bonds.push({ tankRow: tankCell.row, tankCol: tankCell.col, unitRow: r, unitCol: c });
               }
             }

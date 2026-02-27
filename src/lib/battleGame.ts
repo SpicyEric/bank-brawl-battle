@@ -552,7 +552,7 @@ function findFriendlyTank(unit: Unit, allUnits: Unit[]): Unit | null {
 
 // Check if position is orthogonally adjacent to a unit
 function isAdjacentTo(pos: Position, target: Unit): boolean {
-  return ORTHOGONAL.some(o => pos.row === target.row + o.row && pos.col === target.col + o.col);
+  return ALL_ADJACENT.some(o => pos.row === target.row + o.row && pos.col === target.col + o.col);
 }
 
 // Move toward target: terrain-aware with anti-stalemate + kiting for ranged + tank pull
@@ -697,9 +697,9 @@ export function moveToward(unit: Unit, target: Unit, grid: Cell[][], allUnits?: 
 export function setBondsForPlacement(units: Unit[]): void {
   const tanks = units.filter(u => u.type === 'tank');
   for (const unit of units) {
-    if (unit.type === 'tank') continue;
     for (const tank of tanks) {
-      if (unit.team === tank.team && ORTHOGONAL.some(o => unit.row === tank.row + o.row && unit.col === tank.col + o.col)) {
+      if (unit.id === tank.id) continue; // skip self
+      if (unit.team === tank.team && ALL_ADJACENT.some(o => unit.row === tank.row + o.row && unit.col === tank.col + o.col)) {
         unit.bondedToTankId = tank.id;
         unit.bondBroken = false;
         break;
@@ -710,12 +710,12 @@ export function setBondsForPlacement(units: Unit[]): void {
 
 // Check if defender has a friendly tank adjacent (shield aura)
 function hasAdjacentFriendlyTank(defender: Unit, grid: Cell[][]): boolean {
-  for (const offset of ORTHOGONAL) {
+  for (const offset of ALL_ADJACENT) {
     const r = defender.row + offset.row;
     const c = defender.col + offset.col;
     if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
       const cell = grid[r][c];
-      if (cell.unit && cell.unit.type === 'tank' && cell.unit.team === defender.team && cell.unit.hp > 0 && !cell.unit.dead) {
+      if (cell.unit && cell.unit.type === 'tank' && cell.unit.team === defender.team && cell.unit.hp > 0 && !cell.unit.dead && cell.unit.id !== defender.id) {
         return true;
       }
     }
@@ -744,8 +744,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
     dmg *= 0.8;
   }
 
-  // Shield aura: defender adjacent to friendly tank takes -20% damage (not the tank itself)
-  if (grid && defender.type !== 'tank' && hasAdjacentFriendlyTank(defender, grid)) {
+// Shield aura: defender adjacent to friendly tank takes -20% damage (tanks also protect each other)
+  if (grid && hasAdjacentFriendlyTank(defender, grid)) {
     dmg *= 0.8;
   }
 
