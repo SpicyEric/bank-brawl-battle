@@ -134,7 +134,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
 
   // Handle battle events: shake + damage popups + projectiles + heal glows + freeze
   // Delay damage/effects by movement animation duration so they appear after units arrive
-  const MOVE_ANIM_DURATION = 700;
+  const MOVE_ANIM_DURATION = 580;
   const pendingEventsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (battleEvents.length === 0) return;
@@ -247,7 +247,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
 
     // --- Phase 2: Ranged damage appears AFTER projectile arrives ---
-    const PROJECTILE_FLIGHT_TIME = 750; // matches longest projectile animation
+    const PROJECTILE_FLIGHT_TIME = 620; // matches longest projectile animation
     if (rangedDamageEvents.length > 0) {
       setTimeout(() => {
         const rangedShake = new Set<string>();
@@ -322,7 +322,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       // Freeze is from frost (ranged), so delay after projectile
       setTimeout(() => {
         setFreezeEffects(prev => [...prev, ...newFreezes]);
-        setTimeout(() => setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id))), 1600);
+        setTimeout(() => setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id))), 1350);
       }, PROJECTILE_FLIGHT_TIME);
     }
   };
@@ -387,7 +387,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   className="absolute inset-0 flex flex-col items-center justify-center z-10"
                   style={{
                     ...slideStyle,
-                    transition: offset ? 'none' : 'transform 700ms ease-out',
+                    transition: offset ? 'none' : 'transform 580ms ease-out',
                   }}
                 >
                   <span
