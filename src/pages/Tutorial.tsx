@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import {
@@ -12,25 +12,17 @@ interface TutorialStep {
   id: string;
   title: string;
   text: string;
-  /** Units to pre-place on the grid for this step */
   setupGrid?: (grid: Cell[][]) => Cell[][];
-  /** If set, player must place these unit types to proceed */
-  playerMustPlace?: { types: UnitType[]; rows: number[] };
-  /** Highlight specific cells with a pulsing ring */
+  playerMustPlace?: { types: UnitType[]; rows: number[]; oneEach?: boolean; exclude?: UnitType[] };
   highlightCells?: { row: number; col: number }[];
-  /** Show a mini-battle automatically */
-  autoBattle?: boolean;
-  /** Extra hint shown below main text */
   hint?: string;
+  /** Auto-dismiss title overlay then delay before enabling Weiter */
+  autoIntro?: { displayMs: number; delayAfterMs: number };
+  /** Show ability buttons preview */
+  showAbilityPreview?: boolean;
 }
 
-/* ─── Helper: place a unit on a grid (mutates clone) ─── */
-function placeOn(grid: Cell[][], type: UnitType, team: 'player' | 'enemy', row: number, col: number): Cell[][] {
-  const g = grid.map(r => r.map(c => ({ ...c })));
-  g[row][col] = { ...g[row][col], unit: createUnit(type, team, row, col) };
-  return g;
-}
-
+/* ─── Helpers ─── */
 function placeMany(grid: Cell[][], units: { type: UnitType; team: 'player' | 'enemy'; row: number; col: number }[]): Cell[][] {
   let g = grid.map(r => r.map(c => ({ ...c })));
   for (const u of units) {
@@ -39,25 +31,28 @@ function placeMany(grid: Cell[][], units: { type: UnitType; team: 'player' | 'en
   return g;
 }
 
+const ENEMY_BLUE_TEAM = [
+  { type: 'rider' as UnitType, team: 'enemy' as const, row: 0, col: 1 },
+  { type: 'archer' as UnitType, team: 'enemy' as const, row: 0, col: 4 },
+  { type: 'frost' as UnitType, team: 'enemy' as const, row: 0, col: 6 },
+  { type: 'archer' as UnitType, team: 'enemy' as const, row: 1, col: 2 },
+  { type: 'rider' as UnitType, team: 'enemy' as const, row: 2, col: 5 },
+];
+
 /* ─── The tutorial steps ─── */
 const STEPS: TutorialStep[] = [
   {
     id: 'welcome',
     title: '⚔️ Willkommen, Kommandant!',
-    text: 'Das ist dein Schlachtfeld — ein 8×8 Raster. Du platzierst Einheiten auf deiner Seite (unten), der Gegner auf seiner (oben). Dann kämpfen sie automatisch!',
-    hint: 'Tippe auf "Weiter" um fortzufahren.',
+    text: 'Das ist dein Schlachtfeld — ein 8×8 Raster. Du platzierst Einheiten auf deiner Seite (unten, blau), der Gegner auf seiner (oben, rot). Dann kämpfen sie automatisch!',
+    hint: 'Schau dir das Spielfeld an — die unteren 3 Reihen gehören dir!',
+    autoIntro: { displayMs: 3000, delayAfterMs: 2000 },
   },
   {
     id: 'enemy_setup',
     title: '🔵 Der Gegner stellt auf!',
     text: 'Schau dir die gegnerische Aufstellung an — der Feind hat ein blaulastiges Team gewählt: Reiter, Bogenschützen und Frostmagier. Erkennst du die blauen Punkte oben links an jeder Einheit?',
-    setupGrid: (grid) => placeMany(grid, [
-      { type: 'rider', team: 'enemy', row: 0, col: 1 },
-      { type: 'archer', team: 'enemy', row: 0, col: 4 },
-      { type: 'frost', team: 'enemy', row: 0, col: 6 },
-      { type: 'archer', team: 'enemy', row: 1, col: 2 },
-      { type: 'rider', team: 'enemy', row: 2, col: 5 },
-    ]),
+    setupGrid: (grid) => placeMany(grid, ENEMY_BLUE_TEAM),
     highlightCells: [
       { row: 0, col: 1 }, { row: 0, col: 4 }, { row: 0, col: 6 },
       { row: 1, col: 2 }, { row: 2, col: 5 },
@@ -73,15 +68,15 @@ const STEPS: TutorialStep[] = [
   {
     id: 'counter_place',
     title: '🎯 Konter den Gegner!',
-    text: 'Der Gegner hat BLAU gewählt — du brauchst GRÜNE Einheiten um zu kontern! Platziere jetzt 3 grüne Einheiten (Schildträger, Magier oder Schamane) auf deinen Reihen unten.',
-    playerMustPlace: { types: ['tank', 'mage', 'healer'], rows: PLAYER_ROWS },
-    hint: 'Tippe unten auf eine grüne Einheit, dann tippe auf ein freies Feld in den unteren 3 Reihen.',
+    text: 'Der Gegner hat BLAU gewählt — du brauchst GRÜNE Einheiten um zu kontern! Platziere von jeder grünen Einheit genau eine: Schildträger, Magier UND Schamane.',
+    playerMustPlace: { types: ['tank', 'mage', 'healer'], rows: PLAYER_ROWS, oneEach: true },
+    hint: 'Tippe unten auf eine grüne Einheit, dann tippe auf ein freies Feld in den unteren 3 Reihen. Du brauchst von jeder genau eine!',
   },
   {
     id: 'variation',
     title: '🎨 Variation ist wichtig!',
-    text: 'Gut gemacht! Aber ein reines Mono-Team ist riskant. Platziere jetzt noch 2 weitere Einheiten — diesmal aus einer ANDEREN Farbe für Variation. So bist du flexibler!',
-    playerMustPlace: { types: UNIT_TYPES, rows: PLAYER_ROWS },
+    text: 'Gut gemacht! Aber ein reines Mono-Team ist riskant. Platziere jetzt noch 2 weitere Einheiten — diesmal aus einer ANDEREN Farbe (Rot oder Blau) für Variation. So bist du flexibler!',
+    playerMustPlace: { types: ['warrior', 'assassin', 'dragon', 'rider', 'archer', 'frost'], rows: PLAYER_ROWS, exclude: ['tank', 'mage', 'healer'] },
     hint: 'Wähle z.B. einen Krieger (rot) oder Bogenschütze (blau) für Abwechslung.',
   },
   {
@@ -102,7 +97,6 @@ const STEPS: TutorialStep[] = [
         { type: 'mage', team: 'player', row: 7, col: 1 },
         { type: 'healer', team: 'player', row: 7, col: 6 },
       ]);
-      // Add enemies
       g = placeMany(g, [
         { type: 'warrior', team: 'enemy', row: 2, col: 2 },
         { type: 'warrior', team: 'enemy', row: 2, col: 5 },
@@ -113,9 +107,9 @@ const STEPS: TutorialStep[] = [
       return g;
     },
     highlightCells: [
-      { row: 5, col: 2 }, { row: 5, col: 5 }, // front
-      { row: 6, col: 3 }, // mid
-      { row: 7, col: 1 }, { row: 7, col: 6 }, // back
+      { row: 5, col: 2 }, { row: 5, col: 5 },
+      { row: 6, col: 3 },
+      { row: 7, col: 1 }, { row: 7, col: 6 },
     ],
     hint: '💡 Tanks vorne als Schutzschild, Fernkämpfer hinten für maximale Effizienz!',
   },
@@ -133,13 +127,14 @@ const STEPS: TutorialStep[] = [
       g[4][0].terrain = 'water';
       return g;
     },
-    hint: 'Platziere deine Einheiten strategisch auf Wald oder Hügel für einen Vorteil!',
+    hint: 'Einheiten versuchen automatisch, nahe Terrain-Felder zu besetzen. Platziere sie in der Nähe von Wald oder Hügel, damit sie den Vorteil im Kampf nutzen!',
   },
   {
     id: 'abilities',
     title: '🔥 Fähigkeiten im Kampf',
-    text: 'Während des Kampfes hast du 3 einmalige Fähigkeiten:\n\n🔥 Kriegsschrei — +25% Schaden für 3 Züge, danach -15% für 2 Züge\n🎯 Fokusfeuer — Alle greifen das stärkste Ziel an\n💀 Opferritual — Opfere deine schwächste Einheit, heile alle anderen um 40%',
+    text: 'Während des Kampfes hast du 3 einmalige Fähigkeiten:\n\n🔥 Kriegsschrei — +25% Schaden für 3 Züge, danach -15% für 2 Züge\n🎯 Fokusfeuer — Alle greifen das schwächste Ziel an (4 Züge)\n💀 Opferritual — Opfere deine schwächste Einheit, heile alle anderen um 15%',
     hint: 'Timing ist alles! Nutze den Kriegsschrei wenn viele deiner Einheiten am Leben sind.',
+    showAbilityPreview: true,
   },
   {
     id: 'ready',
@@ -156,37 +151,66 @@ const Tutorial = () => {
   const [grid, setGrid] = useState<Cell[][]>(createEmptyGrid());
   const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(null);
   const [placedUnits, setPlacedUnits] = useState<Unit[]>([]);
-  const [overlayVisible, setOverlayVisible] = useState(true);
   const current = STEPS[step];
   const isLast = step === STEPS.length - 1;
   const isPlacingStep = !!current.playerMustPlace;
 
-  // How many units does player need to place in this step?
+  // For welcome auto-intro
+  const [introVisible, setIntroVisible] = useState(false);
+  const [weiterDelayed, setWeiterDelayed] = useState(false);
+
+  // How many units needed
   const requiredCount = current.id === 'counter_place' ? 3 : current.id === 'variation' ? 2 : 0;
   const [placedCount, setPlacedCount] = useState(0);
+  // Track which types have been placed (for oneEach)
+  const [placedTypes, setPlacedTypes] = useState<Set<UnitType>>(new Set());
+
+  // Row strategy animation state
+  const [rowAnimPhase, setRowAnimPhase] = useState(0);
+  const rowAnimRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Setup grid when step changes
   useEffect(() => {
-    setOverlayVisible(true);
     setPlacedCount(0);
+    setPlacedTypes(new Set());
+    setWeiterDelayed(false);
+    setRowAnimPhase(0);
+
+    // Auto-intro for welcome step
+    if (current.autoIntro) {
+      setIntroVisible(true);
+      const t1 = setTimeout(() => setIntroVisible(false), current.autoIntro.displayMs);
+      const t2 = setTimeout(() => setWeiterDelayed(false), current.autoIntro.displayMs + current.autoIntro.delayAfterMs);
+      setWeiterDelayed(true);
+      return () => { clearTimeout(t1); clearTimeout(t2); };
+    }
 
     if (current.id === 'counter_place') {
-      // Show enemy blue team, clear player side
       let g = createEmptyGrid();
-      g = placeMany(g, [
-        { type: 'rider', team: 'enemy', row: 0, col: 1 },
-        { type: 'archer', team: 'enemy', row: 0, col: 4 },
-        { type: 'frost', team: 'enemy', row: 0, col: 6 },
-        { type: 'archer', team: 'enemy', row: 1, col: 2 },
-        { type: 'rider', team: 'enemy', row: 2, col: 5 },
-      ]);
+      g = placeMany(g, ENEMY_BLUE_TEAM);
       setGrid(g);
       setPlacedUnits([]);
       setSelectedUnit('tank');
     } else if (current.id === 'variation') {
-      // Keep existing grid with player's green units, let them add more
       setSelectedUnit('warrior');
       setPlacedCount(0);
+      setPlacedTypes(new Set());
+    } else if (current.id === 'row_strategy') {
+      // Setup grid and start animation
+      if (current.setupGrid) {
+        const g = current.setupGrid(createEmptyGrid());
+        setGrid(g);
+      }
+      setPlacedUnits([]);
+      setSelectedUnit(null);
+      // Start row animation cycle
+      setRowAnimPhase(0);
+      if (rowAnimRef.current) clearInterval(rowAnimRef.current);
+      let phase = 0;
+      rowAnimRef.current = setInterval(() => {
+        phase = (phase + 1) % 4; // 0=all home, 1=front moves, 2=front+mid, 3=all move
+        setRowAnimPhase(phase);
+      }, 1500);
     } else if (current.setupGrid) {
       const g = current.setupGrid(createEmptyGrid());
       setGrid(g);
@@ -196,22 +220,19 @@ const Tutorial = () => {
       setGrid(createEmptyGrid());
       setPlacedUnits([]);
       setSelectedUnit(null);
-    } else if (current.id === 'enemy_setup') {
+    } else if (current.id === 'enemy_setup' || current.id === 'color_system') {
       let g = createEmptyGrid();
-      g = placeMany(g, [
-        { type: 'rider', team: 'enemy', row: 0, col: 1 },
-        { type: 'archer', team: 'enemy', row: 0, col: 4 },
-        { type: 'frost', team: 'enemy', row: 0, col: 6 },
-        { type: 'archer', team: 'enemy', row: 1, col: 2 },
-        { type: 'rider', team: 'enemy', row: 2, col: 5 },
-      ]);
+      g = placeMany(g, ENEMY_BLUE_TEAM);
       setGrid(g);
       setPlacedUnits([]);
       setSelectedUnit(null);
     } else {
-      // Keep grid as-is for text-only steps
       setSelectedUnit(null);
     }
+
+    return () => {
+      if (rowAnimRef.current) { clearInterval(rowAnimRef.current); rowAnimRef.current = null; }
+    };
   }, [step]);
 
   // Handle cell click during placement steps
@@ -219,7 +240,6 @@ const Tutorial = () => {
     if (!isPlacingStep || !selectedUnit) return;
     if (!current.playerMustPlace!.rows.includes(row)) return;
     if (grid[row][col].unit) {
-      // Remove own unit
       const unit = grid[row][col].unit!;
       if (unit.team === 'player') {
         const newGrid = grid.map(r => r.map(c => ({ ...c })));
@@ -227,14 +247,17 @@ const Tutorial = () => {
         setGrid(newGrid);
         setPlacedUnits(prev => prev.filter(u => u.id !== unit.id));
         setPlacedCount(prev => Math.max(0, prev - 1));
+        setPlacedTypes(prev => { const s = new Set(prev); s.delete(unit.type); return s; });
       }
       return;
     }
     if (grid[row][col].terrain === 'water') return;
     if (placedCount >= requiredCount) return;
 
-    // Check allowed types for this step
+    // Check allowed types
     if (!current.playerMustPlace!.types.includes(selectedUnit)) return;
+    // For oneEach, prevent duplicates
+    if (current.playerMustPlace!.oneEach && placedTypes.has(selectedUnit)) return;
 
     const newUnit = createUnit(selectedUnit, 'player', row, col);
     const newGrid = grid.map(r => r.map(c => ({ ...c })));
@@ -242,12 +265,27 @@ const Tutorial = () => {
     setGrid(newGrid);
     setPlacedUnits(prev => [...prev, newUnit]);
     setPlacedCount(prev => prev + 1);
-  }, [isPlacingStep, selectedUnit, grid, current, requiredCount, placedCount]);
+    setPlacedTypes(prev => new Set(prev).add(selectedUnit));
+  }, [isPlacingStep, selectedUnit, grid, current, requiredCount, placedCount, placedTypes]);
 
-  const canProceed = !isPlacingStep || placedCount >= requiredCount;
+  const canProceed = (!isPlacingStep && !weiterDelayed) || (isPlacingStep && placedCount >= requiredCount);
 
-  // Unit picker for placement steps
+  // Available types for the picker
   const availableTypes = current.playerMustPlace?.types || [];
+  const excludeTypes = current.playerMustPlace?.exclude || [];
+
+  // Row strategy highlight animation
+  const getRowAnimHighlights = (): { row: number; col: number }[] => {
+    if (current.id !== 'row_strategy') return current.highlightCells || [];
+    // Phase 0: highlight all positions, 1: front row pulsing, 2: front+mid, 3: all
+    const front = [{ row: 5, col: 2 }, { row: 5, col: 5 }];
+    const mid = [{ row: 6, col: 3 }];
+    const back = [{ row: 7, col: 1 }, { row: 7, col: 6 }];
+    if (rowAnimPhase === 1) return front;
+    if (rowAnimPhase === 2) return [...front, ...mid];
+    if (rowAnimPhase === 3) return [...front, ...mid, ...back];
+    return [];
+  };
 
   return (
     <div className="min-h-[100dvh] max-h-[100dvh] bg-background flex flex-col max-w-md mx-auto overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -262,7 +300,7 @@ const Tutorial = () => {
         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
           Tutorial <span className="text-foreground font-bold">{step + 1}</span>/{STEPS.length}
         </p>
-        <div className="w-6" /> {/* spacer */}
+        <div className="w-6" />
       </div>
 
       {/* Grid */}
@@ -272,39 +310,55 @@ const Tutorial = () => {
           phase={isPlacingStep ? 'place_player' : 'battle'}
           onCellClick={handleCellClick}
           battleEvents={[]}
+          alwaysShowColorDots
+          showZoneColors
         />
 
         {/* Highlight rings */}
-        {current.highlightCells && overlayVisible && (
-          <>
-            {current.highlightCells.map((c, i) => {
-              const cellSize = 100 / GRID_SIZE;
-              return (
-                <div
-                  key={i}
-                  className="absolute pointer-events-none z-20 rounded-md border-2 border-primary animate-pulse"
-                  style={{
-                    left: `${c.col * cellSize}%`,
-                    top: `${c.row * cellSize}%`,
-                    width: `${cellSize}%`,
-                    height: `${cellSize}%`,
-                  }}
-                />
-              );
-            })}
-          </>
-        )}
+        {getRowAnimHighlights().map((c, i) => {
+          const cellSize = 100 / GRID_SIZE;
+          return (
+            <div
+              key={`${c.row}-${c.col}-${i}`}
+              className="absolute pointer-events-none z-20 rounded-md border-2 border-primary animate-pulse"
+              style={{
+                left: `${c.col * cellSize}%`,
+                top: `${c.row * cellSize}%`,
+                width: `${cellSize}%`,
+                height: `${cellSize}%`,
+              }}
+            />
+          );
+        })}
 
-        {/* Phase overlay with dim */}
-        {overlayVisible && !isPlacingStep && (
-          <div
-            className="absolute inset-0 z-30 bg-background/70 backdrop-blur-[2px] rounded-xl flex items-center justify-center cursor-pointer"
-            onClick={() => setOverlayVisible(false)}
-          >
+        {/* Welcome auto-intro overlay */}
+        {introVisible && current.autoIntro && (
+          <div className="absolute inset-0 z-30 bg-background/80 backdrop-blur-[2px] rounded-xl flex items-center justify-center transition-opacity duration-500">
             <div className="text-center px-4">
               <p className="text-2xl font-black text-foreground mb-2">{current.title}</p>
-              <p className="text-xs text-muted-foreground">Tippe um das Feld zu sehen</p>
+              <p className="text-xs text-muted-foreground animate-pulse">Lade Schlachtfeld...</p>
             </div>
+          </div>
+        )}
+
+        {/* Row strategy phase labels */}
+        {current.id === 'row_strategy' && rowAnimPhase > 0 && (
+          <div className="absolute right-1 top-0 bottom-0 z-20 pointer-events-none flex flex-col justify-end pb-1">
+            {[
+              { label: 'Zug 1', row: 5, active: rowAnimPhase >= 1 },
+              { label: 'Zug 2', row: 6, active: rowAnimPhase >= 2 },
+              { label: 'Zug 3', row: 7, active: rowAnimPhase >= 3 },
+            ].map(r => (
+              <div
+                key={r.row}
+                className={`text-[8px] font-bold px-1 py-0.5 rounded transition-all ${
+                  r.active ? 'text-primary bg-primary/20' : 'text-muted-foreground/30'
+                }`}
+                style={{ height: `${100/GRID_SIZE}%`, display: 'flex', alignItems: 'center' }}
+              >
+                {r.label}
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -322,6 +376,24 @@ const Tutorial = () => {
           )}
         </div>
 
+        {/* Ability preview buttons */}
+        {current.showAbilityPreview && (
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="p-2 rounded-lg bg-warning/10 border border-warning/30 text-center">
+              <span className="text-lg block">🔥</span>
+              <p className="text-[9px] font-bold text-warning">Kriegsschrei</p>
+            </div>
+            <div className="p-2 rounded-lg bg-primary/10 border border-primary/30 text-center">
+              <span className="text-lg block">🎯</span>
+              <p className="text-[9px] font-bold text-primary">Fokusfeuer</p>
+            </div>
+            <div className="p-2 rounded-lg bg-danger/10 border border-danger/30 text-center">
+              <span className="text-lg block">💀</span>
+              <p className="text-[9px] font-bold text-danger">Opferritual</p>
+            </div>
+          </div>
+        )}
+
         {/* Unit picker for placement steps */}
         {isPlacingStep && (
           <div className="space-y-2 mb-3">
@@ -329,20 +401,28 @@ const Tutorial = () => {
               {placedCount}/{requiredCount} platziert — wähle eine Einheit, dann tippe auf das Feld
             </p>
             <div className="grid grid-cols-3 gap-1.5">
-              {(current.id === 'counter_place' ? ['tank', 'mage', 'healer'] as UnitType[] : UNIT_TYPES).map(type => {
+              {(current.id === 'counter_place'
+                ? (['tank', 'mage', 'healer'] as UnitType[])
+                : UNIT_TYPES.filter(t => !excludeTypes.includes(t))
+              ).map(type => {
                 const def = UNIT_DEFS[type];
                 const color = UNIT_COLOR_GROUPS[type];
                 const isSelected = selectedUnit === type;
                 const allowed = availableTypes.includes(type);
-                if (current.id === 'counter_place' && !['tank', 'mage', 'healer'].includes(type)) return null;
+                const alreadyPlaced = current.playerMustPlace?.oneEach && placedTypes.has(type);
+                if (!allowed) return null;
                 return (
                   <button
                     key={type}
-                    onClick={() => allowed && setSelectedUnit(type)}
+                    onClick={() => !alreadyPlaced && setSelectedUnit(type)}
                     className={`p-1.5 rounded-lg border-2 transition-all text-center select-none ${
-                      !allowed ? 'opacity-30 cursor-not-allowed border-border' :
+                      alreadyPlaced ? 'opacity-30 cursor-not-allowed border-border' :
                       isSelected
-                        ? `border-primary bg-primary/10 ring-1 ring-primary`
+                        ? `ring-1 ring-primary ${
+                          color === 'red' ? 'border-unit-red bg-unit-red/10' :
+                          color === 'blue' ? 'border-unit-blue bg-unit-blue/10' :
+                          'border-unit-green bg-unit-green/10'
+                        }`
                         : `border-border hover:border-primary/50 ${
                           color === 'red' ? 'bg-unit-red/10' : color === 'blue' ? 'bg-unit-blue/10' : 'bg-unit-green/10'
                         }`
@@ -389,7 +469,7 @@ const Tutorial = () => {
             disabled={!canProceed}
             className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 active:scale-[0.97] transition-all flex items-center justify-center gap-2 mb-4 disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            {isPlacingStep && !canProceed ? `Noch ${requiredCount - placedCount} platzieren` : 'Weiter'}
+            {isPlacingStep && !canProceed ? `Noch ${requiredCount - placedCount} platzieren` : weiterDelayed ? 'Bitte warten...' : 'Weiter'}
             {canProceed && <ArrowRight size={16} />}
           </button>
         )}

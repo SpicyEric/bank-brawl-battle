@@ -12,6 +12,10 @@ interface BattleGridProps {
   opponentMoraleActive?: 'buff' | 'debuff' | null;
   focusFireActive?: boolean;
   sacrificeFlash?: boolean;
+  /** Always show color dots on units regardless of phase */
+  alwaysShowColorDots?: boolean;
+  /** Always show zone colors (player=blue, enemy=red) regardless of phase */
+  showZoneColors?: boolean;
 }
 
 interface UnitPos { row: number; col: number }
@@ -22,7 +26,7 @@ interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -258,7 +262,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const unit = cell.unit;
           const def = unit ? UNIT_DEFS[unit.type] : null;
           const colorGroup = unit && !unit.dead ? UNIT_COLOR_GROUPS[unit.type] : null;
-          const showColorDot = colorGroup && (phase === 'place_player' || phase === 'place_enemy');
+          const showColorDot = colorGroup && (alwaysShowColorDots || phase === 'place_player' || phase === 'place_enemy');
           const hpPercent = unit && !unit.dead ? (unit.hp / unit.maxHp) * 100 : 0;
           const isLow = unit && !unit.dead ? unit.hp / unit.maxHp < 0.3 : false;
           const isFlashing = flashCells.has(`${cell.row}-${cell.col}`);
@@ -281,8 +285,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               key={cellKey}
               onClick={() => onCellClick(cell.row, cell.col)}
               className={`aspect-square flex flex-col items-center justify-center relative overflow-visible
-                ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'bg-primary/5 hover:bg-primary/15 cursor-pointer' : isPlayerZone && isPlacing && terrain === 'water' ? 'cursor-not-allowed' : ''}
-                ${isEnemyZone && !unit ? 'bg-danger/5' : ''}
+                ${isPlayerZone && (isPlacing || showZoneColors) && !unit && terrain !== 'water' ? 'bg-primary/5' : ''} ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'hover:bg-primary/15 cursor-pointer' : isPlayerZone && isPlacing && terrain === 'water' ? 'cursor-not-allowed' : ''}
+                ${(isEnemyZone && (showZoneColors || !isPlacing)) || (isEnemyZone && !unit) ? 'bg-danger/5' : ''}
                 ${!unit && !hasTerrain ? 'bg-card' : ''}
                 ${!unit && terrain === 'forest' ? 'bg-[hsl(145,30%,15%)]' : ''}
                 ${!unit && terrain === 'hill' ? 'bg-[hsl(35,25%,18%)]' : ''}
