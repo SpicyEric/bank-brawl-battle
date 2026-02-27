@@ -41,6 +41,15 @@ export function useBattleGame() {
   // Sacrifice Ritual state
   const [sacrificeUsed, setSacrificeUsed] = useState(false);
 
+  // AI ability state
+  const aiMoraleUsed = useRef(false);
+  const aiMoralePhase = useRef<'none' | 'buff' | 'debuff'>('none');
+  const aiMoraleTicksLeft = useRef(0);
+  const [aiMoraleActive, setAiMoraleActive] = useState<'buff' | 'debuff' | null>(null);
+  const aiFocusFireUsed = useRef(false);
+  const aiFocusFireTicksLeft = useRef(0);
+  const aiSacrificeUsed = useRef(false);
+
   // Full reset
   const resetGame = useCallback(() => {
     setGrid(generateTerrain(createEmptyGrid()));
@@ -63,6 +72,13 @@ export function useBattleGame() {
     setFocusFireActive(false);
     focusFireTicksLeft.current = 0;
     setSacrificeUsed(false);
+    aiMoraleUsed.current = false;
+    aiMoralePhase.current = 'none';
+    aiMoraleTicksLeft.current = 0;
+    setAiMoraleActive(null);
+    aiFocusFireUsed.current = false;
+    aiFocusFireTicksLeft.current = 0;
+    aiSacrificeUsed.current = false;
   }, []);
 
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore);
@@ -137,6 +153,13 @@ export function useBattleGame() {
     setFocusFireActive(false);
     focusFireTicksLeft.current = 0;
     setSacrificeUsed(false);
+    aiMoraleUsed.current = false;
+    aiMoralePhase.current = 'none';
+    aiMoraleTicksLeft.current = 0;
+    setAiMoraleActive(null);
+    aiFocusFireUsed.current = false;
+    aiFocusFireTicksLeft.current = 0;
+    aiSacrificeUsed.current = false;
   }, []);
 
   // Activate morale boost
@@ -228,12 +251,94 @@ export function useBattleGame() {
         }
       }
 
+      // AI morale boost tick-down
+      if (aiMoralePhase.current !== 'none' && aiMoraleTicksLeft.current > 0) {
+        aiMoraleTicksLeft.current -= 1;
+        if (aiMoraleTicksLeft.current <= 0) {
+          if (aiMoralePhase.current === 'buff') {
+            aiMoralePhase.current = 'debuff';
+            aiMoraleTicksLeft.current = 3;
+            setAiMoraleActive('debuff');
+          } else {
+            aiMoralePhase.current = 'none';
+            setAiMoraleActive(null);
+          }
+        }
+      }
+
+      // AI focus fire tick-down
+      if (aiFocusFireTicksLeft.current > 0) {
+        aiFocusFireTicksLeft.current -= 1;
+      }
+
+      // --- AI ability decisions (singleplayer) ---
+      const pAliveNow = allUnits.filter(u => u.team === 'player' && u.hp > 0);
+      const eAliveNow = allUnits.filter(u => u.team === 'enemy' && u.hp > 0);
+      const currentTurnNum = turnCountRef.current;
+
+      // AI Kriegsschrei: use when losing or randomly after tick 4
+      if (!aiMoraleUsed.current && currentTurnNum >= 3) {
+        const shouldUse = eAliveNow.length < pAliveNow.length // losing units
+          || (currentTurnNum >= 5 && Math.random() < 0.3) // random chance
+          || (currentTurnNum >= 8 && Math.random() < 0.6); // higher chance later
+        if (shouldUse) {
+          aiMoraleUsed.current = true;
+          aiMoralePhase.current = 'buff';
+          aiMoraleTicksLeft.current = 3;
+          setAiMoraleActive('buff');
+          // log handled via setBattleLog above
+          setBattleLog(prev => ['🔥 GEGNER: KRIEGSSCHREI! +25% Schaden für 3 Züge!', ...prev]);
+          setBattleEvents([{ type: 'hit', attackerId: 'ai', attackerRow: 0, attackerCol: 4, attackerEmoji: '🔥', targetId: '', targetRow: 0, targetCol: 0, damage: 0, isStrong: false, isWeak: false, isRanged: false }]);
+        }
+      }
+
+      // AI Fokusfeuer: use when player has a high-HP unit
+      if (!aiFocusFireUsed.current && currentTurnNum >= 4) {
+        const highHpPlayer = pAliveNow.find(u => u.hp > u.maxHp * 0.7);
+        const shouldUse = (highHpPlayer && Math.random() < 0.4)
+          || (currentTurnNum >= 7 && Math.random() < 0.25);
+        if (shouldUse) {
+          aiFocusFireUsed.current = true;
+          aiFocusFireTicksLeft.current = 3;
+          setBattleLog(prev => ['🎯 GEGNER: FOKUSFEUER! Alle feindlichen Einheiten greifen ein Ziel an!', ...prev]);
+        }
+      }
+
+      // AI Opferritual: use when losing badly and has enough units
+      if (!aiSacrificeUsed.current && eAliveNow.length >= 2 && currentTurnNum >= 5) {
+        const avgEnemyHp = eAliveNow.reduce((s, u) => s + u.hp / u.maxHp, 0) / eAliveNow.length;
+        const shouldUse = (avgEnemyHp < 0.5 && Math.random() < 0.5) // units are hurting
+          || (eAliveNow.length <= 2 && Math.random() < 0.3); // desperation
+        if (shouldUse) {
+          aiSacrificeUsed.current = true;
+          const weakest = eAliveNow.reduce((a, b) => a.hp < b.hp ? a : b);
+          // Kill weakest enemy unit, heal others
+          if (newGrid[weakest.row][weakest.col].unit) {
+            newGrid[weakest.row][weakest.col].unit!.hp = 0;
+            (newGrid[weakest.row][weakest.col].unit as any).dead = true;
+          }
+          for (const eu of eAliveNow) {
+            if (eu.id !== weakest.id && eu.hp > 0) {
+              const healAmt = Math.round(eu.maxHp * 0.15);
+              eu.hp = Math.min(eu.maxHp, eu.hp + healAmt);
+            }
+          }
+          setBattleLog(prev => [`💀 GEGNER: OPFERRITUAL! ${UNIT_DEFS[weakest.type].emoji} geopfert – alle anderen geheilt!`, ...prev]);
+        }
+      }
+
       // Calculate player damage modifier from morale
       const playerDmgMod = moralePhase.current === 'buff' ? 1.25 : moralePhase.current === 'debuff' ? 0.85 : 1.0;
+      // Calculate enemy damage modifier from AI morale
+      const enemyDmgMod = aiMoralePhase.current === 'buff' ? 1.25 : aiMoralePhase.current === 'debuff' ? 0.85 : 1.0;
 
-      // Focus fire: determine highest HP enemy target
+      // Focus fire: determine highest HP enemy target (player ability)
       const focusTarget = focusFireTicksLeft.current > 0
         ? allUnits.filter(u => u.team === 'enemy' && u.hp > 0).sort((a, b) => b.hp - a.hp)[0] ?? null
+        : null;
+      // AI focus fire: determine highest HP player target
+      const aiFocusTarget = aiFocusFireTicksLeft.current > 0
+        ? allUnits.filter(u => u.team === 'player' && u.hp > 0).sort((a, b) => b.hp - a.hp)[0] ?? null
         : null;
 
       const logs: string[] = [];
@@ -291,8 +396,10 @@ export function useBattleGame() {
           // No allies to heal → fall through to normal attack logic below
         }
 
-        // Focus fire override: player units target highest HP enemy
-        const target = (focusTarget && unit.team === 'player') ? focusTarget : findTarget(unit, allUnits);
+        // Focus fire override: player units target highest HP enemy, AI units target highest HP player
+        const target = (focusTarget && unit.team === 'player') ? focusTarget
+          : (aiFocusTarget && unit.team === 'enemy') ? aiFocusTarget
+          : findTarget(unit, allUnits);
         if (!target) continue;
 
         if (!canAttack(unit, target)) {
@@ -312,8 +419,9 @@ export function useBattleGame() {
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           let dmg = calcDamage(unit, target, newGrid);
-          // Apply morale modifier for player units
+          // Apply morale modifier
           if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
+          else dmg = Math.round(dmg * enemyDmgMod);
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
 
@@ -462,6 +570,13 @@ export function useBattleGame() {
     setFocusFireActive(false);
     focusFireTicksLeft.current = 0;
     setSacrificeUsed(false);
+    aiMoraleUsed.current = false;
+    aiMoralePhase.current = 'none';
+    aiMoraleTicksLeft.current = 0;
+    setAiMoraleActive(null);
+    aiFocusFireUsed.current = false;
+    aiFocusFireTicksLeft.current = 0;
+    aiSacrificeUsed.current = false;
 
     if (newStarts) {
       setGrid(generateTerrain(createEmptyGrid()));
@@ -491,5 +606,6 @@ export function useBattleGame() {
     focusFireUsed, focusFireActive, activateFocusFire,
     sacrificeUsed, activateSacrifice,
     waitingForOpponent: false,
+    aiMoraleActive,
   };
 }

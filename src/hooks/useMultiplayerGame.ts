@@ -850,6 +850,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     activateSacrifice,
     opponentMoraleActive,
     waitingForOpponent,
+    aiMoraleActive: null as 'buff' | 'debuff' | null,
     isHost,
     myRows,
     placeTimer,
