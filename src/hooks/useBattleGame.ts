@@ -3,8 +3,8 @@ import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateAIPlacement, getMaxUnits, generateTerrain, setBondsForPlacement, moveTankFormation,
-  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
-  OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES,
+  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
@@ -29,6 +29,20 @@ export function useBattleGame(difficulty: number = 2) {
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const turnCountRef = useRef(0);
+
+  // Placement timer (difficulty 2+)
+  const hasPlaceTimer = difficulty >= 2;
+  const [placeTimer, setPlaceTimer] = useState(PLACE_TIME_LIMIT);
+  const placeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const playerUnitsRef = useRef(playerUnits);
+  useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
+
+  // Fatigue system: tracks how many consecutive rounds each unit type survived
+  const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
+  const [enemyFatigue, setEnemyFatigue] = useState<Record<string, number>>({});
+  // Banned units for current round (fatigue >= 2)
+  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 2);
+  const enemyBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (enemyFatigue[t] || 0) >= 2);
 
   // Morale boost state
   const [moraleBoostUsed, setMoraleBoostUsed] = useState(false);
@@ -112,7 +126,39 @@ export function useBattleGame(difficulty: number = 2) {
     setOvertimeCount(0);
     setDrawOfferPending(false);
     setGameDraw(false);
+    setPlayerFatigue({});
+    setEnemyFatigue({});
+    setPlaceTimer(PLACE_TIME_LIMIT);
   }, []);
+
+  // Placement timer countdown (difficulty 2+)
+  useEffect(() => {
+    if (phase !== 'place_player' || !hasPlaceTimer) {
+      if (placeTimerRef.current) clearInterval(placeTimerRef.current);
+      return;
+    }
+    setPlaceTimer(PLACE_TIME_LIMIT);
+    placeTimerRef.current = setInterval(() => {
+      setPlaceTimer(prev => {
+        if (prev <= 1) {
+          if (placeTimerRef.current) clearInterval(placeTimerRef.current);
+          // Auto-confirm placement when timer runs out
+          setTimeout(() => {
+            if (playerUnitsRef.current.length > 0) {
+              // Will be handled by confirmPlacement call below
+            }
+            // Force confirm even with 0 units - skip turn
+            confirmPlacementRef.current?.();
+          }, 0);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => { if (placeTimerRef.current) clearInterval(placeTimerRef.current); };
+  }, [phase, hasPlaceTimer, roundNumber]);
+
+  const confirmPlacementRef = useRef<(() => void) | null>(null);
 
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore);
   const enemyMaxUnits = getMaxUnits(enemyScore, playerScore);
@@ -120,6 +166,7 @@ export function useBattleGame(difficulty: number = 2) {
   // Place unit
   const placeUnit = useCallback((row: number, col: number) => {
     if (phase !== 'place_player' || !selectedUnit) return;
+    if (playerBannedUnits.includes(selectedUnit)) return; // Fatigue ban
     if (!PLAYER_ROWS.includes(row)) return;
     if (playerUnits.length >= playerMaxUnits) return;
     if (grid[row][col].unit) return;
@@ -132,7 +179,7 @@ export function useBattleGame(difficulty: number = 2) {
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
-  }, [phase, selectedUnit, playerUnits, grid, playerMaxUnits]);
+  }, [phase, selectedUnit, playerUnits, grid, playerMaxUnits, playerBannedUnits]);
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
@@ -151,11 +198,21 @@ export function useBattleGame(difficulty: number = 2) {
 
   // Confirm placement
   const confirmPlacement = useCallback(() => {
-    if (playerUnits.length === 0) return;
+    if (placeTimerRef.current) clearInterval(placeTimerRef.current);
+
+    // If no units placed and timer forced it, auto-lose the round
+    if (playerUnits.length === 0) {
+      const newES = enemyScoreRef.current + 1;
+      enemyScoreRef.current = newES;
+      setEnemyScore(newES);
+      setPhase('round_lost');
+      setBattleLog(prev => ['⏰ Keine Einheiten platziert – Runde verloren!', ...prev]);
+      return;
+    }
 
     const pUnits = playerUnits.map(u => ({ ...u }));
     
-    const aiPlacements = generateAIPlacement(pUnits, enemyMaxUnits, grid, difficulty);
+    const aiPlacements = generateAIPlacement(pUnits, enemyMaxUnits, grid, difficulty, enemyBannedUnits);
     const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
 
     // Set bonds for all units (player + enemy)
@@ -174,7 +231,10 @@ export function useBattleGame(difficulty: number = 2) {
     });
 
     setPhase('place_enemy');
-  }, [playerUnits]);
+  }, [playerUnits, enemyBannedUnits]);
+
+  // Keep confirmPlacementRef in sync for auto-confirm timer
+  useEffect(() => { confirmPlacementRef.current = confirmPlacement; }, [confirmPlacement]);
 
   // Start battle
   const startBattle = useCallback(() => {
@@ -735,19 +795,49 @@ export function useBattleGame(difficulty: number = 2) {
   }, []);
 
   const nextRound = useCallback(() => {
+    // Update fatigue: surviving unit types get +1 fatigue, dead ones reset to 0
+    // Also, banned types reset to 0 (they rested this round)
+    setPlayerFatigue(prev => {
+      const next = { ...prev };
+      const survivingTypes = new Set(playerUnits.filter(u => u.hp > 0 && !u.dead).map(u => u.type));
+      for (const t of UNIT_TYPES) {
+        if (playerBannedUnits.includes(t)) {
+          next[t] = 0; // rested this round
+        } else if (survivingTypes.has(t)) {
+          next[t] = (next[t] || 0) + 1;
+        } else {
+          next[t] = 0; // died or wasn't used
+        }
+      }
+      return next;
+    });
+    setEnemyFatigue(prev => {
+      const next = { ...prev };
+      const survivingTypes = new Set(enemyUnits.filter(u => u.hp > 0 && !u.dead).map(u => u.type));
+      for (const t of UNIT_TYPES) {
+        if (enemyBannedUnits.includes(t)) {
+          next[t] = 0; // rested this round
+        } else if (survivingTypes.has(t)) {
+          next[t] = (next[t] || 0) + 1;
+        } else {
+          next[t] = 0;
+        }
+      }
+      return next;
+    });
+
     // Track overtime
     if (inOvertime) {
       const newOT = overtimeCount + 1;
       setOvertimeCount(newOT);
-      // After AUTO_OVERTIMES, offer draw before starting next round
       if (newOT >= AUTO_OVERTIMES && !gameOver) {
         setDrawOfferPending(true);
-        return; // Don't start next round yet – wait for player decision
+        return;
       }
     }
     setDrawOfferPending(false);
     startNextRound();
-  }, [playerStarts, inOvertime, overtimeCount, gameOver]);
+  }, [playerStarts, inOvertime, overtimeCount, gameOver, playerUnits, enemyUnits, playerBannedUnits, enemyBannedUnits]);
 
   const startNextRound = useCallback(() => {
     const newStarts = !playerStarts;
@@ -757,7 +847,8 @@ export function useBattleGame(difficulty: number = 2) {
     setTurnCount(0);
     turnCountRef.current = 0;
     setBattleLog([]);
-    setSelectedUnit('warrior');
+    setSelectedUnit(UNIT_TYPES.find(t => !playerBannedUnits.includes(t)) || 'warrior');
+    setPlaceTimer(PLACE_TIME_LIMIT);
     setMoraleBoostUsed(false);
     setMoraleBoostActive(null);
     moraleTicksLeft.current = 0;
@@ -781,7 +872,7 @@ export function useBattleGame(difficulty: number = 2) {
     } else {
       const terrainGrid = generateTerrain(createEmptyGrid());
       const aiMax = getMaxUnits(enemyScore, playerScore);
-      const aiPlacements = generateAIPlacement([], aiMax, terrainGrid, difficulty);
+      const aiPlacements = generateAIPlacement([], aiMax, terrainGrid, difficulty, enemyBannedUnits);
       const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
       for (const e of enemies) terrainGrid[e.row][e.col].unit = e;
       setGrid(terrainGrid);
@@ -811,5 +902,10 @@ export function useBattleGame(difficulty: number = 2) {
     aiMoraleActive,
     inOvertime, overtimeCount, drawOfferPending,
     acceptDraw, continueOvertime,
+    // Fatigue system
+    playerBannedUnits,
+    playerFatigue,
+    // Placement timer
+    placeTimer: hasPlaceTimer ? placeTimer : undefined,
   };
 }

@@ -4,6 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  PLACE_TIME_LIMIT,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +15,7 @@ interface MultiplayerConfig {
   role: 'player1' | 'player2';
 }
 
-const PLACE_TIME_LIMIT = 10; // seconds for each player to place
+// Use the shared PLACE_TIME_LIMIT from battleGame
 
 function serializeUnit(u: Unit) {
   return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken };
@@ -979,5 +980,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     drawOfferPending: false,
     acceptDraw: () => {},
     continueOvertime: () => {},
+    playerBannedUnits: [] as UnitType[],
+    playerFatigue: {} as Record<string, number>,
   };
 }
