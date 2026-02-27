@@ -46,7 +46,7 @@ function SinglePlayerGame() {
   return <GameUI game={game} isMultiplayer={false} />;
 }
 
-function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean }; isMultiplayer: boolean; flipped?: boolean }) {
+function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
@@ -114,6 +114,15 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
       game.nextRound();
     }
   }, [nextRoundCountdown, isMultiplayer, game]);
+
+  // Handle opponent disconnect → redirect after 3s
+  useEffect(() => {
+    if (!game.opponentLeft) return;
+    const timer = setTimeout(() => {
+      navigate('/');
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [game.opponentLeft, navigate]);
 
   return (
     <div className="min-h-[100dvh] max-h-[100dvh] bg-background flex flex-col max-w-md mx-auto overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -426,6 +435,13 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
 
       {inspectUnit && (
         <UnitInfoModal unitType={inspectUnit} onClose={() => setInspectUnit(null)} />
+      )}
+      {/* Opponent disconnect overlay */}
+      {game.opponentLeft && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex flex-col items-center justify-center gap-4">
+          <p className="text-2xl font-black text-foreground">🚪 Gegner hat das Spiel verlassen</p>
+          <p className="text-sm text-muted-foreground">Du wirst zum Hauptmenü weitergeleitet...</p>
+        </div>
       )}
       <div className="h-6" />
     </div>
