@@ -8,13 +8,14 @@ interface BattleGridProps {
   onCellClick: (row: number, col: number) => void;
   lastPlaced?: { row: number; col: number; type: UnitType } | null;
   battleEvents?: BattleEvent[];
+  moraleBoostActive?: 'buff' | 'debuff' | null;
 }
 
 interface UnitPos { row: number; col: number }
 interface DamagePopup { id: string; row: number; col: number; damage: number; isStrong: boolean; isWeak: boolean; isKill: boolean }
 interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [] }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -25,6 +26,17 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
+  const [warCryFlash, setWarCryFlash] = useState(false);
+  const prevMorale = useRef<'buff' | 'debuff' | null>(null);
+
+  // War cry flash animation
+  useEffect(() => {
+    if (moraleBoostActive === 'buff' && prevMorale.current !== 'buff') {
+      setWarCryFlash(true);
+      setTimeout(() => setWarCryFlash(false), 600);
+    }
+    prevMorale.current = moraleBoostActive ?? null;
+  }, [moraleBoostActive]);
 
   // Flash effect for attack pattern on placement
   useEffect(() => {
@@ -251,6 +263,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           </div>
         );
       })}
+      {/* War cry overlay flash */}
+      {warCryFlash && (
+        <div className="absolute inset-0 z-40 pointer-events-none rounded-xl war-cry-flash flex items-center justify-center">
+          <span className="text-5xl war-cry-emoji">🔥</span>
+        </div>
+      )}
+
+      {/* Active morale glow border */}
+      {moraleBoostActive === 'buff' && (
+        <div className="absolute inset-0 z-30 pointer-events-none rounded-xl border-2 border-warning shadow-[inset_0_0_20px_hsl(var(--warning)/0.15),0_0_15px_hsl(var(--warning)/0.2)] animate-pulse" />
+      )}
+      {moraleBoostActive === 'debuff' && (
+        <div className="absolute inset-0 z-30 pointer-events-none rounded-xl border-2 border-danger/40 shadow-[inset_0_0_15px_hsl(var(--danger)/0.1)]" />
+      )}
     </div>
   );
 }
