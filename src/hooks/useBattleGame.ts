@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
-  generateAIPlacement, getMaxUnits, generateTerrain,
+  generateAIPlacement, getMaxUnits, generateTerrain, setBondsForPlacement,
   GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES,
   getActivationTurn,
@@ -154,10 +154,15 @@ export function useBattleGame(difficulty: number = 2) {
     if (playerUnits.length === 0) return;
 
     const pUnits = playerUnits.map(u => ({ ...u }));
-    setPlayerUnits(pUnits);
-
+    
     const aiPlacements = generateAIPlacement(pUnits, enemyMaxUnits, grid, difficulty);
     const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
+
+    // Set bonds for all units (player + enemy)
+    const allUnits = [...pUnits, ...enemies];
+    setBondsForPlacement(allUnits);
+
+    setPlayerUnits(pUnits);
     setEnemyUnits(enemies);
 
     // Build full grid preserving terrain

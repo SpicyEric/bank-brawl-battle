@@ -21,6 +21,8 @@ export interface Unit {
   activationTurn?: number; // turn number when this unit becomes active (staggered rows)
   startRow?: number; // the row the unit was originally placed on
   lastAttackedId?: string; // last enemy attacked (rider uses this for target-switching)
+  bondedToTankId?: string; // if placed adjacent to a tank, bonded for strong pull
+  bondBroken?: boolean; // once bonded unit moves away, bond is broken
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -197,10 +199,10 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   tank: {
     label: 'Schildträger',
     emoji: '🛡️',
-    hp: 200,
+    hp: 175,
     attack: 19,
     cooldown: 3,
-    description: 'Bewegt sich orthogonal (1 Feld). Greift angrenzend an. Zieht Feinde an.',
+    description: 'Bewegt sich orthogonal (1 Feld). Schützt angrenzende Verbündete (-20% Schaden). Zieht Feinde an. Verbündete können sich an ihn binden.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: ['rider', 'archer', 'frost'],
@@ -388,9 +390,9 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
 
-  // Tanks taunt: if any tank is within distance 3, prioritize it
+  // Tank aggro: if any enemy tank is within distance 3, 60% chance to target it
   const nearbyTanks = enemies.filter(e => e.type === 'tank' && distance(unit, e) <= 3);
-  if (nearbyTanks.length > 0) {
+  if (nearbyTanks.length > 0 && Math.random() < 0.6) {
     nearbyTanks.sort((a, b) => distance(unit, a) - distance(unit, b));
     return nearbyTanks[0];
   }
@@ -399,19 +401,15 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   if (unit.type === 'warrior' && unit.lastAttackedId) {
     const lockedTarget = enemies.find(e => e.id === unit.lastAttackedId);
     if (lockedTarget) return lockedTarget;
-    // Target died, fall through to find a new one
   }
 
   // === ASSASSIN: Opportunist – prefers wounded enemies, then nearest ===
   if (unit.type === 'assassin') {
-    // Find wounded enemies (<70% HP)
     const wounded = enemies.filter(e => e.hp < e.maxHp * 0.7);
     if (wounded.length > 0) {
-      // Among wounded, pick the lowest HP (finish off)
       wounded.sort((a, b) => a.hp - b.hp);
       return wounded[0];
     }
-    // No wounded? Pick closest enemy
     enemies.sort((a, b) => distance(unit, a) - distance(unit, b));
     return enemies[0];
   }
@@ -425,12 +423,11 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     }
   }
 
-  // Column-based targeting: enemies in the same column get priority (~70% of the time)
+  // Column-based targeting
   const sameColEnemies = enemies.filter(e => e.col === unit.col);
   const nearColEnemies = enemies.filter(e => Math.abs(e.col - unit.col) === 1);
   const columnEnemies = [...sameColEnemies, ...nearColEnemies];
 
-  // 70% chance to pick from same/adjacent column if available
   if (columnEnemies.length > 0 && Math.random() < 0.7) {
     columnEnemies.sort((a, b) => {
       const aColDist = Math.abs(a.col - unit.col);
@@ -545,12 +542,66 @@ function isBehindAllies(pos: Position, unit: Unit, allUnits: Unit[]): boolean {
   }
 }
 
-// Move toward target: terrain-aware with anti-stalemate + kiting for ranged
+// Find nearest friendly tank position
+function findFriendlyTank(unit: Unit, allUnits: Unit[]): Unit | null {
+  const tanks = allUnits.filter(u => u.team === unit.team && u.type === 'tank' && u.hp > 0 && !u.dead && u.id !== unit.id);
+  if (tanks.length === 0) return null;
+  tanks.sort((a, b) => distance(unit, a) - distance(unit, b));
+  return tanks[0];
+}
+
+// Check if position is orthogonally adjacent to a unit
+function isAdjacentTo(pos: Position, target: Unit): boolean {
+  return ORTHOGONAL.some(o => pos.row === target.row + o.row && pos.col === target.col + o.col);
+}
+
+// Move toward target: terrain-aware with anti-stalemate + kiting for ranged + tank pull
 export function moveToward(unit: Unit, target: Unit, grid: Cell[][], allUnits?: Unit[]): Position {
   const possibleMoves = getMoveCells(unit, grid);
   if (possibleMoves.length === 0) return { row: unit.row, col: unit.col };
 
   const isRangedKiter = RANGED_KITERS.includes(unit.type);
+
+  // --- Tank pull logic (before normal movement) ---
+  if (unit.type !== 'tank' && unit.type !== 'healer' && allUnits) {
+    const friendlyTank = findFriendlyTank(unit, allUnits);
+    if (friendlyTank) {
+      const isBonded = unit.bondedToTankId === friendlyTank.id && !unit.bondBroken;
+      const pullChance = isBonded ? 0.75 : 0.30;
+      const currentlyAdjacent = isAdjacentTo(unit, friendlyTank);
+
+      if (Math.random() < pullChance) {
+        if (isBonded && currentlyAdjacent) {
+          // Bonded + adjacent: try to stay adjacent while still attacking
+          const adjacentAttackMoves = possibleMoves.filter(pos =>
+            isAdjacentTo(pos, friendlyTank) && couldAttackFrom(pos, unit.type, target)
+          );
+          if (adjacentAttackMoves.length > 0) {
+            return adjacentAttackMoves[0];
+          }
+          // Can't attack from adjacent position — stay put if can attack from here
+          if (canAttack(unit, target)) {
+            return { row: unit.row, col: unit.col };
+          }
+          // Must move to attack — bond breaks
+          unit.bondBroken = true;
+        } else if (!currentlyAdjacent && distance(unit, friendlyTank) <= 3) {
+          // Soft pull: prefer moves that are closer to tank (among equally good moves)
+          const movesNearTank = possibleMoves.filter(pos =>
+            distance(pos, friendlyTank) < distance(unit, friendlyTank) &&
+            couldAttackFrom(pos, unit.type, target)
+          );
+          if (movesNearTank.length > 0) {
+            movesNearTank.sort((a, b) => distance(a, friendlyTank) - distance(b, friendlyTank));
+            return movesNearTank[0];
+          }
+        }
+      } else if (isBonded && currentlyAdjacent) {
+        // 25% chance: bond breaks, unit moves freely
+        unit.bondBroken = true;
+      }
+    }
+  }
 
   // If can already attack, consider kiting or staying
   if (canAttack(unit, target)) {
@@ -642,7 +693,37 @@ export function moveToward(unit: Unit, target: Unit, grid: Cell[][], allUnits?: 
   return best;
 }
 
-// Calculate damage with counter system + terrain bonuses
+// Helper to set bonds on units placed adjacent to tanks
+export function setBondsForPlacement(units: Unit[]): void {
+  const tanks = units.filter(u => u.type === 'tank');
+  for (const unit of units) {
+    if (unit.type === 'tank') continue;
+    for (const tank of tanks) {
+      if (unit.team === tank.team && ORTHOGONAL.some(o => unit.row === tank.row + o.row && unit.col === tank.col + o.col)) {
+        unit.bondedToTankId = tank.id;
+        unit.bondBroken = false;
+        break;
+      }
+    }
+  }
+}
+
+// Check if defender has a friendly tank adjacent (shield aura)
+function hasAdjacentFriendlyTank(defender: Unit, grid: Cell[][]): boolean {
+  for (const offset of ORTHOGONAL) {
+    const r = defender.row + offset.row;
+    const c = defender.col + offset.col;
+    if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+      const cell = grid[r][c];
+      if (cell.unit && cell.unit.type === 'tank' && cell.unit.team === defender.team && cell.unit.hp > 0 && !cell.unit.dead) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Calculate damage with counter system + terrain bonuses + shield aura
 export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): number {
   const aDef = UNIT_DEFS[attacker.type];
   let dmg = attacker.attack * (0.95 + Math.random() * 0.1);
@@ -660,6 +741,11 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
 
   // Forest bonus: defender in forest takes -20% damage
   if (grid && grid[defender.row][defender.col].terrain === 'forest') {
+    dmg *= 0.8;
+  }
+
+  // Shield aura: defender adjacent to friendly tank takes -20% damage (not the tank itself)
+  if (grid && defender.type !== 'tank' && hasAdjacentFriendlyTank(defender, grid)) {
     dmg *= 0.8;
   }
 

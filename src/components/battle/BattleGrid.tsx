@@ -338,6 +338,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                       colorGroup === 'red' ? 'bg-unit-red' : colorGroup === 'blue' ? 'bg-unit-blue' : 'bg-unit-green'
                     }`} />
                   )}
+                  {/* Shield aura indicator: show small shield icon if unit is next to friendly tank */}
+                  {unit.type !== 'tank' && phase === 'battle' && (() => {
+                    for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }]) {
+                      const r = cell.row + offset.row;
+                      const c = cell.col + offset.col;
+                      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+                        const neighbor = grid[r]?.[c];
+                        if (neighbor?.unit && neighbor.unit.type === 'tank' && neighbor.unit.team === unit.team && neighbor.unit.hp > 0 && !neighbor.unit.dead) {
+                          return <span className="absolute top-0 right-0.5 text-[7px] opacity-70 select-none">🛡️</span>;
+                        }
+                      }
+                    }
+                    return null;
+                  })()}
                 </div>
               )}
             </button>
@@ -345,7 +359,46 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         })}
       </div>
 
-      {/* Projectile animations */}
+      {/* Shield bond connections during placement */}
+      {(isPlacing || phase === 'place_enemy') && (() => {
+        const bonds: { tankRow: number; tankCol: number; unitRow: number; unitCol: number }[] = [];
+        const tanks = grid.flat().filter(c => c.unit && !c.unit.dead && c.unit.type === 'tank' && c.unit.team === 'player');
+        for (const tankCell of tanks) {
+          for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }]) {
+            const r = tankCell.row + offset.row;
+            const c = tankCell.col + offset.col;
+            if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+              const neighbor = grid[r][c];
+              if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === 'player' && neighbor.unit.type !== 'tank') {
+                bonds.push({ tankRow: tankCell.row, tankCol: tankCell.col, unitRow: r, unitCol: c });
+              }
+            }
+          }
+        }
+        return bonds.map((b, i) => {
+          const x1 = b.tankCol * cellSize + cellSize / 2;
+          const y1 = b.tankRow * cellSize + cellSize / 2;
+          const x2 = b.unitCol * cellSize + cellSize / 2;
+          const y2 = b.unitRow * cellSize + cellSize / 2;
+          return (
+            <svg key={`bond-${i}`} className="absolute inset-0 z-20 pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <line
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke="hsl(152, 60%, 48%)"
+                strokeWidth="0.6"
+                strokeDasharray="1.5,1"
+                opacity="0.7"
+              >
+                <animate attributeName="stroke-dashoffset" from="0" to="-5" dur="1.5s" repeatCount="indefinite" />
+              </line>
+              <circle cx={(x1 + x2) / 2} cy={(y1 + y2) / 2} r="1.2" fill="hsl(152, 60%, 48%)" opacity="0.8">
+                <animate attributeName="opacity" values="0.4;0.9;0.4" dur="1.5s" repeatCount="indefinite" />
+              </circle>
+            </svg>
+          );
+        });
+      })()}
+
       {projectiles.map(p => {
         const fromX = p.fromCol * cellSize + cellSize / 2;
         const fromY = p.fromRow * cellSize + cellSize / 2;

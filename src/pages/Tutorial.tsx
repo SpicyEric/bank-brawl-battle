@@ -82,7 +82,7 @@ const STEPS: TutorialStep[] = [
   {
     id: 'unit_roles',
     title: '🛡️ Einheiten-Rollen',
-    text: 'Jede Einheit hat eine besondere Rolle:\n\n🛡️ Schildträger — Viele HP, blockt den Weg\n🏹 Bogenschütze — Fernkampf, greift aus 3 Feldern an\n🔮 Magier — Diagonaler Fernkampf, versteckt sich hinten\n🗡️ Assassine — Hoher Schaden, greift Verletzte an\n🐉 Drache — Flächenschaden im 3×3 Bereich\n🥶 Frostmagier — Friert Gegner ein!\n🏇 Reiter — Springt über Hindernisse\n🌿 Schamane — Heilt Verbündete\n⚔️ Krieger — Beißt sich am Ziel fest',
+    text: 'Jede Einheit hat eine besondere Rolle:\n\n🛡️ Schildträger — Viele HP, schützt Nachbarn (-20% Schaden). Platziere Verbündete direkt daneben für eine Bindung!\n🏹 Bogenschütze — Fernkampf, greift aus 3 Feldern an\n🔮 Magier — Diagonaler Fernkampf, versteckt sich hinten\n🗡️ Assassine — Hoher Schaden, greift Verletzte an\n🐉 Drache — Flächenschaden im 3×3 Bereich\n🥶 Frostmagier — Friert Gegner ein!\n🏇 Reiter — Springt über Hindernisse\n🌿 Schamane — Heilt Verbündete\n⚔️ Krieger — Beißt sich am Ziel fest',
     hint: 'Halte im Spiel lange auf eine Einheit gedrückt, um Details zu sehen.',
   },
   {
