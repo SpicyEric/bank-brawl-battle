@@ -480,6 +480,8 @@ export function useBattleGame() {
           else dmg = Math.round(dmg * enemyDmgMod);
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
+          // Warrior: track last attacked for lock-on behavior
+          if (unit.type === 'warrior') unit.lastAttackedId = target.id;
           // Rider: track last attacked for target-switching
           if (unit.type === 'rider') unit.lastAttackedId = target.id;
 
