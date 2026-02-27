@@ -470,6 +470,50 @@ export function useBattleGame() {
           const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
           const dist = Math.abs(unit.row - target.row) + Math.abs(unit.col - target.col);
           logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.frozen ? ' 🧊' : ''}${target.hp <= 0 ? ' ☠️' : ''}`);
+
+          // Dragon AOE: collect all cells in 3x3 around the dragon for fire effect
+          let aoeCells: { row: number; col: number }[] | undefined;
+          if (unit.type === 'dragon') {
+            aoeCells = [];
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                const ar = unit.row + dr;
+                const ac = unit.col + dc;
+                if (ar >= 0 && ar < GRID_SIZE && ac >= 0 && ac < GRID_SIZE) {
+                  aoeCells.push({ row: ar, col: ac });
+                }
+              }
+            }
+
+            // Splash damage: 50% to other enemies in the 3x3 area
+            const splashDmg = Math.round(dmg * 0.5);
+            for (const aoePos of aoeCells) {
+              const cellUnit = newGrid[aoePos.row][aoePos.col].unit;
+              if (cellUnit && cellUnit.hp > 0 && !cellUnit.dead && cellUnit.team !== unit.team && cellUnit.id !== target.id) {
+                cellUnit.hp = Math.max(0, cellUnit.hp - splashDmg);
+                const splashDef = UNIT_DEFS[cellUnit.type];
+                logs.push(`🔥 ${unit.team === 'player' ? '👤' : '💀'} Drache 🔥→ ${splashDef.emoji} ${splashDmg} (Flächenschaden)`);
+                events.push({
+                  type: cellUnit.hp <= 0 ? 'kill' : 'hit',
+                  attackerId: unit.id,
+                  attackerRow: unit.row,
+                  attackerCol: unit.col,
+                  attackerEmoji: '🔥',
+                  targetId: cellUnit.id,
+                  targetRow: aoePos.row,
+                  targetCol: aoePos.col,
+                  damage: splashDmg,
+                  isStrong: false, isWeak: false,
+                  isRanged: false,
+                  isAoe: true,
+                });
+                if (cellUnit.hp <= 0) {
+                  (cellUnit as any).dead = true;
+                }
+              }
+            }
+          }
+
           events.push({
             type: target.hp <= 0 ? 'kill' : 'hit',
             attackerId: unit.id,
@@ -482,6 +526,8 @@ export function useBattleGame() {
             damage: dmg,
             isStrong, isWeak,
             isRanged: dist > 1,
+            isAoe: unit.type === 'dragon',
+            aoeCells: aoeCells,
           });
 
           if (target.hp <= 0) {

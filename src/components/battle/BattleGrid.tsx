@@ -17,6 +17,7 @@ interface BattleGridProps {
 interface UnitPos { row: number; col: number }
 interface DamagePopup { id: string; row: number; col: number; damage: number; isStrong: boolean; isWeak: boolean; isKill: boolean }
 interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string }
+interface DragonFire { id: string; cells: { row: number; col: number }[] }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
@@ -27,8 +28,10 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [shakeCells, setShakeCells] = useState<Set<string>>(new Set());
   const [popups, setPopups] = useState<DamagePopup[]>([]);
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
+  const [dragonFires, setDragonFires] = useState<DragonFire[]>([]);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
+  const dragonFireCounter = useRef(0);
   const [warCryFlash, setWarCryFlash] = useState(false);
   const [focusFlashAnim, setFocusFlashAnim] = useState(false);
   const [sacrificeAnim, setSacrificeAnim] = useState(false);
@@ -120,6 +123,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     const newShake = new Set<string>();
     const newPopups: DamagePopup[] = [];
     const newProjs: Projectile[] = [];
+    const newDragonFires: DragonFire[] = [];
 
     for (const evt of battleEvents) {
       const key = `${evt.targetRow}-${evt.targetCol}`;
@@ -131,6 +135,15 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         damage: evt.damage, isStrong: evt.isStrong, isWeak: evt.isWeak,
         isKill: evt.type === 'kill',
       });
+
+      // Dragon AOE fire effect
+      if (evt.aoeCells && evt.aoeCells.length > 0) {
+        dragonFireCounter.current += 1;
+        newDragonFires.push({
+          id: `dfire-${dragonFireCounter.current}`,
+          cells: evt.aoeCells,
+        });
+      }
 
       if (evt.isRanged) {
         projCounter.current += 1;
@@ -146,6 +159,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     setShakeCells(newShake);
     setPopups(prev => [...prev, ...newPopups]);
     setProjectiles(prev => [...prev, ...newProjs]);
+    if (newDragonFires.length > 0) {
+      setDragonFires(prev => [...prev, ...newDragonFires]);
+    }
 
     setTimeout(() => setShakeCells(new Set()), 400);
     setTimeout(() => {
@@ -154,6 +170,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     setTimeout(() => {
       setProjectiles(prev => prev.filter(p => !newProjs.find(np => np.id === p.id)));
     }, 450);
+    if (newDragonFires.length > 0) {
+      setTimeout(() => {
+        setDragonFires(prev => prev.filter(f => !newDragonFires.find(nf => nf.id === f.id)));
+      }, 800);
+    }
   }, [battleEvents]);
 
   const cellSize = 100 / GRID_SIZE;
@@ -330,6 +351,30 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           <span className="text-5xl sacrifice-emoji">💀</span>
         </div>
       )}
+
+      {/* Dragon fire AOE overlay */}
+      {dragonFires.map(fire => (
+        fire.cells.map((cell, i) => {
+          const left = cell.col * cellSize;
+          const top = cell.row * cellSize;
+          return (
+            <div
+              key={`${fire.id}-${i}`}
+              className="absolute pointer-events-none z-25 dragon-fire-cell"
+              style={{
+                left: `${left}%`,
+                top: `${top}%`,
+                width: `${cellSize}%`,
+                height: `${cellSize}%`,
+              }}
+            >
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="text-lg dragon-fire-emoji" style={{ animationDelay: `${i * 40}ms` }}>🔥</span>
+              </div>
+            </div>
+          );
+        })
+      ))}
     </div>
   );
 }
