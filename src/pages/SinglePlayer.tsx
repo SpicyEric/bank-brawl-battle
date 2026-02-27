@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMusic } from '@/hooks/useMusic';
 import { ArrowLeft, Swords, BookOpen, Trophy, ChevronRight } from 'lucide-react';
+import menuBg from '@/assets/menu-bg.png';
 
 export type Difficulty = 1 | 2 | 3 | 4 | 5;
 
@@ -21,11 +22,10 @@ const SinglePlayer = () => {
   const [subMenu, setSubMenu] = useState<SubMenu>('main');
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-      {/* Ambient glow */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-primary/5 blur-[100px]" />
-      </div>
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      {/* Background image - dimmed */}
+      <img src={menuBg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-none" />
 
       {/* Back button */}
       <button
