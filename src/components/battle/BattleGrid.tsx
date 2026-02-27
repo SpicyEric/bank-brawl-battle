@@ -16,6 +16,8 @@ interface BattleGridProps {
   alwaysShowColorDots?: boolean;
   /** Always show zone colors (player=blue, enemy=red) regardless of phase */
   showZoneColors?: boolean;
+  /** Flip the grid vertically (for player2 in multiplayer) */
+  flipped?: boolean;
 }
 
 interface UnitPos { row: number; col: number }
@@ -26,7 +28,7 @@ interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -252,13 +254,15 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   }, [battleEvents]);
 
   const cellSize = 100 / GRID_SIZE;
+  // When flipped, visual row position is inverted for overlay effects
+  const visualRow = (r: number) => flipped ? (GRID_SIZE - 1 - r) : r;
 
   return (
     <div className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto relative">
       <div className="grid grid-cols-8 gap-[2px] w-full h-full bg-border rounded-xl overflow-hidden border border-border">
-         {grid.flat().map((cell) => {
-          const isPlayerZone = PLAYER_ROWS.includes(cell.row);
-          const isEnemyZone = cell.row < 3;
+         {(flipped ? [...grid].reverse().flat() : grid.flat()).map((cell) => {
+          const isPlayerZone = flipped ? cell.row < 3 : PLAYER_ROWS.includes(cell.row);
+          const isEnemyZone = flipped ? PLAYER_ROWS.includes(cell.row) : cell.row < 3;
           const unit = cell.unit;
           const def = unit ? UNIT_DEFS[unit.type] : null;
           const colorGroup = unit && !unit.dead ? UNIT_COLOR_GROUPS[unit.type] : null;
@@ -377,9 +381,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         }
         return bonds.map((b, i) => {
           const x1 = b.tankCol * cellSize + cellSize / 2;
-          const y1 = b.tankRow * cellSize + cellSize / 2;
+          const y1 = visualRow(b.tankRow) * cellSize + cellSize / 2;
           const x2 = b.unitCol * cellSize + cellSize / 2;
-          const y2 = b.unitRow * cellSize + cellSize / 2;
+          const y2 = visualRow(b.unitRow) * cellSize + cellSize / 2;
           return (
             <svg key={`bond-${i}`} className="absolute inset-0 z-20 pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
               <line
@@ -401,9 +405,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
 
       {projectiles.map(p => {
         const fromX = p.fromCol * cellSize + cellSize / 2;
-        const fromY = p.fromRow * cellSize + cellSize / 2;
+        const fromY = visualRow(p.fromRow) * cellSize + cellSize / 2;
         const toX = p.toCol * cellSize + cellSize / 2;
-        const toY = p.toRow * cellSize + cellSize / 2;
+        const toY = visualRow(p.toRow) * cellSize + cellSize / 2;
         const projClass = p.type === 'arrow' ? 'projectile-arrow'
           : p.type === 'magic' ? 'projectile-magic'
           : p.type === 'frost' ? 'projectile-frost'
@@ -431,7 +435,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       {/* Damage popups overlay */}
       {popups.map(p => {
         const left = p.col * cellSize + cellSize / 2;
-        const top = p.row * cellSize + cellSize / 4;
+        const top = visualRow(p.row) * cellSize + cellSize / 4;
         return (
           <div
             key={p.id}
@@ -491,7 +495,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       {dragonFires.map(fire => (
         fire.cells.map((cell, i) => {
           const left = cell.col * cellSize;
-          const top = cell.row * cellSize;
+          const top = visualRow(cell.row) * cellSize;
           return (
             <div
               key={`${fire.id}-${i}`}
@@ -514,7 +518,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       {/* Heal glow overlay */}
       {healGlows.map(h => {
         const left = h.col * cellSize;
-        const top = h.row * cellSize;
+        const top = visualRow(h.row) * cellSize;
         return (
           <div
             key={h.id}
@@ -536,7 +540,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       {/* Heal popups */}
       {healPopups.map(h => {
         const left = h.col * cellSize + cellSize / 2;
-        const top = h.row * cellSize + cellSize / 4;
+        const top = visualRow(h.row) * cellSize + cellSize / 4;
         return (
           <div
             key={h.id}
@@ -556,7 +560,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       {/* Freeze effect overlay */}
       {freezeEffects.map(f => {
         const left = f.col * cellSize;
-        const top = f.row * cellSize;
+        const top = visualRow(f.row) * cellSize;
         return (
           <div
             key={f.id}
