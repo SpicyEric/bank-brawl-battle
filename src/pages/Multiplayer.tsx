@@ -92,7 +92,7 @@ const Multiplayer = () => {
     setState('starting');
 
     try {
-      await updateRoom(roomId, { status: 'starting' });
+      await updateRoom(roomId, { status: 'playing' });
       navigateToGame('player1', roomId);
     } catch (e: any) {
       toast.error('Start fehlgeschlagen: ' + e.message);
@@ -115,7 +115,7 @@ const Multiplayer = () => {
         setOpponentJoined(false);
       }
 
-      if (room.status === 'starting') {
+      if (room.status === 'playing') {
         navigateToGame(myRole, roomId);
       }
     };
