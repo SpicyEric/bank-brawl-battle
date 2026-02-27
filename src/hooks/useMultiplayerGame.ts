@@ -46,7 +46,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const [roundNumber, setRoundNumber] = useState(1);
   const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
-  const [waitingForOpponent, setWaitingForOpponent] = useState(false);
   const [opponentLeft, setOpponentLeft] = useState(false);
 
   // Morale boost state (each player has their own)
@@ -77,7 +76,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(1);
   const [placingPhase, setPlacingPhase] = useState<'first' | 'second' | 'done'>('first');
   const [placeTimer, setPlaceTimer] = useState(MULTI_PLACE_TIME_LIMIT);
-  const [isMyTurnToPlace, setIsMyTurnToPlace] = useState(false);
   const [opponentUnitsVisible, setOpponentUnitsVisible] = useState<Unit[]>([]);
 
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -86,38 +84,24 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const placingPhaseRef = useRef(placingPhase);
   const phaseRef = useRef(phase);
   const playerUnitsRef = useRef(playerUnits);
-  const isMyTurnRef = useRef(isMyTurnToPlace);
   const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hadBothPlayersRef = useRef(false);
+
+  // Derive isMyTurnToPlace and waitingForOpponent directly (no effects — avoids race conditions)
+  const myPlayerNum = isHost ? 1 : 2;
+  const isMyTurnToPlace = phase === 'place_player' && (
+    (placingPhase === 'first' && myPlayerNum === placingPlayer) ||
+    (placingPhase === 'second' && myPlayerNum !== placingPlayer)
+  );
+  const waitingForOpponent = phase === 'place_player' && !isMyTurnToPlace && placingPhase !== 'done';
+
+  const isMyTurnRef = useRef(isMyTurnToPlace);
 
   // Keep refs in sync
   useEffect(() => { placingPhaseRef.current = placingPhase; }, [placingPhase]);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
   useEffect(() => { isMyTurnRef.current = isMyTurnToPlace; }, [isMyTurnToPlace]);
-
-  // Determine if it's my turn
-  useEffect(() => {
-    if (phase !== 'place_player') {
-      setIsMyTurnToPlace(false);
-      return;
-    }
-    const myPlayerNum = isHost ? 1 : 2;
-    if (placingPhase === 'first') {
-      setIsMyTurnToPlace(myPlayerNum === placingPlayer);
-    } else if (placingPhase === 'second') {
-      setIsMyTurnToPlace(myPlayerNum !== placingPlayer);
-    } else {
-      setIsMyTurnToPlace(false);
-    }
-  }, [phase, placingPhase, placingPlayer, isHost]);
-
-  // Waiting state: it's placement phase but not my turn
-  useEffect(() => {
-    if (phase === 'place_player') {
-      setWaitingForOpponent(!isMyTurnToPlace && placingPhase !== 'done');
-    }
-  }, [phase, isMyTurnToPlace, placingPhase]);
 
   // Setup broadcast channel
   useEffect(() => {
@@ -240,7 +224,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setTurnCount(0);
         setSelectedUnit('warrior'); // will be corrected by fatigue check in UI
         setBattleTimer(ROUND_TIME_LIMIT);
-        setWaitingForOpponent(false);
         setOpponentUnitsVisible([]);
         // Reset morale for new round
         setMoraleBoostUsed(false);
@@ -450,7 +433,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       // For the first placer, switch to waiting
       setPlacingPhase('second');
-      setWaitingForOpponent(true);
+      
       setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
 
     } else if (currentPlacingPhase === 'second') {
@@ -554,7 +537,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setBattleTimer(ROUND_TIME_LIMIT);
     setPlacingPhase('done');
     setOpponentUnitsVisible([]);
-    setWaitingForOpponent(false);
     // Reset all abilities for battle start
     setMoraleBoostUsed(false);
     setMoraleBoostActive(null);
@@ -994,7 +976,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setGrid(newGrid);
     setPhase('place_player');
     setBattleTimer(ROUND_TIME_LIMIT);
-    setWaitingForOpponent(false);
+    
     setPlacingPlayer(whoFirst as 1 | 2);
     setPlacingPhase('first');
     setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
