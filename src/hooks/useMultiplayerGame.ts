@@ -3,7 +3,7 @@ import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
-  GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   PLACE_TIME_LIMIT,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
@@ -68,6 +68,10 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
   // Sacrifice Ritual state
   const [sacrificeUsed, setSacrificeUsed] = useState(false);
+
+  // Fatigue system: tracks how many consecutive rounds each unit type survived
+  const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
+  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 2);
 
   // Alternating placement state
   const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(1);
@@ -202,6 +206,22 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       }
 
       if (action === 'next_round') {
+        // Update fatigue before resetting
+        setPlayerFatigue(prev => {
+          const next = { ...prev };
+          const survivingTypes = new Set(playerUnits.filter(u => u.hp > 0 && !u.dead).map(u => u.type));
+          for (const t of UNIT_TYPES) {
+            if ((prev[t] || 0) >= 2) {
+              next[t] = 0; // rested this round
+            } else if (survivingTypes.has(t)) {
+              next[t] = (next[t] || 0) + 1;
+            } else {
+              next[t] = 0;
+            }
+          }
+          return next;
+        });
+
         setGrid(data.grid as Cell[][]);
         setPhase('place_player');
         setRoundNumber(data.roundNumber);
@@ -214,7 +234,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setEnemyUnits([]);
         setBattleLog([]);
         setTurnCount(0);
-        setSelectedUnit('warrior');
+        setSelectedUnit('warrior'); // will be corrected by fatigue check in UI
         setBattleTimer(ROUND_TIME_LIMIT);
         setWaitingForOpponent(false);
         setOpponentUnitsVisible([]);
@@ -328,6 +348,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Place unit on my side
   const placeUnit = useCallback((row: number, col: number) => {
     if (phase !== 'place_player' || !isMyTurnToPlace || !selectedUnit) return;
+    if (playerBannedUnits.includes(selectedUnit)) return; // Fatigue ban
     if (!myRows.includes(row)) return;
     if (playerUnits.length >= BASE_UNITS) return;
     if (grid[row][col].unit) return;
@@ -340,7 +361,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
-  }, [phase, isMyTurnToPlace, selectedUnit, playerUnits, grid, myRows, myTeam]);
+  }, [phase, isMyTurnToPlace, selectedUnit, playerUnits, grid, myRows, myTeam, playerBannedUnits]);
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
@@ -904,12 +925,28 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     const newGrid = generateTerrain(createEmptyGrid());
     const whoFirst = Math.random() < 0.5 ? 1 : 2;
 
+    // Update fatigue before resetting units
+    setPlayerFatigue(prev => {
+      const next = { ...prev };
+      const survivingTypes = new Set(playerUnits.filter(u => u.hp > 0 && !u.dead).map(u => u.type));
+      for (const t of UNIT_TYPES) {
+        if (playerBannedUnits.includes(t)) {
+          next[t] = 0; // rested this round
+        } else if (survivingTypes.has(t)) {
+          next[t] = (next[t] || 0) + 1;
+        } else {
+          next[t] = 0; // died or wasn't used
+        }
+      }
+      return next;
+    });
+
     setRoundNumber(newRound);
     setPlayerUnits([]);
     setEnemyUnits([]);
     setBattleLog([]);
     setTurnCount(0);
-    setSelectedUnit('warrior');
+    setSelectedUnit(UNIT_TYPES.find(t => !playerBannedUnits.includes(t)) || 'warrior');
     setGrid(newGrid);
     setPhase('place_player');
     setBattleTimer(ROUND_TIME_LIMIT);
@@ -943,7 +980,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         });
       }, 300);
     }
-  }, [roundNumber, roomId, isHost, playerScore, enemyScore]);
+  }, [roundNumber, roomId, isHost, playerScore, enemyScore, playerUnits, playerBannedUnits]);
 
   const resetGame = useCallback(() => {}, []);
   const startBattle = useCallback(() => {}, []);
@@ -980,7 +1017,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     drawOfferPending: false,
     acceptDraw: () => {},
     continueOvertime: () => {},
-    playerBannedUnits: [] as UnitType[],
-    playerFatigue: {} as Record<string, number>,
+    playerBannedUnits,
+    playerFatigue,
   };
 }
