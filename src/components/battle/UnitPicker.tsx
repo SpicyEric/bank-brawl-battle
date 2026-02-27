@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { UnitType, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, ColorGroup } from '@/lib/battleGame';
 import { UnitInfoModal } from './UnitInfoModal';
 
@@ -13,6 +13,8 @@ const COLOR_BG: Record<ColorGroup, string> = {
   green: 'bg-unit-green/15',
 };
 
+const LONG_PRESS_MS = 400;
+
 interface UnitPickerProps {
   selected: UnitType | null;
   onSelect: (type: UnitType) => void;
@@ -22,11 +24,36 @@ interface UnitPickerProps {
 
 export function UnitPicker({ selected, onSelect, placedCount, maxUnits }: UnitPickerProps) {
   const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPress = useRef(false);
+
+  const startPress = useCallback((type: UnitType) => {
+    didLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      didLongPress.current = true;
+      setInfoUnit(type);
+    }, LONG_PRESS_MS);
+  }, []);
+
+  const cancelPress = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
+
+  const handleClick = useCallback((type: UnitType) => {
+    if (didLongPress.current) {
+      didLongPress.current = false;
+      return; // was a long press, don't select
+    }
+    onSelect(type);
+  }, [onSelect]);
 
   return (
     <>
       <div className="space-y-2">
-        <p className="text-xs text-muted-foreground text-center">{placedCount}/{maxUnits} platziert</p>
+        <p className="text-xs text-muted-foreground text-center">{placedCount}/{maxUnits} platziert · <span className="text-[10px] opacity-60">gedrückt halten = Info</span></p>
         <div className="grid grid-cols-3 gap-2">
           {UNIT_TYPES.map(type => {
             const def = UNIT_DEFS[type];
@@ -35,19 +62,20 @@ export function UnitPicker({ selected, onSelect, placedCount, maxUnits }: UnitPi
             return (
               <button
                 key={type}
-                onClick={() => onSelect(type)}
-                className={`p-2 rounded-xl border-2 transition-all text-center relative ${
+                onClick={() => handleClick(type)}
+                onTouchStart={() => startPress(type)}
+                onTouchEnd={cancelPress}
+                onTouchCancel={cancelPress}
+                onMouseDown={() => startPress(type)}
+                onMouseUp={cancelPress}
+                onMouseLeave={cancelPress}
+                onContextMenu={(e) => e.preventDefault()}
+                className={`p-2 rounded-xl border-2 transition-all text-center relative select-none ${
                   isSelected
                     ? `${COLOR_BORDER[color]} ${COLOR_BG[color]} ring-1 ring-primary`
                     : `border-border ${COLOR_BG[color]} hover:${COLOR_BORDER[color]}`
                 }`}
               >
-                <button
-                  onClick={(e) => { e.stopPropagation(); setInfoUnit(type); }}
-                  className="absolute top-1 right-1 w-4 h-4 rounded-full bg-muted text-muted-foreground text-[9px] flex items-center justify-center hover:bg-accent"
-                >
-                  i
-                </button>
                 <span className="text-xl block">{def.emoji}</span>
                 <p className="text-[10px] font-semibold text-foreground mt-1">{def.label}</p>
                 <p className="text-[9px] text-muted-foreground">❤️{def.hp} ⚔️{def.attack}</p>
