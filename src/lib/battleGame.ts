@@ -784,14 +784,15 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
   // Difficulty-based counter chance
   const counterChance = difficulty === 1 ? 0 : difficulty === 2 ? 0.4 : difficulty === 3 ? 0.6 : difficulty === 4 ? 0.8 : 0.95;
 
+  // Tank bond chance: higher difficulty = more likely to use tank formations
+  const tankBondChance = difficulty === 1 ? 0 : difficulty === 2 ? 0.1 : difficulty === 3 ? 0.3 : difficulty === 4 ? 0.5 : 0.7;
+
   // At difficulty 5, build an optimal composition: pure counters with color advantage
   if (difficulty >= 5 && playerUnits.length > 0) {
-    // Count player colors
     const redCount = playerUnits.filter(u => ['warrior', 'assassin', 'dragon'].includes(u.type)).length;
     const greenCount = playerUnits.filter(u => ['tank', 'mage', 'healer'].includes(u.type)).length;
     const blueCount = playerUnits.filter(u => ['rider', 'archer', 'frost'].includes(u.type)).length;
 
-    // Pick the color that counters the most common player color
     const counterColor = redCount >= greenCount && redCount >= blueCount ? 'blue'
       : greenCount >= blueCount ? 'red' : 'green';
 
@@ -801,12 +802,18 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
       blue: ['rider', 'archer', 'frost'],
     };
 
-    // Build optimized team: mostly counter color, with specific strong picks
     const mainPool = colorUnits[counterColor];
+    
+    // Difficulty 5: Force at least 1 tank for shield formation
+    const hasTankInPool = mainPool.includes('tank');
+    let forceTank = !hasTankInPool && Math.random() < 0.5; // 50% chance to add off-color tank
+    
     for (let i = 0; i < count; i++) {
       let type: UnitType;
-      if (Math.random() < 0.95) {
-        // Pick from counter color, avoiding too many healers
+      if (forceTank && i === 0) {
+        type = 'tank';
+        forceTank = false;
+      } else if (Math.random() < 0.95) {
         const pool = mainPool.filter(t => t !== 'healer' || placements.filter(p => p.type === 'healer').length < 1);
         type = pool[Math.floor(Math.random() * pool.length)];
       } else {
@@ -815,8 +822,6 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
 
       let row: number, col: number;
       let attempts = 0;
-      // Smart row placement at high difficulty
-      const unitDef = UNIT_DEFS[type];
       const isRanged = type === 'archer' || type === 'frost' || type === 'mage';
       const isTank = type === 'tank';
       const preferredRow = isTank ? 2 : isRanged ? 0 : 1;
@@ -829,21 +834,35 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
       usedCells.add(`${row},${col}`);
       placements.push({ type, row, col });
     }
+    
+    // Difficulty 5: Rearrange to create tank bonds
+    _applyTankBondFormation(placements, usedCells, currentGrid, 0.7);
     return placements;
   }
 
+  // Difficulty 3+: chance to include a tank for shield formation
+  const shouldUseTankFormation = difficulty >= 3 && Math.random() < tankBondChance;
+  let tankInserted = false;
+
   for (let i = 0; i < count; i++) {
     let type: UnitType;
-    if (counterPicks.length > 0 && Math.random() < counterChance) {
+    
+    // Force first unit as tank if using tank formation and no tank picked yet
+    if (shouldUseTankFormation && !tankInserted && i === 0) {
+      type = 'tank';
+      tankInserted = true;
+    } else if (counterPicks.length > 0 && Math.random() < counterChance) {
       type = counterPicks[Math.floor(Math.random() * counterPicks.length)];
     } else {
       type = UNIT_TYPES[Math.floor(Math.random() * UNIT_TYPES.length)];
     }
+    
+    // Track if we got a tank naturally
+    if (type === 'tank') tankInserted = true;
 
     let row: number, col: number;
     let attempts = 0;
 
-    // Difficulty 4+: smart row placement
     if (difficulty >= 4) {
       const isRanged = type === 'archer' || type === 'frost' || type === 'mage';
       const isTank = type === 'tank';
@@ -854,12 +873,10 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
         attempts++;
       } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
     } else if (difficulty >= 3 && currentGrid) {
-      // Difficulty 3: slight terrain preference
       do {
         row = Math.floor(Math.random() * 3);
         col = Math.floor(Math.random() * GRID_SIZE);
         attempts++;
-        // Prefer terrain tiles 30% of the time
         if (attempts < 15 && Math.random() < 0.3 && currentGrid[row]?.[col]?.terrain === 'none') {
           continue;
         }
@@ -876,7 +893,57 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
     usedCells.add(`${row},${col}`);
     placements.push({ type, row, col });
   }
+
+  // Apply tank bond formation rearrangement if we have a tank and difficulty warrants it
+  if (shouldUseTankFormation && tankInserted) {
+    _applyTankBondFormation(placements, usedCells, currentGrid, tankBondChance);
+  }
+
   return placements;
+}
+
+// Rearrange non-tank units to be adjacent to tanks for bond formation
+function _applyTankBondFormation(
+  placements: { type: UnitType; row: number; col: number }[],
+  usedCells: Set<string>,
+  currentGrid?: Cell[][],
+  intensity: number = 0.5,
+): void {
+  const tanks = placements.filter(p => p.type === 'tank');
+  if (tanks.length === 0) return;
+
+  const nonTanks = placements.filter(p => p.type !== 'tank');
+  const adjacentOffsets = [
+    { row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 },
+    { row: -1, col: -1 }, { row: -1, col: 1 }, { row: 1, col: -1 }, { row: 1, col: 1 },
+  ];
+
+  for (const unit of nonTanks) {
+    if (Math.random() > intensity) continue; // skip some units based on intensity
+    
+    // Find best adjacent cell to any tank
+    const candidates: { row: number; col: number }[] = [];
+    for (const tank of tanks) {
+      for (const offset of adjacentOffsets) {
+        const r = tank.row + offset.row;
+        const c = tank.col + offset.col;
+        if (r < 0 || r > 2 || c < 0 || c >= GRID_SIZE) continue; // enemy rows 0-2
+        const key = `${r},${c}`;
+        if (usedCells.has(key) && !(r === unit.row && c === unit.col)) continue;
+        if (currentGrid && currentGrid[r]?.[c]?.terrain === 'water') continue;
+        candidates.push({ row: r, col: c });
+      }
+    }
+
+    if (candidates.length > 0) {
+      const oldKey = `${unit.row},${unit.col}`;
+      const newPos = candidates[Math.floor(Math.random() * candidates.length)];
+      usedCells.delete(oldKey);
+      unit.row = newPos.row;
+      unit.col = newPos.col;
+      usedCells.add(`${newPos.row},${newPos.col}`);
+    }
+  }
 }
 
 // For showing patterns in unit info (relative offsets)
