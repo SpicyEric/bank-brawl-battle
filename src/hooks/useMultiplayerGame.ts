@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
-  generateTerrain, getActivationTurn,
+  generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
@@ -17,7 +17,7 @@ interface MultiplayerConfig {
 const PLACE_TIME_LIMIT = 10; // seconds for each player to place
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId };
+  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken };
 }
 
 function serializeGrid(grid: Cell[][]) {
@@ -432,14 +432,20 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       }
     }
 
+    const allNewUnits: Unit[] = [];
     for (const u of room.player1_units as any[]) {
       const unit: Unit = { ...u, team: 'player', activationTurn: u.activationTurn ?? getActivationTurn(u.row, 'player'), startRow: u.startRow ?? u.row };
       newGrid[unit.row][unit.col].unit = unit;
+      allNewUnits.push(unit);
     }
     for (const u of room.player2_units as any[]) {
       const unit: Unit = { ...u, team: 'enemy', activationTurn: u.activationTurn ?? getActivationTurn(u.row, 'enemy'), startRow: u.startRow ?? u.row };
       newGrid[unit.row][unit.col].unit = unit;
+      allNewUnits.push(unit);
     }
+
+    // Set tank bonds for all units
+    setBondsForPlacement(allNewUnits);
 
     setGrid(newGrid);
     setPhase('battle');
