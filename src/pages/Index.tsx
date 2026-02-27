@@ -40,7 +40,9 @@ function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | '
 }
 
 function SinglePlayerGame() {
-  const game = useBattleGame();
+  const [searchParams] = useSearchParams();
+  const difficulty = parseInt(searchParams.get('difficulty') || '2', 10);
+  const game = useBattleGame(difficulty);
   return <GameUI game={game} isMultiplayer={false} />;
 }
 

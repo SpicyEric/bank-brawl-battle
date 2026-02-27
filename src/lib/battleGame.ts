@@ -666,8 +666,13 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   return Math.floor(dmg);
 }
 
-// Light AI: tries to counter the player's composition
-export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE_UNITS, currentGrid?: Cell[][]): { type: UnitType; row: number; col: number }[] {
+// Difficulty levels:
+// 1 = Einfach: pure random picks
+// 2 = Normal: 40% counter
+// 3 = Herausfordernd: 60% counter + some terrain awareness
+// 4 = Schwer: 80% counter + terrain + smart positioning
+// 5 = Unmöglich: 95% counter + optimal composition + terrain + positioning
+export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE_UNITS, currentGrid?: Cell[][], difficulty: number = 2): { type: UnitType; row: number; col: number }[] {
   const placements: { type: UnitType; row: number; col: number }[] = [];
   const usedCells = new Set<string>();
   const count = maxCount;
@@ -683,7 +688,6 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
   const sortedTypes = Object.entries(playerTypes).sort((a, b) => b[1] - a[1]);
 
   for (const [pType] of sortedTypes) {
-    // Find units that are strong against this type
     for (const [uType, def] of Object.entries(UNIT_DEFS)) {
       if (def.strongVs.includes(pType as UnitType)) {
         counterPicks.push(uType as UnitType);
@@ -691,10 +695,60 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
     }
   }
 
+  // Difficulty-based counter chance
+  const counterChance = difficulty === 1 ? 0 : difficulty === 2 ? 0.4 : difficulty === 3 ? 0.6 : difficulty === 4 ? 0.8 : 0.95;
+
+  // At difficulty 5, build an optimal composition: pure counters with color advantage
+  if (difficulty >= 5 && playerUnits.length > 0) {
+    // Count player colors
+    const redCount = playerUnits.filter(u => ['warrior', 'assassin', 'dragon'].includes(u.type)).length;
+    const greenCount = playerUnits.filter(u => ['tank', 'mage', 'healer'].includes(u.type)).length;
+    const blueCount = playerUnits.filter(u => ['rider', 'archer', 'frost'].includes(u.type)).length;
+
+    // Pick the color that counters the most common player color
+    const counterColor = redCount >= greenCount && redCount >= blueCount ? 'blue'
+      : greenCount >= blueCount ? 'red' : 'green';
+
+    const colorUnits: Record<string, UnitType[]> = {
+      red: ['warrior', 'assassin', 'dragon'],
+      green: ['tank', 'mage', 'healer'],
+      blue: ['rider', 'archer', 'frost'],
+    };
+
+    // Build optimized team: mostly counter color, with specific strong picks
+    const mainPool = colorUnits[counterColor];
+    for (let i = 0; i < count; i++) {
+      let type: UnitType;
+      if (Math.random() < 0.95) {
+        // Pick from counter color, avoiding too many healers
+        const pool = mainPool.filter(t => t !== 'healer' || placements.filter(p => p.type === 'healer').length < 1);
+        type = pool[Math.floor(Math.random() * pool.length)];
+      } else {
+        type = UNIT_TYPES[Math.floor(Math.random() * UNIT_TYPES.length)];
+      }
+
+      let row: number, col: number;
+      let attempts = 0;
+      // Smart row placement at high difficulty
+      const unitDef = UNIT_DEFS[type];
+      const isRanged = type === 'archer' || type === 'frost' || type === 'mage';
+      const isTank = type === 'tank';
+      const preferredRow = isTank ? 2 : isRanged ? 0 : 1;
+      do {
+        row = Math.random() < 0.7 ? preferredRow : Math.floor(Math.random() * 3);
+        col = Math.floor(Math.random() * GRID_SIZE);
+        attempts++;
+      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
+      if (attempts >= 30) continue;
+      usedCells.add(`${row},${col}`);
+      placements.push({ type, row, col });
+    }
+    return placements;
+  }
+
   for (let i = 0; i < count; i++) {
-    // 60% chance to pick a counter, 40% random
     let type: UnitType;
-    if (counterPicks.length > 0 && Math.random() < 0.6) {
+    if (counterPicks.length > 0 && Math.random() < counterChance) {
       type = counterPicks[Math.floor(Math.random() * counterPicks.length)];
     } else {
       type = UNIT_TYPES[Math.floor(Math.random() * UNIT_TYPES.length)];
@@ -702,11 +756,36 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
 
     let row: number, col: number;
     let attempts = 0;
-    do {
-      row = Math.floor(Math.random() * 3); // rows 0-2
-      col = Math.floor(Math.random() * GRID_SIZE);
-      attempts++;
-    } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row] && currentGrid[row][col] && currentGrid[row][col].terrain === 'water')) && attempts < 30);
+
+    // Difficulty 4+: smart row placement
+    if (difficulty >= 4) {
+      const isRanged = type === 'archer' || type === 'frost' || type === 'mage';
+      const isTank = type === 'tank';
+      const preferredRow = isTank ? 2 : isRanged ? 0 : 1;
+      do {
+        row = Math.random() < 0.6 ? preferredRow : Math.floor(Math.random() * 3);
+        col = Math.floor(Math.random() * GRID_SIZE);
+        attempts++;
+      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
+    } else if (difficulty >= 3 && currentGrid) {
+      // Difficulty 3: slight terrain preference
+      do {
+        row = Math.floor(Math.random() * 3);
+        col = Math.floor(Math.random() * GRID_SIZE);
+        attempts++;
+        // Prefer terrain tiles 30% of the time
+        if (attempts < 15 && Math.random() < 0.3 && currentGrid[row]?.[col]?.terrain === 'none') {
+          continue;
+        }
+      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
+    } else {
+      do {
+        row = Math.floor(Math.random() * 3);
+        col = Math.floor(Math.random() * GRID_SIZE);
+        attempts++;
+      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
+    }
+
     if (attempts >= 30) continue;
     usedCells.add(`${row},${col}`);
     placements.push({ type, row, col });

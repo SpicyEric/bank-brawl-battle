@@ -5,6 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import MainMenu from "./pages/MainMenu";
 import Index from "./pages/Index";
+import SinglePlayer from "./pages/SinglePlayer";
+import Tutorial from "./pages/Tutorial";
 import Multiplayer from "./pages/Multiplayer";
 import NotFound from "./pages/NotFound";
 
@@ -18,6 +20,8 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<MainMenu />} />
+          <Route path="/singleplayer" element={<SinglePlayer />} />
+          <Route path="/tutorial" element={<Tutorial />} />
           <Route path="/game" element={<Index />} />
           <Route path="/multiplayer" element={<Multiplayer />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
