@@ -88,6 +88,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const playerUnitsRef = useRef(playerUnits);
   const isMyTurnRef = useRef(isMyTurnToPlace);
   const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hadBothPlayersRef = useRef(false);
 
   // Keep refs in sync
   useEffect(() => { placingPhaseRef.current = placingPhase; }, [placingPhase]);
@@ -268,7 +269,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Presence channel to detect opponent disconnect
   useEffect(() => {
     const presenceChannel = supabase.channel(`presence-${roomId}`);
-    const DISCONNECT_GRACE_MS = 8000;
+    const DISCONNECT_GRACE_MS = 20000;
+    hadBothPlayersRef.current = false;
 
     const clearDisconnectTimer = () => {
       if (disconnectTimeoutRef.current) {
@@ -289,11 +291,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       if (currentPhase === 'battle' || currentPhase === 'round_won' || currentPhase === 'round_lost' || currentPhase === 'round_draw') {
         return true;
       }
-      return currentPhase === 'place_player' && placingPhaseRef.current !== 'first';
+      return currentPhase === 'place_player' && placingPhaseRef.current === 'second';
     };
 
     const scheduleDisconnectCheck = () => {
-      if (!hasMatchStarted() || disconnectTimeoutRef.current) return;
+      if (!hasMatchStarted() || disconnectTimeoutRef.current || !hadBothPlayersRef.current) return;
 
       disconnectTimeoutRef.current = setTimeout(() => {
         disconnectTimeoutRef.current = null;
@@ -303,23 +305,30 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       }, DISCONNECT_GRACE_MS);
     };
 
-    const handlePresenceChange = () => {
+    const handleSyncOrJoin = () => {
       if (bothPlayersPresent()) {
+        hadBothPlayersRef.current = true;
         clearDisconnectTimer();
         setOpponentLeft(false);
         return;
       }
+
+      if (hadBothPlayersRef.current) {
+        scheduleDisconnectCheck();
+      }
+    };
+
+    const handleLeave = () => {
       scheduleDisconnectCheck();
     };
 
     presenceChannel
-      .on('presence', { event: 'sync' }, handlePresenceChange)
-      .on('presence', { event: 'join' }, handlePresenceChange)
-      .on('presence', { event: 'leave' }, handlePresenceChange)
+      .on('presence', { event: 'sync' }, handleSyncOrJoin)
+      .on('presence', { event: 'join' }, handleSyncOrJoin)
+      .on('presence', { event: 'leave' }, handleLeave)
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await presenceChannel.track({ role });
-          handlePresenceChange();
         }
       });
 
