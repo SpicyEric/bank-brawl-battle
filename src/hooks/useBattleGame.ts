@@ -10,7 +10,7 @@ import {
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 
-export function useBattleGame() {
+export function useBattleGame(difficulty: number = 2) {
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
   const [selectedUnit, setSelectedUnit] = useState<UnitType | null>('warrior');
@@ -156,7 +156,7 @@ export function useBattleGame() {
     const pUnits = playerUnits.map(u => ({ ...u }));
     setPlayerUnits(pUnits);
 
-    const aiPlacements = generateAIPlacement(pUnits, enemyMaxUnits, grid);
+    const aiPlacements = generateAIPlacement(pUnits, enemyMaxUnits, grid, difficulty);
     const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
     setEnemyUnits(enemies);
 
@@ -304,32 +304,36 @@ export function useBattleGame() {
         aiFocusFireTicksLeft.current -= 1;
       }
 
-      // --- AI ability decisions (singleplayer) ---
+      // --- AI ability decisions (singleplayer, difficulty-aware) ---
       const pAliveNow = allUnits.filter(u => u.team === 'player' && u.hp > 0);
       const eAliveNow = allUnits.filter(u => u.team === 'enemy' && u.hp > 0);
       const currentTurnNum = turnCountRef.current;
 
-      // AI Kriegsschrei: use when losing or randomly after tick 4
-      if (!aiMoraleUsed.current && currentTurnNum >= 3) {
-        const shouldUse = eAliveNow.length < pAliveNow.length // losing units
-          || (currentTurnNum >= 5 && Math.random() < 0.3) // random chance
-          || (currentTurnNum >= 8 && Math.random() < 0.6); // higher chance later
+      // Difficulty 1-2: AI never uses abilities. Difficulty 3+: uses them with increasing intelligence
+      const aiUsesAbilities = difficulty >= 3;
+
+      // AI Kriegsschrei
+      if (aiUsesAbilities && !aiMoraleUsed.current && currentTurnNum >= (difficulty >= 5 ? 2 : 3)) {
+        const triggerChance = difficulty === 3 ? 0.15 : difficulty === 4 ? 0.3 : 0.5;
+        const shouldUse = eAliveNow.length < pAliveNow.length
+          || (currentTurnNum >= 5 && Math.random() < triggerChance)
+          || (currentTurnNum >= 8 && Math.random() < triggerChance * 2);
         if (shouldUse) {
           aiMoraleUsed.current = true;
           aiMoralePhase.current = 'buff';
           aiMoraleTicksLeft.current = 3;
           setAiMoraleActive('buff');
-          // log handled via setBattleLog above
           setBattleLog(prev => ['🔥 GEGNER: KRIEGSSCHREI! +25% Schaden für 3 Züge!', ...prev]);
           setBattleEvents([{ type: 'hit', attackerId: 'ai', attackerRow: 0, attackerCol: 4, attackerEmoji: '🔥', targetId: '', targetRow: 0, targetCol: 0, damage: 0, isStrong: false, isWeak: false, isRanged: false }]);
         }
       }
 
-      // AI Fokusfeuer: use when player has a high-HP unit
-      if (!aiFocusFireUsed.current && currentTurnNum >= 4) {
+      // AI Fokusfeuer
+      if (aiUsesAbilities && !aiFocusFireUsed.current && currentTurnNum >= (difficulty >= 5 ? 3 : 4)) {
         const highHpPlayer = pAliveNow.find(u => u.hp > u.maxHp * 0.7);
-        const shouldUse = (highHpPlayer && Math.random() < 0.4)
-          || (currentTurnNum >= 7 && Math.random() < 0.25);
+        const triggerChance = difficulty === 3 ? 0.2 : difficulty === 4 ? 0.4 : 0.6;
+        const shouldUse = (highHpPlayer && Math.random() < triggerChance)
+          || (currentTurnNum >= 7 && Math.random() < triggerChance * 0.5);
         if (shouldUse) {
           aiFocusFireUsed.current = true;
           aiFocusFireTicksLeft.current = 3;
@@ -337,15 +341,15 @@ export function useBattleGame() {
         }
       }
 
-      // AI Opferritual: use when losing badly and has enough units
-      if (!aiSacrificeUsed.current && eAliveNow.length >= 2 && currentTurnNum >= 5) {
+      // AI Opferritual
+      if (aiUsesAbilities && !aiSacrificeUsed.current && eAliveNow.length >= 2 && currentTurnNum >= (difficulty >= 5 ? 4 : 5)) {
         const avgEnemyHp = eAliveNow.reduce((s, u) => s + u.hp / u.maxHp, 0) / eAliveNow.length;
-        const shouldUse = (avgEnemyHp < 0.5 && Math.random() < 0.5) // units are hurting
-          || (eAliveNow.length <= 2 && Math.random() < 0.3); // desperation
+        const triggerChance = difficulty === 3 ? 0.25 : difficulty === 4 ? 0.4 : 0.6;
+        const shouldUse = (avgEnemyHp < 0.5 && Math.random() < triggerChance)
+          || (eAliveNow.length <= 2 && Math.random() < triggerChance * 0.6);
         if (shouldUse) {
           aiSacrificeUsed.current = true;
           const weakest = eAliveNow.reduce((a, b) => a.hp < b.hp ? a : b);
-          // Kill weakest enemy unit, heal others
           if (newGrid[weakest.row][weakest.col].unit) {
             newGrid[weakest.row][weakest.col].unit!.hp = 0;
             (newGrid[weakest.row][weakest.col].unit as any).dead = true;
@@ -765,7 +769,7 @@ export function useBattleGame() {
     } else {
       const terrainGrid = generateTerrain(createEmptyGrid());
       const aiMax = getMaxUnits(enemyScore, playerScore);
-      const aiPlacements = generateAIPlacement([], aiMax, terrainGrid);
+      const aiPlacements = generateAIPlacement([], aiMax, terrainGrid, difficulty);
       const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
       for (const e of enemies) terrainGrid[e.row][e.col].unit = e;
       setGrid(terrainGrid);

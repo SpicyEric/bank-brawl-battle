@@ -26,7 +26,7 @@ const MainMenu = () => {
       {/* Menu buttons */}
       <div className="w-full max-w-xs space-y-3 relative z-10">
         <button
-          onClick={() => navigate('/game')}
+          onClick={() => navigate('/singleplayer')}
           className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:opacity-90 active:scale-[0.97] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_hsl(var(--primary)/0.3)]"
         >
           <Swords size={20} />
