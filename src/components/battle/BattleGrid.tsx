@@ -160,122 +160,170 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
 
   const processBattleEvents = (events: BattleEvent[]) => {
     if (events.length === 0) return;
-    const newShake = new Set<string>();
-    const newPopups: DamagePopup[] = [];
-    const newProjs: Projectile[] = [];
-    const newDragonFires: DragonFire[] = [];
-    const newHealGlows: HealGlow[] = [];
-    const newHealPopups: HealPopup[] = [];
-    const newFreezes: FreezeEffect[] = [];
+
+    // Separate ranged (projectile) and melee events
+    const rangedDamageEvents: BattleEvent[] = [];
+    const meleeDamageEvents: BattleEvent[] = [];
+    const healEvents: BattleEvent[] = [];
+    const freezeEvents: BattleEvent[] = [];
 
     for (const evt of events) {
-      // Heal events: green glow + heal popup
-      if (evt.type === 'heal') {
-        healCounter.current += 1;
-        newHealGlows.push({
-          id: `heal-${healCounter.current}`,
-          row: evt.targetRow, col: evt.targetCol,
-        });
-        newHealPopups.push({
-          id: `hpop-${healCounter.current}`,
-          row: evt.targetRow, col: evt.targetCol,
-          healAmount: evt.healAmount || 0,
-        });
-        if (evt.isRanged) {
-          projCounter.current += 1;
-          newProjs.push({
-            id: `proj-${projCounter.current}`,
-            fromRow: evt.attackerRow, fromCol: evt.attackerCol,
-            toRow: evt.targetRow, toCol: evt.targetCol,
-            emoji: '✨',
-          });
-        }
-        continue;
-      }
+      if (evt.type === 'heal') healEvents.push(evt);
+      else if (evt.type === 'freeze') freezeEvents.push(evt);
+      else if (evt.isRanged) rangedDamageEvents.push(evt);
+      else meleeDamageEvents.push(evt);
+    }
 
-      // Freeze events: ice spread animation
-      if (evt.type === 'freeze') {
-        freezeCounter.current += 1;
-        newFreezes.push({
-          id: `freeze-${freezeCounter.current}`,
-          row: evt.targetRow, col: evt.targetCol,
+    // --- Phase 1: Launch projectiles immediately (after movement delay already applied) ---
+    const newProjs: Projectile[] = [];
+    for (const evt of rangedDamageEvents) {
+      projCounter.current += 1;
+      const projType: Projectile['type'] = evt.attackerEmoji === '🏹' ? 'arrow'
+        : evt.attackerEmoji === '🔮' ? 'magic'
+        : evt.attackerEmoji === '🥶' ? 'frost'
+        : 'default';
+      newProjs.push({
+        id: `proj-${projCounter.current}`,
+        fromRow: evt.attackerRow, fromCol: evt.attackerCol,
+        toRow: evt.targetRow, toCol: evt.targetCol,
+        emoji: projType === 'arrow' ? '➴' : projType === 'magic' ? '✦' : projType === 'frost' ? '❄' : evt.attackerEmoji === '🐉' ? '🔥' : '⚡',
+        type: projType,
+      });
+    }
+    // Heal projectiles
+    const healProjs: Projectile[] = [];
+    for (const evt of healEvents) {
+      if (evt.isRanged) {
+        projCounter.current += 1;
+        healProjs.push({
+          id: `proj-${projCounter.current}`,
+          fromRow: evt.attackerRow, fromCol: evt.attackerCol,
+          toRow: evt.targetRow, toCol: evt.targetCol,
+          emoji: '✨',
         });
-        continue;
       }
+    }
+    const allProjs = [...newProjs, ...healProjs];
+    if (allProjs.length > 0) {
+      setProjectiles(prev => [...prev, ...allProjs]);
+    }
 
+    // --- Phase 1b: Melee damage appears immediately (no projectile needed) ---
+    const meleeShake = new Set<string>();
+    const meleePopups: DamagePopup[] = [];
+    const meleeDragonFires: DragonFire[] = [];
+    for (const evt of meleeDamageEvents) {
       const key = `${evt.targetRow}-${evt.targetCol}`;
-      newShake.add(key);
+      meleeShake.add(key);
       popupCounter.current += 1;
-      newPopups.push({
+      meleePopups.push({
         id: `pop-${popupCounter.current}`,
         row: evt.targetRow, col: evt.targetCol,
         damage: evt.damage, isStrong: evt.isStrong, isWeak: evt.isWeak,
         isKill: evt.type === 'kill',
       });
-
-      // Dragon AOE fire effect
       if (evt.aoeCells && evt.aoeCells.length > 0) {
         dragonFireCounter.current += 1;
-        newDragonFires.push({
-          id: `dfire-${dragonFireCounter.current}`,
-          cells: evt.aoeCells,
-        });
-      }
-
-      if (evt.isRanged) {
-        projCounter.current += 1;
-        const projType: Projectile['type'] = evt.attackerEmoji === '🏹' ? 'arrow'
-          : evt.attackerEmoji === '🔮' ? 'magic'
-          : evt.attackerEmoji === '🥶' ? 'frost'
-          : 'default';
-        newProjs.push({
-          id: `proj-${projCounter.current}`,
-          fromRow: evt.attackerRow, fromCol: evt.attackerCol,
-          toRow: evt.targetRow, toCol: evt.targetCol,
-          emoji: projType === 'arrow' ? '➴' : projType === 'magic' ? '✦' : projType === 'frost' ? '❄' : evt.attackerEmoji === '🐉' ? '🔥' : '⚡',
-          type: projType,
-        });
+        meleeDragonFires.push({ id: `dfire-${dragonFireCounter.current}`, cells: evt.aoeCells });
       }
     }
-
-    setShakeCells(newShake);
-    setPopups(prev => [...prev, ...newPopups]);
-    setProjectiles(prev => [...prev, ...newProjs]);
-    if (newDragonFires.length > 0) {
-      setDragonFires(prev => [...prev, ...newDragonFires]);
-    }
-    if (newHealGlows.length > 0) {
-      setHealGlows(prev => [...prev, ...newHealGlows]);
-      setHealPopups(prev => [...prev, ...newHealPopups]);
-    }
-    if (newFreezes.length > 0) {
-      setFreezeEffects(prev => [...prev, ...newFreezes]);
-    }
-
-    setTimeout(() => setShakeCells(new Set()), 700);
-    setTimeout(() => {
-      setPopups(prev => prev.filter(p => !newPopups.find(np => np.id === p.id)));
-    }, 1200);
-    setTimeout(() => {
-      setProjectiles(prev => prev.filter(p => !newProjs.find(np => np.id === p.id)));
-    }, 800);
-    if (newDragonFires.length > 0) {
+    if (meleePopups.length > 0) {
+      setShakeCells(prev => new Set([...prev, ...meleeShake]));
+      setPopups(prev => [...prev, ...meleePopups]);
+      setTimeout(() => setShakeCells(prev => {
+        const next = new Set(prev);
+        meleeShake.forEach(k => next.delete(k));
+        return next;
+      }), 700);
       setTimeout(() => {
-        setDragonFires(prev => prev.filter(f => !newDragonFires.find(nf => nf.id === f.id)));
+        setPopups(prev => prev.filter(p => !meleePopups.find(mp => mp.id === p.id)));
+      }, 1200);
+    }
+    if (meleeDragonFires.length > 0) {
+      setDragonFires(prev => [...prev, ...meleeDragonFires]);
+      setTimeout(() => {
+        setDragonFires(prev => prev.filter(f => !meleeDragonFires.find(nf => nf.id === f.id)));
       }, 1400);
     }
+
+    // --- Phase 2: Ranged damage appears AFTER projectile arrives ---
+    const PROJECTILE_FLIGHT_TIME = 750; // matches longest projectile animation
+    if (rangedDamageEvents.length > 0) {
+      setTimeout(() => {
+        const rangedShake = new Set<string>();
+        const rangedPopups: DamagePopup[] = [];
+        const rangedDragonFires: DragonFire[] = [];
+        for (const evt of rangedDamageEvents) {
+          const key = `${evt.targetRow}-${evt.targetCol}`;
+          rangedShake.add(key);
+          popupCounter.current += 1;
+          rangedPopups.push({
+            id: `pop-${popupCounter.current}`,
+            row: evt.targetRow, col: evt.targetCol,
+            damage: evt.damage, isStrong: evt.isStrong, isWeak: evt.isWeak,
+            isKill: evt.type === 'kill',
+          });
+          if (evt.aoeCells && evt.aoeCells.length > 0) {
+            dragonFireCounter.current += 1;
+            rangedDragonFires.push({ id: `dfire-${dragonFireCounter.current}`, cells: evt.aoeCells });
+          }
+        }
+        setShakeCells(prev => new Set([...prev, ...rangedShake]));
+        setPopups(prev => [...prev, ...rangedPopups]);
+        setTimeout(() => setShakeCells(prev => {
+          const next = new Set(prev);
+          rangedShake.forEach(k => next.delete(k));
+          return next;
+        }), 700);
+        setTimeout(() => {
+          setPopups(prev => prev.filter(p => !rangedPopups.find(rp => rp.id === p.id)));
+        }, 1200);
+        if (rangedDragonFires.length > 0) {
+          setDragonFires(prev => [...prev, ...rangedDragonFires]);
+          setTimeout(() => {
+            setDragonFires(prev => prev.filter(f => !rangedDragonFires.find(nf => nf.id === f.id)));
+          }, 1400);
+        }
+      }, PROJECTILE_FLIGHT_TIME);
+    }
+
+    // Clean up projectiles after flight
+    if (allProjs.length > 0) {
+      setTimeout(() => {
+        setProjectiles(prev => prev.filter(p => !allProjs.find(ap => ap.id === p.id)));
+      }, PROJECTILE_FLIGHT_TIME + 100);
+    }
+
+    // --- Heal effects (immediate for melee heals, delayed for ranged) ---
+    const newHealGlows: HealGlow[] = [];
+    const newHealPopups: HealPopup[] = [];
+    for (const evt of healEvents) {
+      healCounter.current += 1;
+      newHealGlows.push({ id: `heal-${healCounter.current}`, row: evt.targetRow, col: evt.targetCol });
+      newHealPopups.push({ id: `hpop-${healCounter.current}`, row: evt.targetRow, col: evt.targetCol, healAmount: evt.healAmount || 0 });
+    }
+    const healDelay = healProjs.length > 0 ? PROJECTILE_FLIGHT_TIME : 0;
     if (newHealGlows.length > 0) {
       setTimeout(() => {
-        setHealGlows(prev => prev.filter(h => !newHealGlows.find(nh => nh.id === h.id)));
-      }, 1500);
-      setTimeout(() => {
-        setHealPopups(prev => prev.filter(h => !newHealPopups.find(nh => nh.id === h.id)));
-      }, 1400);
+        setHealGlows(prev => [...prev, ...newHealGlows]);
+        setHealPopups(prev => [...prev, ...newHealPopups]);
+        setTimeout(() => setHealGlows(prev => prev.filter(h => !newHealGlows.find(nh => nh.id === h.id))), 1500);
+        setTimeout(() => setHealPopups(prev => prev.filter(h => !newHealPopups.find(nh => nh.id === h.id))), 1400);
+      }, healDelay);
+    }
+
+    // --- Freeze effects ---
+    const newFreezes: FreezeEffect[] = [];
+    for (const evt of freezeEvents) {
+      freezeCounter.current += 1;
+      newFreezes.push({ id: `freeze-${freezeCounter.current}`, row: evt.targetRow, col: evt.targetCol });
     }
     if (newFreezes.length > 0) {
+      // Freeze is from frost (ranged), so delay after projectile
       setTimeout(() => {
-        setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id)));
-      }, 1600);
+        setFreezeEffects(prev => [...prev, ...newFreezes]);
+        setTimeout(() => setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id))), 1600);
+      }, PROJECTILE_FLIGHT_TIME);
     }
   };
 
