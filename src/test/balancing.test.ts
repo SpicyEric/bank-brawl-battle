@@ -139,6 +139,26 @@ function simulateBattle(playerTeam: UnitType[], enemyTeam: UnitType[], options?:
           target.frozen = 1;
         }
 
+        // Dragon AOE: 50% splash to other enemies in 3x3
+        if (unit.type === 'dragon') {
+          const splashDmg = Math.round(dmg * 0.5);
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const ar = unit.row + dr;
+              const ac = unit.col + dc;
+              if (ar >= 0 && ar < GRID_SIZE && ac >= 0 && ac < GRID_SIZE) {
+                const cellUnit = grid[ar][ac].unit;
+                if (cellUnit && cellUnit.hp > 0 && cellUnit.team !== unit.team && cellUnit.id !== target.id) {
+                  cellUnit.hp = Math.max(0, cellUnit.hp - splashDmg);
+                  if (cellUnit.hp <= 0) {
+                    grid[ar][ac].unit = null;
+                  }
+                }
+              }
+            }
+          }
+        }
+
         if (target.hp <= 0) {
           grid[target.row][target.col].unit = null;
         }
