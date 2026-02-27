@@ -154,6 +154,7 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
           }}
           lastPlaced={lastPlaced}
           battleEvents={game.battleEvents}
+          moraleBoostActive={game.moraleBoostActive}
         />
 
         {phaseOverlay && (

@@ -170,3 +170,26 @@
 .phase-overlay-fade {
   animation: phase-overlay-anim 1.4s ease-out forwards;
 }
+
+@keyframes war-cry-flash-anim {
+  0% { background: transparent; }
+  15% { background: hsl(var(--warning) / 0.4); }
+  30% { background: hsl(var(--warning) / 0.1); }
+  45% { background: hsl(var(--warning) / 0.35); }
+  60% { background: hsl(var(--warning) / 0.05); }
+  75% { background: hsl(var(--warning) / 0.25); }
+  100% { background: transparent; }
+}
+.war-cry-flash {
+  animation: war-cry-flash-anim 0.6s ease-out forwards;
+}
+
+@keyframes war-cry-emoji-anim {
+  0% { opacity: 0; transform: scale(0.3); }
+  20% { opacity: 1; transform: scale(1.4); }
+  50% { transform: scale(1); }
+  100% { opacity: 0; transform: scale(2); }
+}
+.war-cry-emoji {
+  animation: war-cry-emoji-anim 0.6s ease-out forwards;
+}
