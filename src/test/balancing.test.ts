@@ -405,3 +405,148 @@ describe('Counter System Effectiveness', () => {
     }
   });
 });
+
+describe('Mixed Composition Analysis', () => {
+  const SIMS = 150;
+
+  it('2+3 color splits vs Random', () => {
+    const comps: { name: string; team: UnitType[] }[] = [
+      // 2 Red + 3 Blue
+      { name: '2R+3B (Krieger+Assassine+Reiter+Bogen+Frost)', team: ['warrior', 'assassin', 'rider', 'archer', 'frost'] },
+      { name: '2R+3B (Krieger+Drache+Reiter+Bogen+Frost)', team: ['warrior', 'dragon', 'rider', 'archer', 'frost'] },
+      // 2 Red + 3 Green
+      { name: '2R+3G (Krieger+Drache+Schild+Magier+Schamane)', team: ['warrior', 'dragon', 'tank', 'mage', 'healer'] },
+      { name: '2R+3G (Krieger+Assassine+Schild+Magier+Schamane)', team: ['warrior', 'assassin', 'tank', 'mage', 'healer'] },
+      // 2 Blue + 3 Red
+      { name: '2B+3R (Bogen+Frost+Krieger+Assassine+Drache)', team: ['archer', 'frost', 'warrior', 'assassin', 'dragon'] },
+      { name: '2B+3R (Reiter+Bogen+Krieger+Krieger+Drache)', team: ['rider', 'archer', 'warrior', 'warrior', 'dragon'] },
+      // 2 Blue + 3 Green
+      { name: '2B+3G (Bogen+Frost+Schild+Magier+Schamane)', team: ['archer', 'frost', 'tank', 'mage', 'healer'] },
+      { name: '2B+3G (Reiter+Frost+Schild+Schild+Schamane)', team: ['rider', 'frost', 'tank', 'tank', 'healer'] },
+      // 2 Green + 3 Red
+      { name: '2G+3R (Schild+Schamane+Krieger+Krieger+Drache)', team: ['tank', 'healer', 'warrior', 'warrior', 'dragon'] },
+      { name: '2G+3R (Magier+Schamane+Krieger+Assassine+Drache)', team: ['mage', 'healer', 'warrior', 'assassin', 'dragon'] },
+      // 2 Green + 3 Blue
+      { name: '2G+3B (Schild+Schamane+Reiter+Bogen+Frost)', team: ['tank', 'healer', 'rider', 'archer', 'frost'] },
+      { name: '2G+3B (Magier+Schamane+Bogen+Bogen+Frost)', team: ['mage', 'healer', 'archer', 'archer', 'frost'] },
+    ];
+
+    console.log(`\n=== 2+3 COLOR SPLITS vs RANDOM (${SIMS} each) ===`);
+    for (const comp of comps) {
+      let wins = 0;
+      for (let i = 0; i < SIMS; i++) {
+        const { winner } = simulateBattle(comp.team, randomTeam());
+        if (winner === 'player') wins++;
+      }
+      const rate = (wins / SIMS * 100).toFixed(1);
+      const flag = Number(rate) > 70 ? '⚠️ OP' : Number(rate) < 30 ? '⚠️ WEAK' : '✅';
+      console.log(`${flag} ${comp.name}: ${rate}%`);
+    }
+  });
+
+  it('Duplicate-heavy comps vs Random', () => {
+    const comps: { name: string; team: UnitType[] }[] = [
+      { name: '3 Krieger + 2 Bogen', team: ['warrior', 'warrior', 'warrior', 'archer', 'archer'] },
+      { name: '3 Bogen + 2 Schild', team: ['archer', 'archer', 'archer', 'tank', 'tank'] },
+      { name: '3 Schild + 2 Krieger', team: ['tank', 'tank', 'tank', 'warrior', 'warrior'] },
+      { name: '3 Drache + 2 Frost', team: ['dragon', 'dragon', 'dragon', 'frost', 'frost'] },
+      { name: '3 Magier + 2 Reiter', team: ['mage', 'mage', 'mage', 'rider', 'rider'] },
+      { name: '3 Frost + 2 Krieger', team: ['frost', 'frost', 'frost', 'warrior', 'warrior'] },
+      { name: '2 Schamane + 3 Krieger', team: ['healer', 'healer', 'warrior', 'warrior', 'warrior'] },
+      { name: '2 Schamane + 3 Bogen', team: ['healer', 'healer', 'archer', 'archer', 'archer'] },
+      { name: '2 Schamane + 3 Drache', team: ['healer', 'healer', 'dragon', 'dragon', 'dragon'] },
+      { name: '4 Krieger + 1 Schamane', team: ['warrior', 'warrior', 'warrior', 'warrior', 'healer'] },
+      { name: '4 Bogen + 1 Schild', team: ['archer', 'archer', 'archer', 'archer', 'tank'] },
+      { name: '4 Reiter + 1 Schamane', team: ['rider', 'rider', 'rider', 'rider', 'healer'] },
+    ];
+
+    console.log(`\n=== DUPLICATE-HEAVY COMPS vs RANDOM (${SIMS} each) ===`);
+    for (const comp of comps) {
+      let wins = 0;
+      for (let i = 0; i < SIMS; i++) {
+        const { winner } = simulateBattle(comp.team, randomTeam());
+        if (winner === 'player') wins++;
+      }
+      const rate = (wins / SIMS * 100).toFixed(1);
+      const flag = Number(rate) > 70 ? '⚠️ OP' : Number(rate) < 30 ? '⚠️ WEAK' : '✅';
+      console.log(`${flag} ${comp.name}: ${rate}%`);
+    }
+  });
+
+  it('Each unit paired with healer vs Random', () => {
+    console.log(`\n=== EACH UNIT + HEALER SUPPORT vs RANDOM (${SIMS} each) ===`);
+    for (const type of UNIT_TYPES) {
+      if (type === 'healer') continue;
+      const team: UnitType[] = [type, type, type, 'healer', 'healer'];
+      let wins = 0;
+      for (let i = 0; i < SIMS; i++) {
+        const { winner } = simulateBattle(team, randomTeam());
+        if (winner === 'player') wins++;
+      }
+      const rate = (wins / SIMS * 100).toFixed(1);
+      const flag = Number(rate) > 70 ? '⚠️ OP' : Number(rate) < 30 ? '⚠️ WEAK' : '✅';
+      console.log(`${flag} 3x ${UNIT_DEFS[type].emoji} ${UNIT_DEFS[type].label} + 2x Schamane: ${rate}%`);
+    }
+  });
+
+  it('Mirror matchups: same team vs itself should be ~50%', () => {
+    const teams: { name: string; team: UnitType[] }[] = [
+      { name: 'Balanced', team: ['warrior', 'tank', 'archer', 'mage', 'healer'] },
+      { name: 'All Red', team: ['warrior', 'warrior', 'assassin', 'assassin', 'dragon'] },
+      { name: 'All Blue', team: ['rider', 'rider', 'archer', 'archer', 'frost'] },
+      { name: 'All Green', team: ['tank', 'tank', 'mage', 'mage', 'healer'] },
+    ];
+
+    console.log(`\n=== MIRROR MATCHUPS (${SIMS} each, should be ~50%) ===`);
+    for (const t of teams) {
+      let wins = 0;
+      for (let i = 0; i < SIMS; i++) {
+        const { winner } = simulateBattle(t.team, t.team);
+        if (winner === 'player') wins++;
+      }
+      const rate = (wins / SIMS * 100).toFixed(1);
+      console.log(`${t.name}: ${rate}% (${Math.abs(Number(rate) - 50) < 15 ? '✅' : '⚠️ ASYMMETRIC'})`);
+    }
+  });
+
+  it('Per-unit individual battle contribution (1v1 round-robin)', () => {
+    const SIMS_1V1 = 100;
+    console.log(`\n=== 1v1 ROUND ROBIN (${SIMS_1V1} battles each) ===`);
+    const winMatrix: Record<string, Record<string, number>> = {};
+    const totalWins: Record<string, number> = {};
+    const totalGames: Record<string, number> = {};
+
+    for (const a of UNIT_TYPES) {
+      winMatrix[a] = {};
+      totalWins[a] = totalWins[a] || 0;
+      totalGames[a] = totalGames[a] || 0;
+      for (const b of UNIT_TYPES) {
+        if (a === b) { winMatrix[a][b] = 50; continue; }
+        let aWins = 0;
+        for (let i = 0; i < SIMS_1V1; i++) {
+          const { winner } = simulateBattle([a], [b]);
+          if (winner === 'player') aWins++;
+        }
+        winMatrix[a][b] = Math.round(aWins / SIMS_1V1 * 100);
+        totalWins[a] += aWins;
+        totalGames[a] += SIMS_1V1;
+      }
+    }
+
+    // Print header
+    const header = ''.padEnd(14) + UNIT_TYPES.map(t => UNIT_DEFS[t].emoji.padEnd(5)).join('');
+    console.log(header);
+    for (const a of UNIT_TYPES) {
+      const row = UNIT_DEFS[a].label.padEnd(14) + UNIT_TYPES.map(b => `${winMatrix[a][b]}%`.padEnd(5)).join('');
+      console.log(row);
+    }
+
+    console.log('\n=== 1v1 OVERALL WIN RATES ===');
+    const sorted = UNIT_TYPES.map(t => ({ type: t, rate: totalGames[t] > 0 ? totalWins[t] / totalGames[t] * 100 : 50 }))
+      .sort((a, b) => b.rate - a.rate);
+    for (const { type, rate } of sorted) {
+      const flag = rate > 65 ? '⚠️ OP' : rate < 35 ? '⚠️ WEAK' : '✅';
+      console.log(`${flag} ${UNIT_DEFS[type].emoji} ${UNIT_DEFS[type].label}: ${rate.toFixed(1)}%`);
+    }
+  });
+});
