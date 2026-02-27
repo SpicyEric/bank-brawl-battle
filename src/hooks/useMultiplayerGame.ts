@@ -28,6 +28,11 @@ function serializeGrid(grid: Cell[][]) {
   })));
 }
 
+function getDeterministicFirstPlacer(roomId: string, roundNumber: number): 1 | 2 {
+  const seed = [...roomId].reduce((sum, ch) => sum + ch.charCodeAt(0), 0) + roundNumber * 31;
+  return seed % 2 === 0 ? 1 : 2;
+}
+
 export function useMultiplayerGame(config: MultiplayerConfig) {
   const { roomId, role } = config;
   const isHost = role === 'player1';
@@ -78,7 +83,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 1);
 
   // Alternating placement state
-  const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(1);
+  const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(() => getDeterministicFirstPlacer(roomId, 1));
   const [placingPhase, setPlacingPhase] = useState<'first' | 'second' | 'done'>('first');
   const [placeTimer, setPlaceTimer] = useState(MULTI_PLACE_TIME_LIMIT);
   const [opponentUnitsVisible, setOpponentUnitsVisible] = useState<Unit[]>([]);
@@ -339,7 +344,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   useEffect(() => {
     if (isHost && roundNumber === 1 && phase === 'place_player' && placingPhase === 'first' && !initialTerrainSent.current) {
       initialTerrainSent.current = true;
-      const whoFirst = Math.random() < 0.5 ? 1 : 2;
+      const whoFirst = getDeterministicFirstPlacer(roomId, roundNumber);
       setPlacingPlayer(whoFirst as 1 | 2);
 
       setTimeout(() => {
@@ -1006,7 +1011,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const nextRound = useCallback(async () => {
     const newRound = roundNumber + 1;
     const newGrid = generateTerrain(createEmptyGrid());
-    const whoFirst = Math.random() < 0.5 ? 1 : 2;
+    const whoFirst = getDeterministicFirstPlacer(roomId, newRound);
 
     // Update fatigue before resetting units
     setPlayerFatigue(prev => {
