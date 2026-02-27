@@ -227,30 +227,30 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       setFreezeEffects(prev => [...prev, ...newFreezes]);
     }
 
-    setTimeout(() => setShakeCells(new Set()), 400);
+    setTimeout(() => setShakeCells(new Set()), 700);
     setTimeout(() => {
       setPopups(prev => prev.filter(p => !newPopups.find(np => np.id === p.id)));
-    }, 700);
+    }, 1200);
     setTimeout(() => {
       setProjectiles(prev => prev.filter(p => !newProjs.find(np => np.id === p.id)));
-    }, 450);
+    }, 800);
     if (newDragonFires.length > 0) {
       setTimeout(() => {
         setDragonFires(prev => prev.filter(f => !newDragonFires.find(nf => nf.id === f.id)));
-      }, 800);
+      }, 1400);
     }
     if (newHealGlows.length > 0) {
       setTimeout(() => {
         setHealGlows(prev => prev.filter(h => !newHealGlows.find(nh => nh.id === h.id)));
-      }, 900);
+      }, 1500);
       setTimeout(() => {
         setHealPopups(prev => prev.filter(h => !newHealPopups.find(nh => nh.id === h.id)));
-      }, 800);
+      }, 1400);
     }
     if (newFreezes.length > 0) {
       setTimeout(() => {
         setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id)));
-      }, 1000);
+      }, 1600);
     }
   }, [battleEvents]);
 
@@ -314,7 +314,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   className="absolute inset-0 flex flex-col items-center justify-center z-10"
                   style={{
                     ...slideStyle,
-                    transition: offset ? 'none' : 'transform 350ms ease-out',
+                    transition: offset ? 'none' : 'transform 700ms ease-out',
                   }}
                 >
                   <span
