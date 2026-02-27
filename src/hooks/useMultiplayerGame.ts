@@ -1057,7 +1057,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
               roundNumber: newRound,
               playerScore: enemyScore,
               enemyScore: playerScore,
-              placingPlayer: whoFirst === 1 ? 2 : 1, // swap perspective for guest
+              placingPlayer: whoFirst, // absolute player number, no swap needed
             },
           },
         });
