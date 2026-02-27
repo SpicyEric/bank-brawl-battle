@@ -133,8 +133,33 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   }, [grid]);
 
   // Handle battle events: shake + damage popups + projectiles + heal glows + freeze
+  // Delay damage/effects by movement animation duration so they appear after units arrive
+  const MOVE_ANIM_DURATION = 700;
+  const pendingEventsTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (battleEvents.length === 0) return;
+
+    // Cancel any pending event processing from a previous tick
+    if (pendingEventsTimeout.current) {
+      clearTimeout(pendingEventsTimeout.current);
+      pendingEventsTimeout.current = null;
+    }
+
+    pendingEventsTimeout.current = setTimeout(() => {
+      pendingEventsTimeout.current = null;
+      processBattleEvents(battleEvents);
+    }, MOVE_ANIM_DURATION);
+
+    return () => {
+      if (pendingEventsTimeout.current) {
+        clearTimeout(pendingEventsTimeout.current);
+        pendingEventsTimeout.current = null;
+      }
+    };
+  }, [battleEvents]);
+
+  const processBattleEvents = (events: BattleEvent[]) => {
+    if (events.length === 0) return;
     const newShake = new Set<string>();
     const newPopups: DamagePopup[] = [];
     const newProjs: Projectile[] = [];
@@ -143,7 +168,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     const newHealPopups: HealPopup[] = [];
     const newFreezes: FreezeEffect[] = [];
 
-    for (const evt of battleEvents) {
+    for (const evt of events) {
       // Heal events: green glow + heal popup
       if (evt.type === 'heal') {
         healCounter.current += 1;
@@ -252,7 +277,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id)));
       }, 1600);
     }
-  }, [battleEvents]);
+  };
 
   const cellSize = 100 / GRID_SIZE;
   // When flipped, visual row position is inverted for overlay effects
