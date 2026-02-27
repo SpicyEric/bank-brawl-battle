@@ -351,7 +351,7 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
             <div className="flex gap-1 text-[9px] text-muted-foreground justify-center">
               <span>🔥+25%→-15%</span>
               <span>•</span>
-              <span>🎯 Stärkstes Ziel</span>
+              <span>🎯 Schwächstes Ziel</span>
               <span>•</span>
               <span>💀 Opfern=Heilen</span>
             </div>
