@@ -4,6 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateAIPlacement, getMaxUnits, generateTerrain,
   GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES,
   getActivationTurn,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
@@ -50,6 +51,33 @@ export function useBattleGame() {
   const aiFocusFireTicksLeft = useRef(0);
   const aiSacrificeUsed = useRef(false);
 
+  // Overtime state
+  const [overtimeCount, setOvertimeCount] = useState(0);
+  const [drawOfferPending, setDrawOfferPending] = useState(false);
+  const [gameDraw, setGameDraw] = useState(false);
+
+  // Overtime win check: need 2-point lead once both are at OVERTIME_THRESHOLD+
+  const checkGameOver = useCallback((pScore: number, eScore: number, otCount: number): { over: boolean; won: boolean; draw: boolean } => {
+    const bothAtThreshold = pScore >= OVERTIME_THRESHOLD && eScore >= OVERTIME_THRESHOLD;
+
+    if (bothAtThreshold) {
+      // Forced draw after MAX_OVERTIMES
+      if (otCount >= MAX_OVERTIMES) {
+        return { over: true, won: false, draw: true };
+      }
+      // Need 2-point lead
+      if (Math.abs(pScore - eScore) >= 2) {
+        return { over: true, won: pScore > eScore, draw: false };
+      }
+      return { over: false, won: false, draw: false };
+    }
+
+    // Normal win
+    if (pScore >= POINTS_TO_WIN) return { over: true, won: true, draw: false };
+    if (eScore >= POINTS_TO_WIN) return { over: true, won: false, draw: false };
+    return { over: false, won: false, draw: false };
+  }, []);
+
   // Full reset
   const resetGame = useCallback(() => {
     setGrid(generateTerrain(createEmptyGrid()));
@@ -79,6 +107,9 @@ export function useBattleGame() {
     aiFocusFireUsed.current = false;
     aiFocusFireTicksLeft.current = 0;
     aiSacrificeUsed.current = false;
+    setOvertimeCount(0);
+    setDrawOfferPending(false);
+    setGameDraw(false);
   }, []);
 
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore);
@@ -488,11 +519,25 @@ export function useBattleGame() {
       setEnemyUnits(eAlive);
 
       if (eAlive.length === 0) {
-        setPlayerScore(prev => prev + 1);
-        setPhase('round_won');
+        const newPS = playerScore + 1;
+        setPlayerScore(newPS);
+        const result = checkGameOver(newPS, enemyScore, overtimeCount);
+        if (result.draw) {
+          setGameDraw(true);
+          setPhase('game_draw');
+        } else {
+          setPhase('round_won');
+        }
       } else if (pAlive.length === 0) {
-        setEnemyScore(prev => prev + 1);
-        setPhase('round_lost');
+        const newES = enemyScore + 1;
+        setEnemyScore(newES);
+        const result = checkGameOver(playerScore, newES, overtimeCount);
+        if (result.draw) {
+          setGameDraw(true);
+          setPhase('game_draw');
+        } else {
+          setPhase('round_lost');
+        }
       }
 
       setTurnCount(prev => { turnCountRef.current = prev + 1; return prev + 1; });
@@ -534,26 +579,60 @@ export function useBattleGame() {
     const eAlive = enemyUnits.filter(u => u.hp > 0 && !u.dead);
 
     if (pAlive.length > eAlive.length) {
-      setPlayerScore(prev => prev + 1);
-      setPhase('round_won');
+      const newPS = playerScore + 1;
+      setPlayerScore(newPS);
+      const result = checkGameOver(newPS, enemyScore, overtimeCount);
+      if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
+      else setPhase('round_won');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Du hast mehr Einheiten übrig!', ...prev]);
     } else if (eAlive.length > pAlive.length) {
-      setEnemyScore(prev => prev + 1);
-      setPhase('round_lost');
+      const newES = enemyScore + 1;
+      setEnemyScore(newES);
+      const result = checkGameOver(playerScore, newES, overtimeCount);
+      if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
+      else setPhase('round_lost');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Der Gegner hat mehr Einheiten!', ...prev]);
     } else {
-      // Draw: both get a point
-      setPlayerScore(prev => prev + 1);
-      setEnemyScore(prev => prev + 1);
-      setPhase('round_draw');
+      const newPS = playerScore + 1;
+      const newES = enemyScore + 1;
+      setPlayerScore(newPS);
+      setEnemyScore(newES);
+      const result = checkGameOver(newPS, newES, overtimeCount);
+      if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
+      else setPhase('round_draw');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Gleichstand – beide erhalten einen Punkt!', ...prev]);
     }
   }, [battleTimer, phase, playerUnits, enemyUnits]);
 
-  const gameOver = playerScore >= POINTS_TO_WIN || enemyScore >= POINTS_TO_WIN;
-  const gameWon = playerScore >= POINTS_TO_WIN;
+  const gameOverResult = checkGameOver(playerScore, enemyScore, overtimeCount);
+  const gameOver = gameOverResult.over;
+  const gameWon = gameOverResult.won;
+
+  // Check if we're in overtime
+  const inOvertime = playerScore >= OVERTIME_THRESHOLD && enemyScore >= OVERTIME_THRESHOLD;
+
+  // Accept draw offer (singleplayer: player decides alone)
+  const acceptDraw = useCallback(() => {
+    setGameDraw(true);
+    setPhase('game_draw');
+  }, []);
 
   const nextRound = useCallback(() => {
+    // Track overtime
+    if (inOvertime) {
+      const newOT = overtimeCount + 1;
+      setOvertimeCount(newOT);
+      // After AUTO_OVERTIMES, offer draw before starting next round
+      if (newOT >= AUTO_OVERTIMES && !gameOver) {
+        setDrawOfferPending(true);
+        return; // Don't start next round yet – wait for player decision
+      }
+    }
+    setDrawOfferPending(false);
+    startNextRound();
+  }, [playerStarts, inOvertime, overtimeCount, gameOver]);
+
+  const startNextRound = useCallback(() => {
     const newStarts = !playerStarts;
     setRoundNumber(prev => prev + 1);
     setPlayerStarts(newStarts);
@@ -594,12 +673,18 @@ export function useBattleGame() {
     }
   }, [playerStarts]);
 
+  // Continue overtime (decline draw offer)
+  const continueOvertime = useCallback(() => {
+    setDrawOfferPending(false);
+    startNextRound();
+  }, [startNextRound]);
+
   return {
     grid, phase, selectedUnit, setSelectedUnit,
     playerUnits, enemyUnits, turnCount, battleLog, battleEvents, battleTimer,
     playerScore, enemyScore, roundNumber, playerStarts,
     playerMaxUnits, enemyMaxUnits,
-    gameOver, gameWon,
+    gameOver, gameWon, gameDraw,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
     moraleBoostUsed, moraleBoostActive, activateMoraleBoost,
@@ -607,5 +692,7 @@ export function useBattleGame() {
     sacrificeUsed, activateSacrifice,
     waitingForOpponent: false,
     aiMoraleActive,
+    inOvertime, overtimeCount, drawOfferPending,
+    acceptDraw, continueOvertime,
   };
 }

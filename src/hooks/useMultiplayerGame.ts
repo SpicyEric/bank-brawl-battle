@@ -837,7 +837,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     playerStarts: true,
     playerMaxUnits: BASE_UNITS,
     enemyMaxUnits: BASE_UNITS,
-    gameOver, gameWon,
+    gameOver, gameWon, gameDraw: false,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
     moraleBoostUsed,
@@ -856,5 +856,10 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     placeTimer,
     isMyTurnToPlace,
     placingPhase,
+    inOvertime: false,
+    overtimeCount: 0,
+    drawOfferPending: false,
+    acceptDraw: () => {},
+    continueOvertime: () => {},
   };
 }
