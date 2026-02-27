@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useMusic } from '@/hooks/useMusic';
 import { Swords, Users, Volume2, VolumeX } from 'lucide-react';
+import menuBg from '@/assets/menu-bg.png';
 
 const MainMenu = () => {
   const navigate = useNavigate();
@@ -8,6 +9,12 @@ const MainMenu = () => {
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden bg-background" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+      {/* Background image with blur */}
+      <div className="absolute inset-0 z-0">
+        <img src={menuBg} alt="" className="w-full h-full object-cover blur-sm scale-105" />
+        <div className="absolute inset-0 bg-background/50" />
+      </div>
+
       {/* Menu buttons */}
       <div className="w-full max-w-xs space-y-3">
         <button
