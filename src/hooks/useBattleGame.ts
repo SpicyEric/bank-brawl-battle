@@ -460,12 +460,6 @@ export function useBattleGame(difficulty: number = 2) {
           : findTarget(unit, allUnits);
         if (!target) continue;
 
-        // Skip if already moved with tank formation this tick
-        if (unit.movedWithTank) {
-          unit.movedWithTank = false;
-          continue;
-        }
-
         if (!canAttack(unit, target)) {
           // Track stuck turns for anti-stalemate
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
