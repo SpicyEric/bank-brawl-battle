@@ -7,6 +7,8 @@ const BATTLE_TRACKS = [
   '/music/stoischer-kreis-1.mp3',
   '/music/stoischer-kreis-2.mp3',
   '/music/stoischer-kreis-3.mp3',
+  '/music/ewige-klinge.mp3',
+  '/music/ewige-klinge-1.mp3',
 ];
 
 let globalAudio: HTMLAudioElement | null = null;

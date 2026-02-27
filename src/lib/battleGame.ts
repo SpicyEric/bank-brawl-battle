@@ -140,16 +140,24 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 70,
     attack: 18,
     cooldown: 2,
-    description: 'Springer-Kavallerist. Bewegt sich in L-Form (wie Schach-Springer). Springt über Hindernisse. Wechselt Ziele.',
+    description: 'Extrem mobiler Springer. Kann bis zu 3 Felder in alle Richtungen springen und über Hindernisse setzen. Wechselt Ziele.',
     movePattern: [
-      // L-shaped knight moves (can jump over obstacles)
+      // Large star pattern: 3 squares in all 8 directions (jumps over obstacles)
+      // Cardinal: 2 and 3 steps
+      { row: -2, col: 0 }, { row: -3, col: 0 },
+      { row: 2, col: 0 }, { row: 3, col: 0 },
+      { row: 0, col: -2 }, { row: 0, col: -3 },
+      { row: 0, col: 2 }, { row: 0, col: 3 },
+      // Diagonal: 2 and 3 steps
+      { row: -2, col: -2 }, { row: -3, col: -3 },
+      { row: -2, col: 2 }, { row: -3, col: 3 },
+      { row: 2, col: -2 }, { row: 3, col: -3 },
+      { row: 2, col: 2 }, { row: 3, col: 3 },
+      // L-shape knight jumps for extra flexibility
       { row: -2, col: -1 }, { row: -2, col: 1 },
       { row: 2, col: -1 }, { row: 2, col: 1 },
       { row: -1, col: -2 }, { row: -1, col: 2 },
       { row: 1, col: -2 }, { row: 1, col: 2 },
-      // Keep 1-step and 2-step orthogonal
-      ...ORTHOGONAL,
-      { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
     ],
     attackPattern: ORTHOGONAL,
     strongVs: ['warrior', 'assassin', 'dragon'],
