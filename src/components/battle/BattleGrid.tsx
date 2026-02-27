@@ -16,8 +16,10 @@ interface BattleGridProps {
 
 interface UnitPos { row: number; col: number }
 interface DamagePopup { id: string; row: number; col: number; damage: number; isStrong: boolean; isWeak: boolean; isKill: boolean }
+interface HealPopup { id: string; row: number; col: number; healAmount: number }
 interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string }
 interface DragonFire { id: string; cells: { row: number; col: number }[] }
+interface HealGlow { id: string; row: number; col: number }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
@@ -29,9 +31,12 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [popups, setPopups] = useState<DamagePopup[]>([]);
   const [projectiles, setProjectiles] = useState<Projectile[]>([]);
   const [dragonFires, setDragonFires] = useState<DragonFire[]>([]);
+  const [healGlows, setHealGlows] = useState<HealGlow[]>([]);
+  const [healPopups, setHealPopups] = useState<HealPopup[]>([]);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
+  const healCounter = useRef(0);
   const [warCryFlash, setWarCryFlash] = useState(false);
   const [focusFlashAnim, setFocusFlashAnim] = useState(false);
   const [sacrificeAnim, setSacrificeAnim] = useState(false);
@@ -117,15 +122,42 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
   }, [grid]);
 
-  // Handle battle events: shake + damage popups + projectiles
+  // Handle battle events: shake + damage popups + projectiles + heal glows
   useEffect(() => {
     if (battleEvents.length === 0) return;
     const newShake = new Set<string>();
     const newPopups: DamagePopup[] = [];
     const newProjs: Projectile[] = [];
     const newDragonFires: DragonFire[] = [];
+    const newHealGlows: HealGlow[] = [];
+    const newHealPopups: HealPopup[] = [];
 
     for (const evt of battleEvents) {
+      // Heal events: green glow + heal popup
+      if (evt.type === 'heal') {
+        healCounter.current += 1;
+        newHealGlows.push({
+          id: `heal-${healCounter.current}`,
+          row: evt.targetRow, col: evt.targetCol,
+        });
+        newHealPopups.push({
+          id: `hpop-${healCounter.current}`,
+          row: evt.targetRow, col: evt.targetCol,
+          healAmount: evt.healAmount || 0,
+        });
+        // Also show projectile from healer to target
+        if (evt.isRanged) {
+          projCounter.current += 1;
+          newProjs.push({
+            id: `proj-${projCounter.current}`,
+            fromRow: evt.attackerRow, fromCol: evt.attackerCol,
+            toRow: evt.targetRow, toCol: evt.targetCol,
+            emoji: '✨',
+          });
+        }
+        continue;
+      }
+
       const key = `${evt.targetRow}-${evt.targetCol}`;
       newShake.add(key);
       popupCounter.current += 1;
@@ -162,6 +194,10 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     if (newDragonFires.length > 0) {
       setDragonFires(prev => [...prev, ...newDragonFires]);
     }
+    if (newHealGlows.length > 0) {
+      setHealGlows(prev => [...prev, ...newHealGlows]);
+      setHealPopups(prev => [...prev, ...newHealPopups]);
+    }
 
     setTimeout(() => setShakeCells(new Set()), 400);
     setTimeout(() => {
@@ -173,6 +209,14 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     if (newDragonFires.length > 0) {
       setTimeout(() => {
         setDragonFires(prev => prev.filter(f => !newDragonFires.find(nf => nf.id === f.id)));
+      }, 800);
+    }
+    if (newHealGlows.length > 0) {
+      setTimeout(() => {
+        setHealGlows(prev => prev.filter(h => !newHealGlows.find(nh => nh.id === h.id)));
+      }, 900);
+      setTimeout(() => {
+        setHealPopups(prev => prev.filter(h => !newHealPopups.find(nh => nh.id === h.id)));
       }, 800);
     }
   }, [battleEvents]);
@@ -375,6 +419,49 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           );
         })
       ))}
+
+      {/* Heal glow overlay */}
+      {healGlows.map(h => {
+        const left = h.col * cellSize;
+        const top = h.row * cellSize;
+        return (
+          <div
+            key={h.id}
+            className="absolute pointer-events-none z-25 heal-glow-cell"
+            style={{
+              left: `${left}%`,
+              top: `${top}%`,
+              width: `${cellSize}%`,
+              height: `${cellSize}%`,
+            }}
+          >
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-lg heal-glow-emoji">✨</span>
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Heal popups */}
+      {healPopups.map(h => {
+        const left = h.col * cellSize + cellSize / 2;
+        const top = h.row * cellSize + cellSize / 4;
+        return (
+          <div
+            key={h.id}
+            className="absolute pointer-events-none z-20 dmg-popup"
+            style={{
+              left: `${left}%`,
+              top: `${top}%`,
+              transform: 'translate(-50%, -50%)',
+            }}
+          >
+            <span className="text-xs font-bold font-mono drop-shadow-lg text-[hsl(145,65%,50%)]">
+              +{h.healAmount} ❤️
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -261,3 +261,27 @@
 .dragon-fire-emoji {
   animation: dragon-fire-emoji-anim 0.7s ease-out forwards;
 }
+
+/* Heal glow animation */
+@keyframes heal-glow-cell-anim {
+  0% { opacity: 0; background: transparent; }
+  15% { opacity: 1; background: hsl(145 65% 45% / 0.4); }
+  35% { background: hsl(145 65% 50% / 0.3); }
+  60% { background: hsl(150 70% 45% / 0.2); }
+  100% { opacity: 0; background: transparent; }
+}
+.heal-glow-cell {
+  animation: heal-glow-cell-anim 0.9s ease-out forwards;
+  border-radius: 2px;
+}
+
+@keyframes heal-glow-emoji-anim {
+  0% { opacity: 0; transform: scale(0.2) rotate(0deg); }
+  20% { opacity: 1; transform: scale(1.5) rotate(20deg); }
+  50% { opacity: 0.9; transform: scale(1) rotate(-10deg); }
+  75% { opacity: 0.5; transform: scale(1.2) rotate(15deg); }
+  100% { opacity: 0; transform: scale(0.4) translateY(-10px); }
+}
+.heal-glow-emoji {
+  animation: heal-glow-emoji-anim 0.8s ease-out forwards;
+}
