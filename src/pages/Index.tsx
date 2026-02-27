@@ -46,7 +46,7 @@ function SinglePlayerGame() {
 
 function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null }; isMultiplayer: boolean }) {
   const navigate = useNavigate();
-  const { muted, toggleMute } = useMusic();
+  const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
   const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
   const [phaseOverlay, setPhaseOverlay] = useState<string | null>(null);
