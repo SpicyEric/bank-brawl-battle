@@ -48,19 +48,27 @@ export async function joinRoom(roomCode: string): Promise<{ roomId: string; role
     .from('game_rooms')
     .select('*')
     .eq('room_code', code)
-    .single();
+    .maybeSingle();
 
   if (fetchErr || !room) throw new Error('Raum nicht gefunden');
   if (room.status !== 'waiting') throw new Error('Raum ist nicht mehr verfügbar');
   if (room.player1_id === playerId) return { roomId: room.id, role: 'player1' };
   if (room.player2_id) throw new Error('Raum ist bereits voll');
 
-  const { error: updateErr } = await supabase
+  const { data: claimedRoom, error: updateErr } = await supabase
     .from('game_rooms')
     .update({ player2_id: playerId })
-    .eq('id', room.id);
+    .eq('id', room.id)
+    .is('player2_id', null)
+    .eq('status', 'waiting')
+    .select('id, player2_id')
+    .maybeSingle();
 
   if (updateErr) throw updateErr;
+  if (!claimedRoom || claimedRoom.player2_id !== playerId) {
+    throw new Error('Raum konnte nicht beigetreten werden. Bitte erneut versuchen.');
+  }
+
   return { roomId: room.id, role: 'player2' };
 }
 
