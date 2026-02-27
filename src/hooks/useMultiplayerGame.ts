@@ -4,7 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
-  PLACE_TIME_LIMIT,
+  MULTI_PLACE_TIME_LIMIT,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,7 +15,7 @@ interface MultiplayerConfig {
   role: 'player1' | 'player2';
 }
 
-// Use the shared PLACE_TIME_LIMIT from battleGame
+// Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
 
 function serializeUnit(u: Unit) {
   return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken };
@@ -76,7 +76,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Alternating placement state
   const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(1);
   const [placingPhase, setPlacingPhase] = useState<'first' | 'second' | 'done'>('first');
-  const [placeTimer, setPlaceTimer] = useState(PLACE_TIME_LIMIT);
+  const [placeTimer, setPlaceTimer] = useState(MULTI_PLACE_TIME_LIMIT);
   const [isMyTurnToPlace, setIsMyTurnToPlace] = useState(false);
   const [opponentUnitsVisible, setOpponentUnitsVisible] = useState<Unit[]>([]);
 
@@ -131,7 +131,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setGrid(data.grid as Cell[][]);
         setPlacingPlayer(data.placingPlayer);
         setPlacingPhase('first');
-        setPlaceTimer(PLACE_TIME_LIMIT);
+        setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
       }
 
       if (action === 'first_placement_done') {
@@ -145,7 +145,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           return next;
         });
         setPlacingPhase('second');
-        setPlaceTimer(PLACE_TIME_LIMIT);
+        setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
       }
 
       if (action === 'first_placement_forfeit') {
@@ -232,7 +232,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setEnemyScore(data.enemyScore);
         setPlacingPlayer(data.placingPlayer);
         setPlacingPhase('first');
-        setPlaceTimer(PLACE_TIME_LIMIT);
+        setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
         setPlayerUnits([]);
         setEnemyUnits([]);
         setBattleLog([]);
@@ -352,7 +352,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       return;
     }
 
-    setPlaceTimer(PLACE_TIME_LIMIT);
+    setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
     placeTimerRef.current = setInterval(() => {
       setPlaceTimer(prev => {
         if (prev <= 1) {
@@ -439,7 +439,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       // For the first placer, switch to waiting
       setPlacingPhase('second');
       setWaitingForOpponent(true);
-      setPlaceTimer(PLACE_TIME_LIMIT);
+      setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
 
     } else if (currentPlacingPhase === 'second') {
       // Second player done placing
@@ -985,7 +985,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setWaitingForOpponent(false);
     setPlacingPlayer(whoFirst as 1 | 2);
     setPlacingPhase('first');
-    setPlaceTimer(PLACE_TIME_LIMIT);
+    setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
     setOpponentUnitsVisible([]);
 
     await updateRoom(roomId, {

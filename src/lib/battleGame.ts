@@ -265,6 +265,7 @@ export const AUTO_OVERTIMES = 3; // first 3 overtimes are automatic
 export const MAX_OVERTIMES = 5; // after 5th overtime → forced draw
 export const ROUND_TIME_LIMIT = 45; // seconds
 export const PLACE_TIME_LIMIT = 15; // seconds for placement phase (difficulty 2+)
+export const MULTI_PLACE_TIME_LIMIT = 20; // seconds for multiplayer placement phase
 
 export const COUNTER_MULTIPLIER = 1.4;
 export const WEAKNESS_MULTIPLIER = 0.6;
