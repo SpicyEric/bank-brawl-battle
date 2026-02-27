@@ -117,7 +117,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           currentPositions.set(id, { row: cell.row, col: cell.col });
           const prev = prevPositions.current.get(id);
           if (prev && (prev.row !== cell.row || prev.col !== cell.col)) {
-            newOffsets.set(id, { dr: prev.row - cell.row, dc: prev.col - cell.col });
+            const dr = prev.row - cell.row;
+            newOffsets.set(id, { dr: flipped ? -dr : dr, dc: prev.col - cell.col });
           }
         }
       }
