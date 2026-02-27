@@ -410,6 +410,22 @@ export function useBattleGame() {
                 logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
                 healed = true;
                 unit.cooldown = unit.maxCooldown;
+
+                // Emit heal event for animation
+                events.push({
+                  type: 'heal',
+                  attackerId: unit.id,
+                  attackerRow: unit.row,
+                  attackerCol: unit.col,
+                  attackerEmoji: '🌿',
+                  targetId: ally.id,
+                  targetRow: ally.row,
+                  targetCol: ally.col,
+                  damage: 0,
+                  isStrong: false, isWeak: false,
+                  isRanged: Math.abs(unit.row - ally.row) + Math.abs(unit.col - ally.col) > 1,
+                  healAmount: healAmt,
+                });
                 break;
               }
             }
@@ -457,6 +473,8 @@ export function useBattleGame() {
           else dmg = Math.round(dmg * enemyDmgMod);
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
+          // Rider: track last attacked for target-switching
+          if (unit.type === 'rider') unit.lastAttackedId = target.id;
 
           // Frost: 50% chance to freeze the target for 1 turn
           if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {

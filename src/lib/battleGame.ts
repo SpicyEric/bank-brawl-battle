@@ -20,6 +20,7 @@ export interface Unit {
   stuckTurns?: number; // turns without attacking – used for anti-stalemate
   activationTurn?: number; // turn number when this unit becomes active (staggered rows)
   startRow?: number; // the row the unit was originally placed on
+  lastAttackedId?: string; // last enemy attacked (rider uses this for target-switching)
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -139,11 +140,16 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 70,
     attack: 18,
     cooldown: 2,
-    description: 'Schneller Kavallerist. Bewegt sich bis 3 Felder orthogonal. Greift angrenzend an.',
+    description: 'Springer-Kavallerist. Bewegt sich in L-Form (wie Schach-Springer). Springt über Hindernisse. Wechselt Ziele.',
     movePattern: [
+      // L-shaped knight moves (can jump over obstacles)
+      { row: -2, col: -1 }, { row: -2, col: 1 },
+      { row: 2, col: -1 }, { row: 2, col: 1 },
+      { row: -1, col: -2 }, { row: -1, col: 2 },
+      { row: 1, col: -2 }, { row: 1, col: 2 },
+      // Keep 1-step and 2-step orthogonal
       ...ORTHOGONAL,
       { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
-      { row: -3, col: 0 }, { row: 3, col: 0 }, { row: 0, col: -3 }, { row: 0, col: 3 },
     ],
     attackPattern: ORTHOGONAL,
     strongVs: ['warrior', 'assassin', 'dragon'],
@@ -357,17 +363,18 @@ export function getAttackCells(unit: Unit): Position[] {
 export function getMoveCells(unit: Unit, grid: Cell[][]): Position[] {
   const def = UNIT_DEFS[unit.type];
   const canFly = unit.type === 'dragon';
+  const canJump = unit.type === 'rider'; // rider jumps over obstacles like a chess knight
   return def.movePattern
     .map(p => ({ row: unit.row + p.row, col: unit.col + p.col }))
     .filter(p =>
       p.row >= 0 && p.row < GRID_SIZE && p.col >= 0 && p.col < GRID_SIZE &&
       (!grid[p.row][p.col].unit || grid[p.row][p.col].unit!.id === unit.id) &&
-      (canFly || grid[p.row][p.col].terrain !== 'water') &&
-      (canFly || !grid[p.row][p.col].unit?.dead)
+      (canFly || canJump || grid[p.row][p.col].terrain !== 'water') &&
+      (canFly || canJump || !grid[p.row][p.col].unit?.dead)
     );
 }
 
-// Find best target: column priority + frontline mechanic + tank taunt
+// Find best target: column priority + frontline mechanic + tank taunt + rider target-switching
 export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
@@ -377,6 +384,15 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   if (nearbyTanks.length > 0) {
     nearbyTanks.sort((a, b) => distance(unit, a) - distance(unit, b));
     return nearbyTanks[0];
+  }
+
+  // Rider target-switching: prefer enemies it hasn't attacked last
+  if (unit.type === 'rider' && unit.lastAttackedId && enemies.length > 1) {
+    const otherEnemies = enemies.filter(e => e.id !== unit.lastAttackedId);
+    if (otherEnemies.length > 0) {
+      otherEnemies.sort((a, b) => distance(unit, a) - distance(unit, b));
+      return otherEnemies[0];
+    }
   }
 
   // Column-based targeting: enemies in the same column get priority (~70% of the time)
