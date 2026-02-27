@@ -9,7 +9,7 @@ import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 import { useMusic } from '@/hooks/useMusic';
 import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT, OVERTIME_THRESHOLD } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
-import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, sfxFocusFire, sfxSacrifice, setSfxMuted } from '@/lib/sfx';
+import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, sfxFocusFire, sfxSacrifice, sfxShieldWall, setSfxMuted } from '@/lib/sfx';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -290,12 +290,12 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
             </div>
 
             {/* Ability Buttons */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-4 gap-1.5">
               {/* Kriegsschrei */}
               <button
                 onClick={() => { game.activateMoraleBoost(); sfxWarCry(); }}
                 disabled={game.moraleBoostUsed}
-                className={`py-2 rounded-xl font-semibold text-xs transition-all active:scale-[0.97] ${
+                className={`py-2 rounded-xl font-semibold text-[10px] transition-all active:scale-[0.97] ${
                   game.moraleBoostActive === 'buff'
                     ? 'bg-warning/20 border-2 border-warning text-warning animate-pulse cursor-default'
                     : game.moraleBoostActive === 'debuff'
@@ -318,7 +318,7 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
               <button
                 onClick={() => { game.activateFocusFire(); sfxFocusFire(); }}
                 disabled={game.focusFireUsed}
-                className={`py-2 rounded-xl font-semibold text-xs transition-all active:scale-[0.97] ${
+                className={`py-2 rounded-xl font-semibold text-[10px] transition-all active:scale-[0.97] ${
                   game.focusFireActive
                     ? 'bg-primary/20 border-2 border-primary text-primary animate-pulse cursor-default'
                     : game.focusFireUsed
@@ -337,7 +337,7 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
               <button
                 onClick={() => { game.activateSacrifice(); sfxSacrifice(); }}
                 disabled={game.sacrificeUsed || game.playerUnits.filter(u => u.hp > 0).length < 2}
-                className={`py-2 rounded-xl font-semibold text-xs transition-all active:scale-[0.97] ${
+                className={`py-2 rounded-xl font-semibold text-[10px] transition-all active:scale-[0.97] ${
                   game.sacrificeUsed
                     ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
                     : 'bg-danger text-danger-foreground hover:opacity-90 shadow-[0_0_8px_hsl(var(--danger)/0.3)]'
@@ -345,15 +345,36 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
               >
                 {game.sacrificeUsed ? '💀 ✓' : '💀 Opfer'}
               </button>
+
+              {/* Schildwall */}
+              <button
+                onClick={() => { game.activateShieldWall(); sfxShieldWall(); }}
+                disabled={game.shieldWallUsed}
+                className={`py-2 rounded-xl font-semibold text-[10px] transition-all active:scale-[0.97] ${
+                  game.shieldWallActive
+                    ? 'bg-success/20 border-2 border-success text-success animate-pulse cursor-default'
+                    : game.shieldWallUsed
+                    ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
+                    : 'bg-success text-success-foreground hover:opacity-90 shadow-[0_0_8px_hsl(var(--success)/0.3)]'
+                }`}
+              >
+                {game.shieldWallActive
+                  ? '🛡️ AKTIV!'
+                  : game.shieldWallUsed
+                  ? '🛡️ ✓'
+                  : '🛡️ Wall'}
+              </button>
             </div>
 
             {/* Ability info line */}
-            <div className="flex gap-1 text-[9px] text-muted-foreground justify-center">
+            <div className="flex gap-1 text-[8px] text-muted-foreground justify-center flex-wrap">
               <span>🔥+25%→-15%</span>
               <span>•</span>
-              <span>🎯 Schwächstes Ziel</span>
+              <span>🎯 Schwächstes</span>
               <span>•</span>
               <span>💀 Opfern=Heilen</span>
+              <span>•</span>
+              <span>🛡️ Rückzug 50%</span>
             </div>
 
             <BattleLog logs={game.battleLog} />

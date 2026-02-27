@@ -40,9 +40,9 @@ export function useBattleGame(difficulty: number = 2) {
   // Fatigue system: tracks how many consecutive rounds each unit type survived
   const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
   const [enemyFatigue, setEnemyFatigue] = useState<Record<string, number>>({});
-  // Banned units for current round (fatigue >= 2)
-  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 2);
-  const enemyBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (enemyFatigue[t] || 0) >= 2);
+  // Banned units for current round (fatigue >= 1 — units that survived last round are immediately banned)
+  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 1);
+  const enemyBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (enemyFatigue[t] || 0) >= 1);
 
   // Morale boost state
   const [moraleBoostUsed, setMoraleBoostUsed] = useState(false);
@@ -57,6 +57,11 @@ export function useBattleGame(difficulty: number = 2) {
 
   // Sacrifice Ritual state
   const [sacrificeUsed, setSacrificeUsed] = useState(false);
+
+  // Shield Wall state
+  const [shieldWallUsed, setShieldWallUsed] = useState(false);
+  const [shieldWallActive, setShieldWallActive] = useState(false);
+  const shieldWallTicksLeft = useRef(0);
 
   // AI ability state
   const aiMoraleUsed = useRef(false);
@@ -116,6 +121,9 @@ export function useBattleGame(difficulty: number = 2) {
     setFocusFireActive(false);
     focusFireTicksLeft.current = 0;
     setSacrificeUsed(false);
+    setShieldWallUsed(false);
+    setShieldWallActive(false);
+    shieldWallTicksLeft.current = 0;
     aiMoraleUsed.current = false;
     aiMoralePhase.current = 'none';
     aiMoraleTicksLeft.current = 0;
@@ -251,6 +259,9 @@ export function useBattleGame(difficulty: number = 2) {
     setFocusFireActive(false);
     focusFireTicksLeft.current = 0;
     setSacrificeUsed(false);
+    setShieldWallUsed(false);
+    setShieldWallActive(false);
+    shieldWallTicksLeft.current = 0;
     aiMoraleUsed.current = false;
     aiMoralePhase.current = 'none';
     aiMoraleTicksLeft.current = 0;
@@ -317,6 +328,15 @@ export function useBattleGame(difficulty: number = 2) {
     setBattleLog(prev => [`💀 OPFERRITUAL! ${UNIT_DEFS[weakest.type].emoji} geopfert – alle anderen geheilt!`, ...prev]);
   }, [sacrificeUsed, phase, playerUnits]);
 
+  // Activate shield wall – 3 ticks retreat, 50% damage taken, no damage dealt
+  const activateShieldWall = useCallback(() => {
+    if (shieldWallUsed || phase !== 'battle') return;
+    setShieldWallUsed(true);
+    setShieldWallActive(true);
+    shieldWallTicksLeft.current = 3;
+    setBattleLog(prev => ['🛡️ SCHILDWALL! Rückzug zur Base – 50% Schadensreduktion für 3 Züge!', ...prev]);
+  }, [shieldWallUsed, phase]);
+
   // Run one battle tick
   const battleTick = useCallback(() => {
     setGrid(prevGrid => {
@@ -349,7 +369,32 @@ export function useBattleGame(difficulty: number = 2) {
         }
       }
 
-      // AI morale boost tick-down
+      // Shield wall tick-down
+      if (shieldWallTicksLeft.current > 0) {
+        shieldWallTicksLeft.current -= 1;
+        if (shieldWallTicksLeft.current <= 0) {
+          setShieldWallActive(false);
+        }
+        // Retreat: move all player units toward their base rows (5,6,7) as fast as possible
+        const playerAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
+        for (const unit of playerAlive) {
+          // Move toward closest base row (maximize row number)
+          if (unit.row < 5) {
+            // Move as far south as possible (up to 2 steps for speed)
+            for (let step = 2; step >= 1; step--) {
+              const targetRow = Math.min(7, unit.row + step);
+              if (targetRow <= 7 && !newGrid[targetRow][unit.col].unit && newGrid[targetRow][unit.col].terrain !== 'water') {
+                newGrid[unit.row][unit.col].unit = null;
+                unit.row = targetRow;
+                newGrid[unit.row][unit.col].unit = unit;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+
       if (aiMoralePhase.current !== 'none' && aiMoraleTicksLeft.current > 0) {
         aiMoraleTicksLeft.current -= 1;
         if (aiMoraleTicksLeft.current <= 0) {
@@ -429,10 +474,12 @@ export function useBattleGame(difficulty: number = 2) {
         }
       }
 
-      // Calculate player damage modifier from morale
-      const playerDmgMod = moralePhase.current === 'buff' ? 1.25 : moralePhase.current === 'debuff' ? 0.85 : 1.0;
+      // Calculate player damage modifier from morale (+ shield wall: player deals 0 damage)
+      const playerDmgMod = shieldWallTicksLeft.current > 0 ? 0 : (moralePhase.current === 'buff' ? 1.25 : moralePhase.current === 'debuff' ? 0.85 : 1.0);
       // Calculate enemy damage modifier from AI morale
       const enemyDmgMod = aiMoralePhase.current === 'buff' ? 1.25 : aiMoralePhase.current === 'debuff' ? 0.85 : 1.0;
+      // Shield wall: enemies deal only 50% damage to player units
+      const shieldWallDefMod = shieldWallTicksLeft.current > 0 ? 0.5 : 1.0;
 
       // Focus fire: determine lowest HP enemy target (player ability) – finish off weak units
       const focusTarget = focusFireTicksLeft.current > 0
@@ -551,9 +598,13 @@ export function useBattleGame(difficulty: number = 2) {
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           let dmg = calcDamage(unit, target, newGrid);
-          // Apply morale modifier
+          // Apply morale modifier + shield wall
           if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
-          else dmg = Math.round(dmg * enemyDmgMod);
+          else {
+            dmg = Math.round(dmg * enemyDmgMod);
+            // Shield wall: enemy attacks on player units deal 50% damage
+            if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
+          }
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
           // Warrior: track last attacked for lock-on behavior
@@ -804,7 +855,7 @@ export function useBattleGame(difficulty: number = 2) {
         if (playerBannedUnits.includes(t)) {
           next[t] = 0; // rested this round
         } else if (survivingTypes.has(t)) {
-          next[t] = (next[t] || 0) + 1;
+          next[t] = 1; // survived → immediately banned next round
         } else {
           next[t] = 0; // died or wasn't used
         }
@@ -818,7 +869,7 @@ export function useBattleGame(difficulty: number = 2) {
         if (enemyBannedUnits.includes(t)) {
           next[t] = 0; // rested this round
         } else if (survivingTypes.has(t)) {
-          next[t] = (next[t] || 0) + 1;
+          next[t] = 1; // survived → immediately banned next round
         } else {
           next[t] = 0;
         }
@@ -857,6 +908,9 @@ export function useBattleGame(difficulty: number = 2) {
     setFocusFireActive(false);
     focusFireTicksLeft.current = 0;
     setSacrificeUsed(false);
+    setShieldWallUsed(false);
+    setShieldWallActive(false);
+    shieldWallTicksLeft.current = 0;
     aiMoraleUsed.current = false;
     aiMoralePhase.current = 'none';
     aiMoraleTicksLeft.current = 0;
@@ -898,6 +952,7 @@ export function useBattleGame(difficulty: number = 2) {
     moraleBoostUsed, moraleBoostActive, activateMoraleBoost,
     focusFireUsed, focusFireActive, activateFocusFire,
     sacrificeUsed, activateSacrifice,
+    shieldWallUsed, shieldWallActive, activateShieldWall,
     waitingForOpponent: false,
     aiMoraleActive,
     inOvertime, overtimeCount, drawOfferPending,

@@ -132,9 +132,15 @@ const STEPS: TutorialStep[] = [
   {
     id: 'abilities',
     title: '🔥 Fähigkeiten im Kampf',
-    text: 'Während des Kampfes hast du 3 einmalige Fähigkeiten:\n\n🔥 Kriegsschrei — +25% Schaden für 3 Züge, danach -15% für 2 Züge\n🎯 Fokusfeuer — Alle greifen das schwächste Ziel an (4 Züge)\n💀 Opferritual — Opfere deine schwächste Einheit, heile alle anderen um 15%',
-    hint: '💡 Wann welche Fähigkeit?\n\n🔥 Kriegsschrei — Warte, bis ALLE deine Reihen aktiv sind (ab Zug 3). So profitieren alle Einheiten vom Bonus!\n\n🎯 Fokusfeuer — Am besten, wenn der Gegner einen gefährlichen Fernkämpfer oder Heiler hat, den du schnell ausschalten willst.\n\n💀 Opferritual — Behalte die HP deiner Einheiten im Blick! Wenn eine fast tot ist und sowieso im nächsten Zug stirbt, opfere sie rechtzeitig — so heilst du den Rest. Nicht zu früh (du opferst eine gesunde Einheit) und nicht zu spät (sie stirbt vorher)!',
+    text: 'Während des Kampfes hast du 4 einmalige Fähigkeiten:\n\n🔥 Kriegsschrei — +25% Schaden für 3 Züge, danach -15% für 3 Züge\n🎯 Fokusfeuer — Alle greifen das schwächste Ziel an (4 Züge)\n💀 Opferritual — Opfere deine schwächste Einheit, heile alle anderen um 15%\n🛡️ Schildwall — 3 Züge Rückzug zur Base, 50% Schadensreduktion, kein eigener Schaden',
+    hint: '💡 Wann welche Fähigkeit?\n\n🔥 Kriegsschrei — Warte, bis ALLE deine Reihen aktiv sind (ab Zug 3).\n\n🎯 Fokusfeuer — Wenn ein gefährlicher Gegner schnell fallen muss.\n\n💀 Opferritual — Wenn eine Einheit fast tot ist, opfere sie rechtzeitig!\n\n🛡️ Schildwall — Wenn du unter Druck stehst! Deine Einheiten ziehen sich zurück und nehmen nur halben Schaden. Nutze die Pause zum Neuaufbau.',
     showAbilityPreview: true,
+  },
+  {
+    id: 'fatigue',
+    title: '💤 Ermüdung',
+    text: 'Einheiten, die eine Runde ÜBERLEBEN, sind in der nächsten Runde ERMÜDET und können nicht eingesetzt werden (1 Runde Pause).\n\nDas bedeutet: Wenn dein Krieger die Runde überlebt, kannst du ihn in der nächsten Runde nicht platzieren. Danach ist er wieder verfügbar.',
+    hint: '💡 Ermüdung zwingt dich, verschiedene Einheiten zu nutzen! Plane voraus — wenn dein bester Konter ermüdet ist, brauchst du einen Ersatzplan. Einheiten die sterben oder nicht eingesetzt werden, sind NICHT ermüdet.',
   },
   {
     id: 'ready',
@@ -378,18 +384,22 @@ const Tutorial = () => {
 
         {/* Ability preview buttons */}
         {current.showAbilityPreview && (
-          <div className="grid grid-cols-3 gap-2 mb-3">
+          <div className="grid grid-cols-4 gap-1.5 mb-3">
             <div className="p-2 rounded-lg bg-warning/10 border border-warning/30 text-center">
               <span className="text-lg block">🔥</span>
-              <p className="text-[9px] font-bold text-warning">Kriegsschrei</p>
+              <p className="text-[8px] font-bold text-warning">Kriegsschrei</p>
             </div>
             <div className="p-2 rounded-lg bg-primary/10 border border-primary/30 text-center">
               <span className="text-lg block">🎯</span>
-              <p className="text-[9px] font-bold text-primary">Fokusfeuer</p>
+              <p className="text-[8px] font-bold text-primary">Fokusfeuer</p>
             </div>
             <div className="p-2 rounded-lg bg-danger/10 border border-danger/30 text-center">
               <span className="text-lg block">💀</span>
-              <p className="text-[9px] font-bold text-danger">Opferritual</p>
+              <p className="text-[8px] font-bold text-danger">Opferritual</p>
+            </div>
+            <div className="p-2 rounded-lg bg-success/10 border border-success/30 text-center">
+              <span className="text-lg block">🛡️</span>
+              <p className="text-[8px] font-bold text-success">Schildwall</p>
             </div>
           </div>
         )}

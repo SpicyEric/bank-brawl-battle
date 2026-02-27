@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 const MENU_TRACK = '/music/background.mp3';
 const BATTLE_TRACKS = [
@@ -64,11 +64,18 @@ function startMenuMusic() {
 }
 
 function startBattleMusic() {
-  if (currentMode === 'battle') return; // already playing battle music
+  if (currentMode === 'battle') return;
   currentMode = 'battle';
   battleQueue = shuffle(BATTLE_TRACKS);
   battleQueueIndex = 0;
   playTrack(battleQueue[0], false);
+}
+
+function tryAutoplay(mode: 'menu' | 'battle') {
+  if (globalStarted) return;
+  globalStarted = true;
+  if (mode === 'menu') startMenuMusic();
+  else startBattleMusic();
 }
 
 export function useMusic(mode: 'menu' | 'battle' = 'menu') {
@@ -76,16 +83,27 @@ export function useMusic(mode: 'menu' | 'battle' = 'menu') {
 
   useEffect(() => {
     if (!globalStarted) {
+      // Try autoplay immediately
+      tryAutoplay(mode);
+
+      // Fallback: start on first user interaction if autoplay was blocked
       const startOnInteraction = () => {
-        if (globalStarted) return;
-        globalStarted = true;
-        if (mode === 'menu') startMenuMusic();
-        else startBattleMusic();
+        if (globalStarted && globalAudio) {
+          // Already started but might be blocked — try playing
+          globalAudio.play().catch(() => {});
+          document.removeEventListener('click', startOnInteraction);
+          document.removeEventListener('touchstart', startOnInteraction);
+          return;
+        }
+        tryAutoplay(mode);
         document.removeEventListener('click', startOnInteraction);
+        document.removeEventListener('touchstart', startOnInteraction);
       };
       document.addEventListener('click', startOnInteraction);
+      document.addEventListener('touchstart', startOnInteraction);
       return () => {
         document.removeEventListener('click', startOnInteraction);
+        document.removeEventListener('touchstart', startOnInteraction);
       };
     }
 

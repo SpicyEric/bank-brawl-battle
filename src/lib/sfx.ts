@@ -384,3 +384,35 @@ export function sfxSacrifice() {
 
   playNoise(0.2, 0.08);
 }
+
+/** Shield Wall – defensive horn + marching drums */
+export function sfxShieldWall() {
+  if (sfxMuted) return;
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+
+  // Low defensive horn
+  const osc1 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  osc1.type = 'sawtooth';
+  osc1.frequency.setValueAtTime(130, t);
+  osc1.frequency.linearRampToValueAtTime(110, t + 0.3);
+  gain1.gain.setValueAtTime(0.15, t);
+  gain1.gain.setValueAtTime(0.15, t + 0.25);
+  gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+  osc1.connect(gain1);
+  gain1.connect(ctx.destination);
+  osc1.start(t);
+  osc1.stop(t + 0.5);
+
+  // Shield impact
+  setTimeout(() => {
+    playTone(200, 0.15, 'square', 0.12);
+    playNoise(0.1, 0.1);
+  }, 100);
+
+  // Second impact
+  setTimeout(() => {
+    playTone(180, 0.12, 'square', 0.1);
+  }, 250);
+}
