@@ -84,11 +84,14 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const placeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const placingPhaseRef = useRef(placingPhase);
+  const phaseRef = useRef(phase);
   const playerUnitsRef = useRef(playerUnits);
   const isMyTurnRef = useRef(isMyTurnToPlace);
+  const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep refs in sync
   useEffect(() => { placingPhaseRef.current = placingPhase; }, [placingPhase]);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
   useEffect(() => { isMyTurnRef.current = isMyTurnToPlace; }, [isMyTurnToPlace]);
 
@@ -265,37 +268,66 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Presence channel to detect opponent disconnect
   useEffect(() => {
     const presenceChannel = supabase.channel(`presence-${roomId}`);
+    const DISCONNECT_GRACE_MS = 8000;
 
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState();
-        const users = Object.values(state).flat();
-        // If we had 2+ users and now only 1, opponent left
-        if (users.length < 2 && phase !== 'place_player') {
-          // Only trigger if game has started (not in initial lobby)
-          const hasStarted = phase === 'battle' || phase === 'round_won' || phase === 'round_lost' || phase === 'round_draw';
-          if (hasStarted || placingPhase !== 'first') {
-            setOpponentLeft(true);
-          }
-        }
-      })
-      .on('presence', { event: 'leave' }, () => {
-        const state = presenceChannel.presenceState();
-        const users = Object.values(state).flat();
-        if (users.length < 2) {
+    const clearDisconnectTimer = () => {
+      if (disconnectTimeoutRef.current) {
+        clearTimeout(disconnectTimeoutRef.current);
+        disconnectTimeoutRef.current = null;
+      }
+    };
+
+    const bothPlayersPresent = () => {
+      const state = presenceChannel.presenceState();
+      const metas = Object.values(state).flat() as Array<{ role?: string }>;
+      const roles = new Set(metas.map(meta => meta.role).filter(Boolean));
+      return roles.has('player1') && roles.has('player2');
+    };
+
+    const hasMatchStarted = () => {
+      const currentPhase = phaseRef.current;
+      if (currentPhase === 'battle' || currentPhase === 'round_won' || currentPhase === 'round_lost' || currentPhase === 'round_draw') {
+        return true;
+      }
+      return currentPhase === 'place_player' && placingPhaseRef.current !== 'first';
+    };
+
+    const scheduleDisconnectCheck = () => {
+      if (!hasMatchStarted() || disconnectTimeoutRef.current) return;
+
+      disconnectTimeoutRef.current = setTimeout(() => {
+        disconnectTimeoutRef.current = null;
+        if (!bothPlayersPresent() && hasMatchStarted()) {
           setOpponentLeft(true);
         }
-      })
+      }, DISCONNECT_GRACE_MS);
+    };
+
+    const handlePresenceChange = () => {
+      if (bothPlayersPresent()) {
+        clearDisconnectTimer();
+        setOpponentLeft(false);
+        return;
+      }
+      scheduleDisconnectCheck();
+    };
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, handlePresenceChange)
+      .on('presence', { event: 'join' }, handlePresenceChange)
+      .on('presence', { event: 'leave' }, handlePresenceChange)
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           await presenceChannel.track({ role });
+          handlePresenceChange();
         }
       });
 
     return () => {
+      clearDisconnectTimer();
       supabase.removeChannel(presenceChannel);
     };
-  }, [roomId, role, phase, placingPhase]);
+  }, [roomId, role]);
 
   // Host generates terrain and decides who places first
   useEffect(() => {
