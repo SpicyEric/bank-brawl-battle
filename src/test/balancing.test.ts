@@ -748,3 +748,151 @@ describe('Advanced Simulations', () => {
     }
   });
 });
+
+describe('Tank (Schildträger) Rework Analysis', () => {
+  const SIMS = 200;
+
+  it('Tank compositions vs Random: shield aura value', () => {
+    const comps: { name: string; team: UnitType[] }[] = [
+      { name: '1 Tank solo + 4 Random', team: ['tank', 'warrior', 'archer', 'assassin', 'rider'] },
+      { name: '2 Tank + Krieger + Bogen + Schamane', team: ['tank', 'tank', 'warrior', 'archer', 'healer'] },
+      { name: '2 Tank + 2 Assassine + Schamane', team: ['tank', 'tank', 'assassin', 'assassin', 'healer'] },
+      { name: '3 Tank + Magier + Schamane', team: ['tank', 'tank', 'tank', 'mage', 'healer'] },
+      { name: '2 Tank + 2 Magier + Schamane (turtle)', team: ['tank', 'tank', 'mage', 'mage', 'healer'] },
+      { name: '1 Tank + Krieger + Assassine + Bogen + Frost', team: ['tank', 'warrior', 'assassin', 'archer', 'frost'] },
+      { name: '2 Tank + Drache + Bogen + Schamane', team: ['tank', 'tank', 'dragon', 'archer', 'healer'] },
+    ];
+
+    console.log(`\n=== TANK COMPOSITIONS vs RANDOM (${SIMS} each) ===`);
+    for (const comp of comps) {
+      let wins = 0;
+      for (let i = 0; i < SIMS; i++) {
+        if (simulateBattle(comp.team, randomTeam()).winner === 'player') wins++;
+      }
+      const rate = (wins / SIMS * 100).toFixed(1);
+      const flag = Number(rate) > 70 ? '⚠️ OP' : Number(rate) < 30 ? '⚠️ WEAK' : '✅';
+      console.log(`${flag} ${comp.name}: ${rate}%`);
+    }
+  });
+
+  it('Tank comps vs Tank comps (mirror & cross)', () => {
+    const comps: { name: string; team: UnitType[] }[] = [
+      { name: '2T+2M+H', team: ['tank', 'tank', 'mage', 'mage', 'healer'] },
+      { name: '2T+K+B+H', team: ['tank', 'tank', 'warrior', 'archer', 'healer'] },
+      { name: '1T+K+A+B+F', team: ['tank', 'warrior', 'assassin', 'archer', 'frost'] },
+    ];
+
+    console.log(`\n=== TANK vs TANK MATCHUPS (${SIMS} each) ===`);
+    for (let i = 0; i < comps.length; i++) {
+      for (let j = i; j < comps.length; j++) {
+        let wins = 0;
+        for (let s = 0; s < SIMS; s++) {
+          if (simulateBattle(comps[i].team, comps[j].team).winner === 'player') wins++;
+        }
+        const rate = (wins / SIMS * 100).toFixed(1);
+        const label = i === j ? `${comps[i].name} MIRROR` : `${comps[i].name} vs ${comps[j].name}`;
+        console.log(`  ${label}: ${rate}%`);
+      }
+    }
+  });
+
+  it('Tank comps vs anti-tank (Red counter teams)', () => {
+    const tankTeams: { name: string; team: UnitType[] }[] = [
+      { name: '2T+2M+H', team: ['tank', 'tank', 'mage', 'mage', 'healer'] },
+      { name: '3T+M+H', team: ['tank', 'tank', 'tank', 'mage', 'healer'] },
+    ];
+    const antiTank: { name: string; team: UnitType[] }[] = [
+      { name: '3 Krieger + 2 Assassine', team: ['warrior', 'warrior', 'warrior', 'assassin', 'assassin'] },
+      { name: '2 Krieger + 2 Drache + Assassine', team: ['warrior', 'warrior', 'dragon', 'dragon', 'assassin'] },
+      { name: '2 Assassine + 2 Drache + Krieger', team: ['assassin', 'assassin', 'dragon', 'dragon', 'warrior'] },
+    ];
+
+    console.log(`\n=== TANK vs RED COUNTER (${SIMS} each) ===`);
+    for (const t of tankTeams) {
+      for (const a of antiTank) {
+        let wins = 0;
+        for (let s = 0; s < SIMS; s++) {
+          if (simulateBattle(t.team, a.team).winner === 'player') wins++;
+        }
+        const rate = (wins / SIMS * 100).toFixed(1);
+        const flag = Number(rate) > 45 ? '⚠️ Tank too strong vs counter!' : '✅ Counter works';
+        console.log(`${flag} ${t.name} vs ${a.name}: ${rate}% (tank should lose)`);
+      }
+    }
+  });
+
+  it('Bond effectiveness: adjacent placement vs spread', () => {
+    console.log(`\n=== BOND EFFECTIVENESS: ADJACENT vs SPREAD (${SIMS} each) ===`);
+    // Adjacent placement: tank at row 6 col 3, allies at adjacent cells
+    // Spread placement: tank at row 6 col 0, allies spread across row 5-7
+    
+    const team: UnitType[] = ['tank', 'warrior', 'assassin', 'archer', 'mage'];
+    let adjacentWins = 0;
+    let spreadWins = 0;
+    
+    for (let i = 0; i < SIMS; i++) {
+      // Test adjacent
+      const r1 = simulateBattle(team, randomTeam(), { playerRows: [5, 6] });
+      if (r1.winner === 'player') adjacentWins++;
+      // Test spread  
+      const r2 = simulateBattle(team, randomTeam(), { playerRows: [5, 6, 7] });
+      if (r2.winner === 'player') spreadWins++;
+    }
+    console.log(`Adjacent (rows 5-6): ${(adjacentWins / SIMS * 100).toFixed(1)}%`);
+    console.log(`Spread (rows 5-7): ${(spreadWins / SIMS * 100).toFixed(1)}%`);
+  });
+
+  it('Tank aggro magnet: does the tank draw fire effectively?', () => {
+    // Simulate and track how often tank is the first to die
+    console.log(`\n=== TANK AGGRO ANALYSIS (${SIMS} battles) ===`);
+    const team: UnitType[] = ['tank', 'warrior', 'warrior', 'archer', 'archer'];
+    let tankDiesFirst = 0;
+    let totalBattles = 0;
+
+    for (let i = 0; i < SIMS; i++) {
+      const grid = generateTerrain(createEmptyGrid());
+      const allUnits: Unit[] = [];
+      const pCells = shuffle(getCells(PLAYER_ROWS, grid));
+      const eCells = shuffle(getCells(ENEMY_ROWS, grid));
+
+      team.forEach((type, idx) => {
+        if (idx >= pCells.length) return;
+        const u = createUnit(type, 'player', pCells[idx].row, pCells[idx].col);
+        grid[pCells[idx].row][pCells[idx].col].unit = u;
+        allUnits.push(u);
+      });
+      const eTeam = randomTeam();
+      eTeam.forEach((type, idx) => {
+        if (idx >= eCells.length) return;
+        const u = createUnit(type, 'enemy', eCells[idx].row, eCells[idx].col);
+        grid[eCells[idx].row][eCells[idx].col].unit = u;
+        allUnits.push(u);
+      });
+
+      const deathOrder: string[] = [];
+      for (let tick = 0; tick < 80; tick++) {
+        const alive = allUnits.filter(u => u.hp > 0);
+        const acting = alive.filter(u => !u.activationTurn || tick >= u.activationTurn);
+        for (const unit of acting) {
+          if (unit.hp <= 0) continue;
+          if (unit.frozen && unit.frozen > 0) { unit.frozen--; continue; }
+          unit.cooldown = Math.max(0, unit.cooldown - 1);
+          const target = findTarget(unit, alive);
+          if (!target) continue;
+          if (canAttack(unit, target) && unit.cooldown <= 0) {
+            const dmg = calcDamage(unit, target, grid);
+            target.hp = Math.max(0, target.hp - dmg);
+            unit.cooldown = unit.maxCooldown;
+            if (target.hp <= 0 && target.team === 'player' && !deathOrder.includes(target.type)) {
+              deathOrder.push(target.type);
+            }
+          }
+        }
+      }
+      if (deathOrder.length > 0 && deathOrder[0] === 'tank') tankDiesFirst++;
+      totalBattles++;
+    }
+    const rate = (tankDiesFirst / totalBattles * 100).toFixed(1);
+    console.log(`Tank dies first: ${rate}% (higher = aggro magnet works, expect 30-50%)`);
+  });
+});
