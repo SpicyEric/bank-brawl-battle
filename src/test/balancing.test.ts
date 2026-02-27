@@ -109,8 +109,8 @@ function simulateBattle(playerTeam: UnitType[], enemyTeam: UnitType[], options?:
         const healable = allies.filter(a => a.hp < a.maxHp);
         if (healable.length > 0 && unit.cooldown <= 0) {
           for (const ally of healable) {
-            if (canAttack(unit, ally)) {
-              ally.hp = Math.min(ally.maxHp, ally.hp + 15);
+          if (canAttack(unit, ally)) {
+              ally.hp = Math.min(ally.maxHp, ally.hp + 22);
               unit.cooldown = unit.maxCooldown;
               break;
             }
