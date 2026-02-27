@@ -8,7 +8,7 @@ import {
   UnitType, Unit, Cell, UNIT_DEFS, UNIT_TYPES, GRID_SIZE,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, PLAYER_ROWS, ENEMY_ROWS, POINTS_TO_WIN, getActivationTurn,
-  generateAIPlacement, getMaxUnits, TerrainType, setBondsForPlacement,
+  generateAIPlacement, getMaxUnits, TerrainType, setBondsForPlacement, moveTankFormation,
 } from '@/lib/battleGame';
 
 // --- Helpers ---
@@ -35,6 +35,10 @@ function shuffle<T>(arr: T[]): T[] {
 function moveUnit(unit: Unit, target: Unit, grid: Cell[][], allUnits: Unit[]) {
   const newPos = moveToward(unit, target, grid, allUnits);
   if (newPos.row !== unit.row || newPos.col !== unit.col) {
+    // If tank, move bonded units along
+    if (unit.type === 'tank') {
+      moveTankFormation(unit, newPos, grid, allUnits);
+    }
     grid[unit.row][unit.col].unit = null;
     unit.row = newPos.row;
     unit.col = newPos.col;
@@ -92,6 +96,7 @@ function simulateBattle(playerTeam: UnitType[], enemyTeam: UnitType[], options?:
 
     for (const unit of acting) {
       if (unit.hp <= 0) continue;
+      if (unit.movedWithTank) { unit.movedWithTank = false; continue; }
       if (unit.frozen && unit.frozen > 0) { unit.frozen -= 1; continue; }
       unit.cooldown = Math.max(0, unit.cooldown - 1);
 

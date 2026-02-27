@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
-  generateAIPlacement, getMaxUnits, generateTerrain, setBondsForPlacement,
+  generateAIPlacement, getMaxUnits, generateTerrain, setBondsForPlacement, moveTankFormation,
   GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES,
   getActivationTurn,
@@ -460,11 +460,21 @@ export function useBattleGame(difficulty: number = 2) {
           : findTarget(unit, allUnits);
         if (!target) continue;
 
+        // Skip if already moved with tank formation this tick
+        if (unit.movedWithTank) {
+          unit.movedWithTank = false;
+          continue;
+        }
+
         if (!canAttack(unit, target)) {
           // Track stuck turns for anti-stalemate
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
           const newPos = moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
+            // If tank, move bonded units first
+            if (unit.type === 'tank') {
+              moveTankFormation(unit, newPos, newGrid, allUnits);
+            }
             newGrid[unit.row][unit.col].unit = null;
             unit.row = newPos.row;
             unit.col = newPos.col;
@@ -475,6 +485,9 @@ export function useBattleGame(difficulty: number = 2) {
           unit.stuckTurns = 0;
           const kitePos = moveToward(unit, target, newGrid, allUnits);
           if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
+            if (unit.type === 'tank') {
+              moveTankFormation(unit, kitePos, newGrid, allUnits);
+            }
             newGrid[unit.row][unit.col].unit = null;
             unit.row = kitePos.row;
             unit.col = kitePos.col;
