@@ -111,6 +111,7 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
   useEffect(() => {
     if (nextRoundCountdown === 0 && isMultiplayer && game.isHost && !nextRoundTriggered.current) {
       nextRoundTriggered.current = true;
+      setNextRoundCountdown(null); // Clear countdown to prevent re-trigger after phase change
       game.nextRound();
     }
   }, [nextRoundCountdown, isMultiplayer, game]);

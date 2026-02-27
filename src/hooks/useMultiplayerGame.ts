@@ -338,9 +338,12 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     };
   }, [roomId, role]);
 
-  // Host generates terrain and decides who places first
+  // Host generates terrain and decides who places first — ONLY for round 1 (initial setup)
+  // Subsequent rounds are handled by nextRound() which already broadcasts terrain + placingPlayer
+  const initialTerrainSent = useRef(false);
   useEffect(() => {
-    if (isHost && phase === 'place_player' && placingPhase === 'first') {
+    if (isHost && roundNumber === 1 && phase === 'place_player' && placingPhase === 'first' && !initialTerrainSent.current) {
+      initialTerrainSent.current = true;
       const whoFirst = Math.random() < 0.5 ? 1 : 2;
       setPlacingPlayer(whoFirst as 1 | 2);
 
@@ -352,7 +355,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         });
       }, 500);
     }
-  }, [isHost, roundNumber]); // only on round change
+  }, [isHost, roundNumber, phase, placingPhase]);
 
   // Placement timer countdown
   useEffect(() => {
