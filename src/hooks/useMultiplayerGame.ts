@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
-  generateTerrain,
+  generateTerrain, getActivationTurn,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
@@ -17,7 +17,7 @@ interface MultiplayerConfig {
 const PLACE_TIME_LIMIT = 10; // seconds for each player to place
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, stuckTurns: u.stuckTurns };
+  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId };
 }
 
 function serializeGrid(grid: Cell[][]) {
@@ -433,11 +433,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     }
 
     for (const u of room.player1_units as any[]) {
-      const unit: Unit = { ...u, team: 'player' };
+      const unit: Unit = { ...u, team: 'player', activationTurn: u.activationTurn ?? getActivationTurn(u.row, 'player'), startRow: u.startRow ?? u.row };
       newGrid[unit.row][unit.col].unit = unit;
     }
     for (const u of room.player2_units as any[]) {
-      const unit: Unit = { ...u, team: 'enemy' };
+      const unit: Unit = { ...u, team: 'enemy', activationTurn: u.activationTurn ?? getActivationTurn(u.row, 'enemy'), startRow: u.startRow ?? u.row };
       newGrid[unit.row][unit.col].unit = unit;
     }
 
@@ -619,7 +619,12 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       const logs: string[] = [];
       const events: BattleEvent[] = [];
-      const acting = allUnits.filter(u => u.hp > 0).sort((a, b) => a.maxCooldown - b.maxCooldown);
+      const currentTurn = turnCount;
+      const acting = allUnits.filter(u => {
+        if (u.hp <= 0) return false;
+        if (u.activationTurn !== undefined && currentTurn < u.activationTurn) return false;
+        return true;
+      }).sort((a, b) => a.maxCooldown - b.maxCooldown);
 
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
@@ -638,12 +643,20 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
                 logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
                 healed = true;
                 unit.cooldown = unit.maxCooldown;
+                events.push({
+                  type: 'heal',
+                  attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: '🌿',
+                  targetId: ally.id, targetRow: ally.row, targetCol: ally.col,
+                  damage: 0, isStrong: false, isWeak: false,
+                  isRanged: Math.abs(unit.row - ally.row) + Math.abs(unit.col - ally.col) > 1,
+                  healAmount: healAmt,
+                });
                 break;
               }
             }
             if (!healed) {
               healable.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
-              const newPos = moveToward(unit, healable[0], newGrid);
+              const newPos = moveToward(unit, healable[0], newGrid, allUnits);
               if (newPos.row !== unit.row || newPos.col !== unit.col) {
                 newGrid[unit.row][unit.col].unit = null;
                 unit.row = newPos.row; unit.col = newPos.col;
@@ -661,14 +674,21 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
         if (!canAttack(unit, target)) {
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const newPos = moveToward(unit, target, newGrid);
+          const newPos = moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             newGrid[unit.row][unit.col].unit = null;
             unit.row = newPos.row; unit.col = newPos.col;
             newGrid[unit.row][unit.col].unit = unit;
           }
         } else {
+          // Can attack → reset stuck counter, but ranged kiters still reposition
           unit.stuckTurns = 0;
+          const kitePos = moveToward(unit, target, newGrid, allUnits);
+          if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
+            newGrid[unit.row][unit.col].unit = null;
+            unit.row = kitePos.row; unit.col = kitePos.col;
+            newGrid[unit.row][unit.col].unit = unit;
+          }
         }
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
@@ -678,7 +698,17 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           else dmg = Math.round(dmg * enemyDmgMod);
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
-          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) target.frozen = 1;
+          // Warrior: track last attacked for lock-on behavior
+          if (unit.type === 'warrior') unit.lastAttackedId = target.id;
+          // Rider: track last attacked for target-switching
+          if (unit.type === 'rider') unit.lastAttackedId = target.id;
+
+          // Frost: 50% chance to freeze the target for 1 turn
+          let didFreeze = false;
+          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
+            target.frozen = 1;
+            didFreeze = true;
+          }
 
           const def = UNIT_DEFS[unit.type];
           const tDef = UNIT_DEFS[target.type];
@@ -687,12 +717,57 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
           const dist = Math.abs(unit.row - target.row) + Math.abs(unit.col - target.col);
           logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.frozen ? ' 🧊' : ''}${target.hp <= 0 ? ' ☠️' : ''}`);
+
+          // Dragon AOE: collect all cells in 3x3 around the dragon for fire effect
+          let aoeCells: { row: number; col: number }[] | undefined;
+          if (unit.type === 'dragon') {
+            aoeCells = [];
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                const ar = unit.row + dr;
+                const ac = unit.col + dc;
+                if (ar >= 0 && ar < GRID_SIZE && ac >= 0 && ac < GRID_SIZE) {
+                  aoeCells.push({ row: ar, col: ac });
+                }
+              }
+            }
+            // Splash damage: 30% to other enemies in the 3x3 area
+            const splashDmg = Math.round(dmg * 0.3);
+            for (const aoePos of aoeCells) {
+              const cellUnit = newGrid[aoePos.row][aoePos.col].unit;
+              if (cellUnit && cellUnit.hp > 0 && !cellUnit.dead && cellUnit.team !== unit.team && cellUnit.id !== target.id) {
+                cellUnit.hp = Math.max(0, cellUnit.hp - splashDmg);
+                const splashDef = UNIT_DEFS[cellUnit.type];
+                logs.push(`🔥 ${unit.team === 'player' ? '👤' : '💀'} Drache 🔥→ ${splashDef.emoji} ${splashDmg} (Flächenschaden)`);
+                events.push({
+                  type: cellUnit.hp <= 0 ? 'kill' : 'hit',
+                  attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: '🔥',
+                  targetId: cellUnit.id, targetRow: aoePos.row, targetCol: aoePos.col,
+                  damage: splashDmg, isStrong: false, isWeak: false, isRanged: false, isAoe: true,
+                });
+                if (cellUnit.hp <= 0) (cellUnit as any).dead = true;
+              }
+            }
+          }
+
           events.push({
             type: target.hp <= 0 ? 'kill' : 'hit',
             attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: def.emoji,
             targetId: target.id, targetRow: target.row, targetCol: target.col,
             damage: dmg, isStrong, isWeak, isRanged: dist > 1,
+            isAoe: unit.type === 'dragon', aoeCells, isFrozen: didFreeze,
           });
+
+          // Emit freeze event for ice animation
+          if (didFreeze) {
+            events.push({
+              type: 'freeze',
+              attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: '🥶',
+              targetId: target.id, targetRow: target.row, targetCol: target.col,
+              damage: 0, isStrong: false, isWeak: false, isRanged: dist > 1,
+            });
+          }
+
           if (target.hp <= 0) (target as any).dead = true;
         }
       }
