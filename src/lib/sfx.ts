@@ -323,3 +323,64 @@ export function sfxFreeze() {
   // Shimmer
   setTimeout(() => playTone(3000, 0.1, 'sine', 0.04), 50);
 }
+
+/** Focus Fire – targeting lock-on beeps */
+export function sfxFocusFire() {
+  if (sfxMuted) return;
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+
+  // Rapid targeting beeps
+  for (let i = 0; i < 3; i++) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1400 + i * 200, t + i * 0.08);
+    gain.gain.setValueAtTime(0.12, t + i * 0.08);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.08 + 0.06);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t + i * 0.08);
+    osc.stop(t + i * 0.08 + 0.06);
+  }
+
+  // Lock-on confirmation tone
+  setTimeout(() => playTone(2000, 0.15, 'sine', 0.1), 250);
+}
+
+/** Sacrifice Ritual – dark rumble + soul release */
+export function sfxSacrifice() {
+  if (sfxMuted) return;
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+
+  // Deep rumble
+  const osc1 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  osc1.type = 'sawtooth';
+  osc1.frequency.setValueAtTime(80, t);
+  osc1.frequency.exponentialRampToValueAtTime(40, t + 0.4);
+  gain1.gain.setValueAtTime(0.2, t);
+  gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+  osc1.connect(gain1);
+  gain1.connect(ctx.destination);
+  osc1.start(t);
+  osc1.stop(t + 0.5);
+
+  // Soul ascending whistle
+  setTimeout(() => {
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(300, t + 0.15);
+    osc2.frequency.exponentialRampToValueAtTime(2000, t + 0.5);
+    gain2.gain.setValueAtTime(0.1, t + 0.15);
+    gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(t + 0.15);
+    osc2.stop(t + 0.55);
+  }, 150);
+
+  playNoise(0.2, 0.08);
+}
