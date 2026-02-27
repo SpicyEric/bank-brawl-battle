@@ -616,23 +616,34 @@ describe('Advanced Simulations', () => {
     }
   });
 
-  it('Assassin deep-dive: optimal partners', () => {
-    console.log(`\n=== ASSASSIN PARTNER ANALYSIS (${SIMS} each) ===`);
-    const partners: { name: string; team: UnitType[] }[] = [
-      { name: '2 Assassine + 3 Krieger', team: ['assassin','assassin','warrior','warrior','warrior'] },
-      { name: '2 Assassine + 3 Drache', team: ['assassin','assassin','dragon','dragon','dragon'] },
-      { name: '2 Assassine + 2 Bogen + Frost', team: ['assassin','assassin','archer','archer','frost'] },
-      { name: '2 Assassine + 2 Schild + Schamane', team: ['assassin','assassin','tank','tank','healer'] },
+  it('Assassin deep-dive: count variations + mixed comps', () => {
+    const DEEP_SIMS = 300;
+    const comps: { name: string; team: UnitType[] }[] = [
+      // Assassin count scaling
       { name: '1 Assassine + Krieger + Bogen + Schild + Schamane', team: ['assassin','warrior','archer','tank','healer'] },
+      { name: '2 Assassine + Krieger + Bogen + Schild', team: ['assassin','assassin','warrior','archer','tank'] },
+      { name: '3 Assassine + Schild + Schamane', team: ['assassin','assassin','assassin','tank','healer'] },
+      { name: '4 Assassine + Schild', team: ['assassin','assassin','assassin','assassin','tank'] },
+      { name: '5 Assassine (Mono)', team: ['assassin','assassin','assassin','assassin','assassin'] },
+      // Mixed comps with assassin
+      { name: '2 Assassine + 2 Schild + Schamane', team: ['assassin','assassin','tank','tank','healer'] },
+      { name: '2 Assassine + 3 Krieger', team: ['assassin','assassin','warrior','warrior','warrior'] },
+      { name: '2 Assassine + 2 Bogen + Frost', team: ['assassin','assassin','archer','archer','frost'] },
+      { name: '2 Assassine + Drache + Frost + Bogen', team: ['assassin','assassin','dragon','frost','archer'] },
       { name: '1 Assassine + 2 Reiter + 2 Bogen', team: ['assassin','rider','rider','archer','archer'] },
+      // Same comps WITHOUT assassin for comparison
+      { name: 'VERGLEICH: Krieger statt Assassine (K+K+B+Schild+Sch)', team: ['warrior','warrior','archer','tank','healer'] },
+      { name: 'VERGLEICH: Drache statt Assassine (D+K+B+Schild+Sch)', team: ['dragon','warrior','archer','tank','healer'] },
     ];
-    for (const p of partners) {
+
+    console.log(`\n=== ASSASSIN DEEP-DIVE (${DEEP_SIMS} battles each) ===`);
+    for (const p of comps) {
       let wins = 0;
-      for (let i = 0; i < SIMS; i++) {
+      for (let i = 0; i < DEEP_SIMS; i++) {
         if (simulateBattle(p.team, randomTeam()).winner === 'player') wins++;
       }
-      const rate = (wins/SIMS*100).toFixed(1);
-      const flag = Number(rate) > 60 ? '✅ GOOD' : Number(rate) < 40 ? '❌ BAD' : '➖ MEH';
+      const rate = (wins/DEEP_SIMS*100).toFixed(1);
+      const flag = Number(rate) > 65 ? '⚠️ OP' : Number(rate) > 55 ? '✅ GOOD' : Number(rate) < 35 ? '❌ BAD' : '➖ MEH';
       console.log(`${flag} ${p.name}: ${rate}%`);
     }
   });
