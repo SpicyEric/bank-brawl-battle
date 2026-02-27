@@ -9,6 +9,7 @@ import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 import { useMusic } from '@/hooks/useMusic';
 import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
+import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, setSfxMuted } from '@/lib/sfx';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -52,6 +53,9 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
   const [overlaySubtext, setOverlaySubtext] = useState<string | null>(null);
   const prevPhase = useRef(game.phase);
 
+  // Sync SFX mute with music mute
+  useEffect(() => { setSfxMuted(muted); }, [muted]);
+
   useEffect(() => {
     if (game.phase === prevPhase.current) return;
     prevPhase.current = game.phase;
@@ -65,10 +69,13 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
       text = 'Bereit?';
     } else if (game.phase === 'battle') {
       text = 'Kampf!';
+      sfxBattleStart();
     } else if (game.phase === 'round_won') {
       text = '🏆 Gewonnen!';
+      sfxVictory();
     } else if (game.phase === 'round_lost') {
       text = '💀 Verloren!';
+      sfxDefeat();
     } else if (game.phase === 'round_draw') {
       text = '⚖️ Gleichstand!';
     }
@@ -131,11 +138,13 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
               const unit = game.grid[row][col].unit;
               if (unit && unit.team === (isMultiplayer ? (game as any).myRows?.includes(unit.row) ? unit.team : null : 'player')) {
                 game.removeUnit(unit.id);
+                sfxRemove();
                 setLastPlaced(null);
                 return;
               }
-              if (game.selectedUnit) {
+              if (game.selectedUnit && !game.grid[row][col].unit && game.grid[row][col].terrain !== 'water') {
                 game.placeUnit(row, col);
+                sfxPlace();
                 setLastPlaced({ row, col, type: game.selectedUnit });
               }
               return;
@@ -182,7 +191,7 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
               maxUnits={game.playerMaxUnits}
             />
             <button
-              onClick={game.confirmPlacement}
+              onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
               disabled={!isMultiplayer && game.playerUnits.length < game.playerMaxUnits}
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
