@@ -210,8 +210,8 @@ export function useBattleGame(difficulty: number = 2) {
     if (focusFireUsed || phase !== 'battle') return;
     setFocusFireUsed(true);
     setFocusFireActive(true);
-    focusFireTicksLeft.current = 3;
-    setBattleLog(prev => ['🎯 FOKUSFEUER! Alle Einheiten greifen das schwächste Ziel an!', ...prev]);
+    focusFireTicksLeft.current = 4;
+    setBattleLog(prev => ['🎯 FOKUSFEUER! Alle Einheiten greifen das schwächste Ziel an (4 Züge)!', ...prev]);
   }, [focusFireUsed, phase]);
 
   // Activate sacrifice ritual – kill weakest own unit, heal others +15%
