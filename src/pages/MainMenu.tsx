@@ -4,7 +4,7 @@ import { Swords, Users, Volume2, VolumeX, Settings } from 'lucide-react';
 
 const MainMenu = () => {
   const navigate = useNavigate();
-  const { muted, toggleMute } = useMusic();
+  const { muted, toggleMute } = useMusic('menu');
 
   return (
     <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
