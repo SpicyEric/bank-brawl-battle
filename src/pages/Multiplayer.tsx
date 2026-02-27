@@ -4,6 +4,7 @@ import { useMusic } from '@/hooks/useMusic';
 import { createRoom, joinRoom, subscribeToRoom, updateRoom, createGameChannel } from '@/lib/multiplayer';
 import { ArrowLeft, Copy, Check, Users, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import menuBg from '@/assets/menu-bg.png';
 
 type LobbyState = 'menu' | 'creating' | 'hosting' | 'joining' | 'waiting';
 
@@ -73,7 +74,10 @@ const Multiplayer = () => {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center px-6 relative">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden">
+      {/* Background image - dimmed */}
+      <img src={menuBg} alt="" className="absolute inset-0 w-full h-full object-cover" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-none" />
       {/* Back button */}
       <button
         onClick={() => state === 'menu' ? navigate('/') : setState('menu')}
