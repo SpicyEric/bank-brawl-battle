@@ -1,6 +1,6 @@
 export type UnitType = 'warrior' | 'rider' | 'archer' | 'assassin' | 'mage' | 'tank' | 'dragon' | 'healer' | 'frost';
 export type Team = 'player' | 'enemy';
-export type Phase = 'place_player' | 'place_enemy' | 'battle' | 'round_won' | 'round_lost' | 'round_draw';
+export type Phase = 'place_player' | 'place_enemy' | 'battle' | 'round_won' | 'round_lost' | 'round_draw' | 'game_draw';
 
 export interface Position { row: number; col: number }
 
@@ -241,7 +241,10 @@ export function getMaxUnits(myScore: number, opponentScore: number): number {
 export const GRID_SIZE = 8;
 export const PLAYER_ROWS = [5, 6, 7];
 export const ENEMY_ROWS = [0, 1, 2];
-export const POINTS_TO_WIN = 13;
+export const POINTS_TO_WIN = 8;
+export const OVERTIME_THRESHOLD = 7; // at this score, 2-point lead required
+export const AUTO_OVERTIMES = 3; // first 3 overtimes are automatic
+export const MAX_OVERTIMES = 5; // after 5th overtime → forced draw
 export const ROUND_TIME_LIMIT = 45; // seconds
 
 export const COUNTER_MULTIPLIER = 1.4;

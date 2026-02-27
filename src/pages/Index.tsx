@@ -7,7 +7,7 @@ import { UnitPicker } from '@/components/battle/UnitPicker';
 import { BattleLog } from '@/components/battle/BattleLog';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 import { useMusic } from '@/hooks/useMusic';
-import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT } from '@/lib/battleGame';
+import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT, OVERTIME_THRESHOLD } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
 import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, sfxFocusFire, sfxSacrifice, setSfxMuted } from '@/lib/sfx';
 import {
@@ -96,7 +96,11 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
           <ScoreDots score={game.playerScore} max={POINTS_TO_WIN} color="success" />
         </div>
         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
-          Runde <span className="text-foreground font-bold">{game.roundNumber}</span>
+          {game.inOvertime ? (
+            <span className="text-warning">⚡ Verlängerung {game.overtimeCount}</span>
+          ) : (
+            <>Runde <span className="text-foreground font-bold">{game.roundNumber}</span></>
+          )}
           {isMultiplayer && <span className="ml-1 text-primary">⚡</span>}
         </p>
         <div className="flex items-center gap-2">
@@ -313,10 +317,52 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
           </div>
         )}
 
+        {/* Draw offer dialog */}
+        {game.drawOfferPending && (
+          <div className="text-center space-y-4 py-4">
+            <p className="text-lg font-bold text-foreground">🤝 Unentschieden anbieten?</p>
+            <p className="text-sm text-muted-foreground">
+              Stand: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>
+              <br />Verlängerung {game.overtimeCount} — 2 Punkte Vorsprung nötig
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={game.acceptDraw}
+                className="flex-1 py-3 rounded-xl bg-muted text-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
+              >
+                🤝 Unentschieden
+              </button>
+              <button
+                onClick={game.continueOvertime}
+                className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
+              >
+                ⚔️ Weiterkämpfen!
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Game draw */}
+        {game.phase === 'game_draw' && (
+          <div className="text-center space-y-4 py-4">
+            <p className="text-xl font-bold text-foreground">🤝 UNENTSCHIEDEN!</p>
+            <p className="text-sm text-muted-foreground">
+              Endstand: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>
+            </p>
+            <button
+              onClick={() => navigate('/')}
+              className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
+            >
+              🏠 Hauptmenü
+            </button>
+          </div>
+        )}
+
         {(game.phase === 'round_won' || game.phase === 'round_lost' || game.phase === 'round_draw') && (
           <div className="text-center space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
               Stand: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>
+              {game.inOvertime && <span className="text-warning text-xs ml-2">(2 Punkte Vorsprung nötig)</span>}
             </p>
             {game.gameOver ? (
               <div className="space-y-3">
@@ -335,7 +381,7 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
                 onClick={game.nextRound}
                 className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
               >
-                ➡️ Nächste Runde ({game.roundNumber + 1})
+                ➡️ {game.inOvertime ? 'Verlängerung' : 'Nächste Runde'} ({game.roundNumber + 1})
               </button>
             )}
           </div>
