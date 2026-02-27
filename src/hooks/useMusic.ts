@@ -1,7 +1,13 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 
 const MENU_TRACK = '/music/background.mp3';
-const BATTLE_TRACKS = ['/music/stoischer-ringkampf.mp3'];
+const BATTLE_TRACKS = [
+  '/music/stoischer-ringkampf.mp3',
+  '/music/stoischer-kreis.mp3',
+  '/music/stoischer-kreis-1.mp3',
+  '/music/stoischer-kreis-2.mp3',
+  '/music/stoischer-kreis-3.mp3',
+];
 
 let globalAudio: HTMLAudioElement | null = null;
 let globalMuted = false;
