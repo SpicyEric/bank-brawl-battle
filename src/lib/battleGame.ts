@@ -21,8 +21,9 @@ export interface Unit {
   activationTurn?: number; // turn number when this unit becomes active (staggered rows)
   startRow?: number; // the row the unit was originally placed on
   lastAttackedId?: string; // last enemy attacked (rider uses this for target-switching)
-  bondedToTankId?: string; // if placed adjacent to a tank, bonded for strong pull
-  bondBroken?: boolean; // once bonded unit moves away, bond is broken
+  bondedToTankId?: string; // if placed adjacent to a tank, bonded for rigid formation
+  bondBroken?: boolean; // once bond breaks (blocked move), unit moves freely
+  movedWithTank?: boolean; // set to true when unit already moved this tick via tank formation
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -199,7 +200,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   tank: {
     label: 'Schildträger',
     emoji: '🛡️',
-    hp: 175,
+    hp: 160,
     attack: 19,
     cooldown: 3,
     description: 'Bewegt sich orthogonal (1 Feld). Schützt angrenzende Verbündete (-20% Schaden). Zieht Feinde an. Verbündete können sich an ihn binden.',
@@ -229,8 +230,8 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   healer: {
     label: 'Schamane',
     emoji: '🌿',
-    hp: 80,
-    attack: 5,
+    hp: 75,
+    attack: 10,
     cooldown: 2,
     description: 'Heilt Verbündete im Umkreis (2 Felder). Greift nur an, wenn niemand mehr zu heilen ist.',
     movePattern: ALL_ADJACENT,
@@ -523,7 +524,111 @@ function terrainScore(pos: Position, grid: Cell[][]): number {
   return 0;
 }
 
-// Ranged unit types that should kite (keep distance)
+// Internal: select best move from a list of candidate positions
+function _selectBestMove(unit: Unit, target: Unit, possibleMoves: Position[], grid: Cell[][], allUnits: Unit[] | undefined, isRangedKiter: boolean): Position {
+  // If can already attack, consider kiting or staying
+  if (canAttack(unit, target)) {
+    if (isRangedKiter && (unit.stuckTurns || 0) < 3) {
+      const kiteMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
+      if (kiteMoves.length > 0) {
+        kiteMoves.sort((a, b) => {
+          const distA = distance(a, target);
+          const distB = distance(b, target);
+          if (unit.type === 'mage' && allUnits) {
+            const behindA = isBehindAllies(a, unit, allUnits) ? 2 : 0;
+            const behindB = isBehindAllies(b, unit, allUnits) ? 2 : 0;
+            if (behindA !== behindB) return behindB - behindA;
+          }
+          return distB - distA;
+        });
+        const bestKite = kiteMoves[0];
+        if (distance(bestKite, target) >= distance(unit, target)) {
+          return bestKite;
+        }
+      }
+      return { row: unit.row, col: unit.col };
+    }
+    return { row: unit.row, col: unit.col };
+  }
+
+  const isStuck = (unit.stuckTurns || 0) >= 3;
+
+  const attackMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
+  if (attackMoves.length > 0) {
+    if (!isStuck) {
+      attackMoves.sort((a, b) => terrainScore(b, grid) - terrainScore(a, grid) || distance(b, target) - distance(a, target));
+    } else {
+      attackMoves.sort((a, b) => distance(a, target) - distance(b, target));
+    }
+    return attackMoves[0];
+  }
+
+  if (!isStuck) {
+    const currentDist = distance(unit, target);
+    const terrainMoves = possibleMoves.filter(pos => {
+      const t = grid[pos.row][pos.col].terrain;
+      return (t === 'forest' || t === 'hill') && distance(pos, target) <= currentDist;
+    });
+    if (terrainMoves.length > 0) {
+      terrainMoves.sort((a, b) => terrainScore(b, grid) - terrainScore(a, grid));
+      return terrainMoves[0];
+    }
+  }
+
+  const bfsStep = bfsFirstStep(unit, target, grid);
+  if (bfsStep) {
+    const validStep = possibleMoves.find(p => p.row === bfsStep.row && p.col === bfsStep.col);
+    if (validStep) return validStep;
+  }
+
+  const def = UNIT_DEFS[unit.type];
+  let best = { row: unit.row, col: unit.col };
+  let bestScore = Infinity;
+  for (const pos of possibleMoves) {
+    let minAttackDist = Infinity;
+    for (const p of def.attackPattern) {
+      const attackFromRow = target.row - p.row;
+      const attackFromCol = target.col - p.col;
+      if (attackFromRow >= 0 && attackFromRow < GRID_SIZE && attackFromCol >= 0 && attackFromCol < GRID_SIZE) {
+        const d = distance(pos, { row: attackFromRow, col: attackFromCol });
+        if (d < minAttackDist) minAttackDist = d;
+      }
+    }
+    if (minAttackDist < bestScore) {
+      bestScore = minAttackDist;
+      best = pos;
+    }
+  }
+  return best;
+}
+
+// Move bonded units along with a tank that just moved
+export function moveTankFormation(tank: Unit, newPos: Position, grid: Cell[][], allUnits: Unit[]): void {
+  const dr = newPos.row - tank.row;
+  const dc = newPos.col - tank.col;
+  const bondedUnits = allUnits.filter(u =>
+    u.bondedToTankId === tank.id && !u.bondBroken && u.hp > 0 && !u.dead
+  );
+
+  for (const bonded of bondedUnits) {
+    const nr = bonded.row + dr;
+    const nc = bonded.col + dc;
+    if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE &&
+        grid[nr][nc].terrain !== 'water' &&
+        (!grid[nr][nc].unit || grid[nr][nc].unit!.id === tank.id || bondedUnits.some(b => b.id === grid[nr][nc].unit?.id))) {
+      grid[bonded.row][bonded.col].unit = null;
+      bonded.row = nr;
+      bonded.col = nc;
+      grid[nr][nc].unit = bonded;
+      bonded.movedWithTank = true;
+    } else {
+      // Can't follow — bond breaks
+      bonded.bondBroken = true;
+    }
+  }
+}
+
+
 const RANGED_KITERS: UnitType[] = ['archer', 'frost', 'mage'];
 
 // Check if a position is "behind" allies (further from enemies)
@@ -555,142 +660,56 @@ function isAdjacentTo(pos: Position, target: Unit): boolean {
   return ALL_ADJACENT.some(o => pos.row === target.row + o.row && pos.col === target.col + o.col);
 }
 
-// Move toward target: terrain-aware with anti-stalemate + kiting for ranged + tank pull
+// Move toward target: terrain-aware with anti-stalemate + kiting for ranged + rigid tank formation
 export function moveToward(unit: Unit, target: Unit, grid: Cell[][], allUnits?: Unit[]): Position {
   const possibleMoves = getMoveCells(unit, grid);
   if (possibleMoves.length === 0) return { row: unit.row, col: unit.col };
 
   const isRangedKiter = RANGED_KITERS.includes(unit.type);
 
-  // --- Tank pull logic (before normal movement) ---
-  if (unit.type !== 'tank' && unit.type !== 'healer' && allUnits) {
-    const friendlyTank = findFriendlyTank(unit, allUnits);
-    if (friendlyTank) {
-      const isBonded = unit.bondedToTankId === friendlyTank.id && !unit.bondBroken;
-      const pullChance = isBonded ? 0.75 : 0.30;
-      const currentlyAdjacent = isAdjacentTo(unit, friendlyTank);
-
-      if (Math.random() < pullChance) {
-        if (isBonded && currentlyAdjacent) {
-          // Bonded + adjacent: try to stay adjacent while still attacking
-          const adjacentAttackMoves = possibleMoves.filter(pos =>
-            isAdjacentTo(pos, friendlyTank) && couldAttackFrom(pos, unit.type, target)
-          );
-          if (adjacentAttackMoves.length > 0) {
-            return adjacentAttackMoves[0];
-          }
-          // Can't attack from adjacent position — stay put if can attack from here
-          if (canAttack(unit, target)) {
-            return { row: unit.row, col: unit.col };
-          }
-          // Must move to attack — bond breaks
-          unit.bondBroken = true;
-        } else if (!currentlyAdjacent && distance(unit, friendlyTank) <= 3) {
-          // Soft pull: prefer moves that are closer to tank (among equally good moves)
-          const movesNearTank = possibleMoves.filter(pos =>
-            distance(pos, friendlyTank) < distance(unit, friendlyTank) &&
-            couldAttackFrom(pos, unit.type, target)
-          );
-          if (movesNearTank.length > 0) {
-            movesNearTank.sort((a, b) => distance(a, friendlyTank) - distance(b, friendlyTank));
-            return movesNearTank[0];
-          }
-        }
-      } else if (isBonded && currentlyAdjacent) {
-        // 25% chance: bond breaks, unit moves freely
-        unit.bondBroken = true;
-      }
-    }
-  }
-
-  // If can already attack, consider kiting or staying
-  if (canAttack(unit, target)) {
-    if (isRangedKiter && (unit.stuckTurns || 0) < 3) {
-      // Kiting: try to move to a position that's further from the target but still in attack range
-      const kiteMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
-      if (kiteMoves.length > 0) {
-        // Sort by distance from target (prefer far) and backline positioning for mage
-        kiteMoves.sort((a, b) => {
-          const distA = distance(a, target);
-          const distB = distance(b, target);
-          // Mage: prefer positions behind allies
-          if (unit.type === 'mage' && allUnits) {
-            const behindA = isBehindAllies(a, unit, allUnits) ? 2 : 0;
-            const behindB = isBehindAllies(b, unit, allUnits) ? 2 : 0;
-            if (behindA !== behindB) return behindB - behindA;
-          }
-          return distB - distA; // prefer further away
-        });
-        const bestKite = kiteMoves[0];
-        const currentDist = distance(unit, target);
-        // Only kite if the new position is at least as far or further
-        if (distance(bestKite, target) >= currentDist) {
-          return bestKite;
-        }
-      }
-      return { row: unit.row, col: unit.col };
-    }
-    if ((unit.stuckTurns || 0) < 3) {
-      return { row: unit.row, col: unit.col };
-    }
+  // --- Rigid formation: bonded units skip their own move (already moved with tank) ---
+  if (unit.movedWithTank) {
+    unit.movedWithTank = false;
     return { row: unit.row, col: unit.col };
   }
 
-  const isStuck = (unit.stuckTurns || 0) >= 3;
+  // --- Rigid formation: when tank moves, drag all bonded units along ---
+  if (unit.type === 'tank' && allUnits) {
+    const bondedUnits = allUnits.filter(u =>
+      u.bondedToTankId === unit.id && !u.bondBroken && u.hp > 0 && !u.dead
+    );
+    if (bondedUnits.length > 0) {
+      // Filter moves to only those where ALL bonded units can follow
+      const formationMoves = possibleMoves.filter(pos => {
+        const dr = pos.row - unit.row;
+        const dc = pos.col - unit.col;
+        for (const bonded of bondedUnits) {
+          const nr = bonded.row + dr;
+          const nc = bonded.col + dc;
+          if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return false;
+          const cell = grid[nr][nc];
+          if (cell.terrain === 'water' && bonded.type !== 'dragon') return false;
+          // Cell must be empty or occupied by another formation member or the tank's old/new pos
+          if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) {
+            const isFormationMember = cell.unit.id === unit.id || bondedUnits.some(b => b.id === cell.unit!.id);
+            if (!isFormationMember) return false;
+          }
+        }
+        return true;
+      });
 
-  // Priority 1: move to a cell from which we can attack
-  const attackMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
-  if (attackMoves.length > 0) {
-    // Among attack moves, prefer terrain tiles (but only if not stuck)
-    if (!isStuck) {
-      attackMoves.sort((a, b) => terrainScore(b, grid) - terrainScore(a, grid) || distance(b, target) - distance(a, target));
-    } else {
-      attackMoves.sort((a, b) => distance(a, target) - distance(b, target));
-    }
-    return attackMoves[0];
-  }
-
-  // Priority 2: if not stuck, consider moving to a nearby terrain tile that's still closer to target
-  if (!isStuck) {
-    const currentDist = distance(unit, target);
-    const terrainMoves = possibleMoves.filter(pos => {
-      const t = grid[pos.row][pos.col].terrain;
-      return (t === 'forest' || t === 'hill') && distance(pos, target) <= currentDist;
-    });
-    if (terrainMoves.length > 0) {
-      terrainMoves.sort((a, b) => terrainScore(b, grid) - terrainScore(a, grid));
-      return terrainMoves[0];
-    }
-  }
-
-  // Priority 3: BFS to find a path around obstacles
-  const bfsStep = bfsFirstStep(unit, target, grid);
-  if (bfsStep) {
-    const validStep = possibleMoves.find(p => p.row === bfsStep.row && p.col === bfsStep.col);
-    if (validStep) return validStep;
-  }
-
-  // Priority 4: fallback - move closer by manhattan distance
-  const def = UNIT_DEFS[unit.type];
-  let best = { row: unit.row, col: unit.col };
-  let bestScore = Infinity;
-
-  for (const pos of possibleMoves) {
-    let minAttackDist = Infinity;
-    for (const p of def.attackPattern) {
-      const attackFromRow = target.row - p.row;
-      const attackFromCol = target.col - p.col;
-      if (attackFromRow >= 0 && attackFromRow < GRID_SIZE && attackFromCol >= 0 && attackFromCol < GRID_SIZE) {
-        const d = distance(pos, { row: attackFromRow, col: attackFromCol });
-        if (d < minAttackDist) minAttackDist = d;
+      if (formationMoves.length > 0) {
+        // Use formation moves instead of all moves for the rest of the function
+        return _selectBestMove(unit, target, formationMoves, grid, allUnits, isRangedKiter);
+      }
+      // No valid formation move — break bonds and move freely
+      for (const bonded of bondedUnits) {
+        bonded.bondBroken = true;
       }
     }
-    if (minAttackDist < bestScore) {
-      bestScore = minAttackDist;
-      best = pos;
-    }
   }
-  return best;
+
+  return _selectBestMove(unit, target, possibleMoves, grid, allUnits, isRangedKiter);
 }
 
 // Helper to set bonds on units placed adjacent to tanks
