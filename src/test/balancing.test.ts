@@ -139,9 +139,9 @@ function simulateBattle(playerTeam: UnitType[], enemyTeam: UnitType[], options?:
           target.frozen = 1;
         }
 
-        // Dragon AOE: 50% splash to other enemies in 3x3
+        // Dragon AOE: 30% splash to other enemies in 3x3
         if (unit.type === 'dragon') {
-          const splashDmg = Math.round(dmg * 0.5);
+          const splashDmg = Math.round(dmg * 0.3);
           for (let dr = -1; dr <= 1; dr++) {
             for (let dc = -1; dc <= 1; dc++) {
               const ar = unit.row + dr;
