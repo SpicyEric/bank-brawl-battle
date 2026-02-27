@@ -550,3 +550,181 @@ describe('Mixed Composition Analysis', () => {
     }
   });
 });
+
+describe('Advanced Simulations', () => {
+  const SIMS = 150;
+
+  it('Comeback mechanic: 6v5 and 7v5 advantage', () => {
+    const team5: UnitType[] = ['warrior', 'tank', 'archer', 'mage', 'healer'];
+    const team6: UnitType[] = ['warrior', 'tank', 'archer', 'mage', 'healer', 'rider'];
+    const team7: UnitType[] = ['warrior', 'tank', 'archer', 'mage', 'healer', 'rider', 'frost'];
+
+    console.log(`\n=== COMEBACK MECHANIC: SIZE ADVANTAGE (${SIMS} each) ===`);
+    const matchups = [
+      { name: '6v5', a: team6, b: team5 },
+      { name: '7v5', a: team7, b: team5 },
+      { name: '7v6', a: team7, b: team6 },
+    ];
+    for (const m of matchups) {
+      let wins = 0;
+      for (let i = 0; i < SIMS; i++) {
+        const { winner } = simulateBattle(m.a, m.b);
+        if (winner === 'player') wins++;
+      }
+      console.log(`${m.name}: bigger team wins ${(wins/SIMS*100).toFixed(1)}%`);
+    }
+  });
+
+  it('Healer value: does adding a healer improve winrate?', () => {
+    console.log(`\n=== HEALER VALUE ANALYSIS (${SIMS} each) ===`);
+    const bases: { name: string; without: UnitType[]; with: UnitType[] }[] = [
+      { name: '4 Krieger vs 3 Krieger+Schamane', without: ['warrior','warrior','warrior','warrior'], with: ['warrior','warrior','warrior','healer'] },
+      { name: '4 Bogen vs 3 Bogen+Schamane', without: ['archer','archer','archer','archer'], with: ['archer','archer','archer','healer'] },
+      { name: '4 Schild vs 3 Schild+Schamane', without: ['tank','tank','tank','tank'], with: ['tank','tank','tank','healer'] },
+      { name: '4 Drache vs 3 Drache+Schamane', without: ['dragon','dragon','dragon','dragon'], with: ['dragon','dragon','dragon','healer'] },
+      { name: '4 Reiter vs 3 Reiter+Schamane', without: ['rider','rider','rider','rider'], with: ['rider','rider','rider','healer'] },
+    ];
+    for (const b of bases) {
+      let winsWithout = 0, winsWith = 0;
+      for (let i = 0; i < SIMS; i++) {
+        const r = randomTeam(4);
+        if (simulateBattle(b.without, r).winner === 'player') winsWithout++;
+        if (simulateBattle(b.with, r).winner === 'player') winsWith++;
+      }
+      const diff = (winsWith/SIMS*100) - (winsWithout/SIMS*100);
+      console.log(`${b.name}: ohne ${(winsWithout/SIMS*100).toFixed(1)}% → mit ${(winsWith/SIMS*100).toFixed(1)}% (${diff > 0 ? '+' : ''}${diff.toFixed(1)}%)`);
+    }
+  });
+
+  it('Assassin deep-dive: optimal partners', () => {
+    console.log(`\n=== ASSASSIN PARTNER ANALYSIS (${SIMS} each) ===`);
+    const partners: { name: string; team: UnitType[] }[] = [
+      { name: '2 Assassine + 3 Krieger', team: ['assassin','assassin','warrior','warrior','warrior'] },
+      { name: '2 Assassine + 3 Drache', team: ['assassin','assassin','dragon','dragon','dragon'] },
+      { name: '2 Assassine + 2 Bogen + Frost', team: ['assassin','assassin','archer','archer','frost'] },
+      { name: '2 Assassine + 2 Schild + Schamane', team: ['assassin','assassin','tank','tank','healer'] },
+      { name: '1 Assassine + Krieger + Bogen + Schild + Schamane', team: ['assassin','warrior','archer','tank','healer'] },
+      { name: '1 Assassine + 2 Reiter + 2 Bogen', team: ['assassin','rider','rider','archer','archer'] },
+    ];
+    for (const p of partners) {
+      let wins = 0;
+      for (let i = 0; i < SIMS; i++) {
+        if (simulateBattle(p.team, randomTeam()).winner === 'player') wins++;
+      }
+      const rate = (wins/SIMS*100).toFixed(1);
+      const flag = Number(rate) > 60 ? '✅ GOOD' : Number(rate) < 40 ? '❌ BAD' : '➖ MEH';
+      console.log(`${flag} ${p.name}: ${rate}%`);
+    }
+  });
+
+  it('Dragon deep-dive: optimal partners', () => {
+    console.log(`\n=== DRAGON PARTNER ANALYSIS (${SIMS} each) ===`);
+    const partners: { name: string; team: UnitType[] }[] = [
+      { name: '2 Drache + 3 Krieger', team: ['dragon','dragon','warrior','warrior','warrior'] },
+      { name: '2 Drache + 2 Schild + Schamane', team: ['dragon','dragon','tank','tank','healer'] },
+      { name: '2 Drache + 2 Bogen + Frost', team: ['dragon','dragon','archer','archer','frost'] },
+      { name: '1 Drache + Krieger + Bogen + Schild + Schamane', team: ['dragon','warrior','archer','tank','healer'] },
+      { name: '1 Drache + 2 Frost + 2 Bogen', team: ['dragon','frost','frost','archer','archer'] },
+    ];
+    for (const p of partners) {
+      let wins = 0;
+      for (let i = 0; i < SIMS; i++) {
+        if (simulateBattle(p.team, randomTeam()).winner === 'player') wins++;
+      }
+      const rate = (wins/SIMS*100).toFixed(1);
+      const flag = Number(rate) > 60 ? '✅ GOOD' : Number(rate) < 40 ? '❌ BAD' : '➖ MEH';
+      console.log(`${flag} ${p.name}: ${rate}%`);
+    }
+  });
+
+  it('Color ratio impact: 1/4, 2/3, 3/2, 4/1 splits of each color', () => {
+    console.log(`\n=== COLOR RATIO IMPACT vs RANDOM (${SIMS} each) ===`);
+    const redUnits: UnitType[] = ['warrior', 'assassin', 'dragon'];
+    const blueUnits: UnitType[] = ['rider', 'archer', 'frost'];
+    const greenUnits: UnitType[] = ['tank', 'mage', 'healer'];
+    const colorSets = [
+      { name: 'Red', units: redUnits },
+      { name: 'Blue', units: blueUnits },
+      { name: 'Green', units: greenUnits },
+    ];
+
+    for (const primary of colorSets) {
+      for (const secondary of colorSets) {
+        if (primary.name === secondary.name) continue;
+        const splits = [
+          { label: `1${primary.name}+4${secondary.name}`, count: [1, 4] },
+          { label: `2${primary.name}+3${secondary.name}`, count: [2, 3] },
+          { label: `3${primary.name}+2${secondary.name}`, count: [3, 2] },
+          { label: `4${primary.name}+1${secondary.name}`, count: [4, 1] },
+        ];
+        const results: string[] = [];
+        for (const split of splits) {
+          const team: UnitType[] = [];
+          for (let i = 0; i < split.count[0]; i++) team.push(primary.units[i % primary.units.length]);
+          for (let i = 0; i < split.count[1]; i++) team.push(secondary.units[i % secondary.units.length]);
+          let wins = 0;
+          for (let i = 0; i < SIMS; i++) {
+            if (simulateBattle(team, randomTeam()).winner === 'player') wins++;
+          }
+          results.push(`${split.label}=${(wins/SIMS*100).toFixed(0)}%`);
+        }
+        console.log(`  ${results.join(' | ')}`);
+      }
+    }
+  });
+
+  it('Best possible 5-unit team search (top combos)', () => {
+    // Test a curated set of "theoretically best" compositions
+    const SIMS_TOP = 200;
+    const topComps: { name: string; team: UnitType[] }[] = [
+      { name: 'Krieger+Schild+Bogen+Frost+Reiter', team: ['warrior','tank','archer','frost','rider'] },
+      { name: 'Krieger+Krieger+Bogen+Bogen+Schild', team: ['warrior','warrior','archer','archer','tank'] },
+      { name: 'Krieger+Bogen+Frost+Schild+Magier', team: ['warrior','archer','frost','tank','mage'] },
+      { name: 'Krieger+Drache+Bogen+Schild+Frost', team: ['warrior','dragon','archer','tank','frost'] },
+      { name: 'Frost+Frost+Bogen+Schild+Schild', team: ['frost','frost','archer','tank','tank'] },
+      { name: 'Krieger+Krieger+Drache+Bogen+Frost', team: ['warrior','warrior','dragon','archer','frost'] },
+      { name: 'Schild+Schild+Krieger+Krieger+Bogen', team: ['tank','tank','warrior','warrior','archer'] },
+      { name: 'Reiter+Reiter+Schild+Schild+Schamane', team: ['rider','rider','tank','tank','healer'] },
+      { name: 'Frost+Bogen+Bogen+Schild+Krieger', team: ['frost','archer','archer','tank','warrior'] },
+      { name: 'Drache+Krieger+Schild+Bogen+Frost', team: ['dragon','warrior','tank','archer','frost'] },
+    ];
+
+    console.log(`\n=== TOP TEAM CANDIDATES vs RANDOM (${SIMS_TOP} each) ===`);
+    const ranked: { name: string; rate: number }[] = [];
+    for (const comp of topComps) {
+      let wins = 0;
+      for (let i = 0; i < SIMS_TOP; i++) {
+        if (simulateBattle(comp.team, randomTeam()).winner === 'player') wins++;
+      }
+      const rate = wins/SIMS_TOP*100;
+      ranked.push({ name: comp.name, rate });
+    }
+    ranked.sort((a, b) => b.rate - a.rate);
+    for (const { name, rate } of ranked) {
+      const flag = rate > 70 ? '🏆' : rate > 60 ? '✅' : rate > 50 ? '➖' : '❌';
+      console.log(`${flag} ${name}: ${rate.toFixed(1)}%`);
+    }
+  });
+
+  it('Battle length analysis: which comps lead to long/short fights?', () => {
+    console.log(`\n=== BATTLE LENGTH ANALYSIS (${SIMS} each) ===`);
+    const comps: { name: string; team: UnitType[] }[] = [
+      { name: 'All Melee (Krieger+Assassine+Reiter)', team: ['warrior','warrior','assassin','rider','rider'] },
+      { name: 'All Ranged (Bogen+Frost+Magier)', team: ['archer','archer','frost','frost','mage'] },
+      { name: 'Tank Wall (3 Schild+2 Schamane)', team: ['tank','tank','tank','healer','healer'] },
+      { name: 'Glass Cannon (3 Drache+2 Assassine)', team: ['dragon','dragon','dragon','assassin','assassin'] },
+      { name: 'Balanced', team: ['warrior','tank','archer','mage','healer'] },
+      { name: 'Random', team: randomTeam() },
+    ];
+
+    for (const comp of comps) {
+      let totalTicks = 0, timeouts = 0;
+      for (let i = 0; i < SIMS; i++) {
+        const { ticks } = simulateBattle(comp.team, randomTeam());
+        totalTicks += ticks;
+        if (ticks >= 80) timeouts++;
+      }
+      console.log(`${comp.name}: avg ${(totalTicks/SIMS).toFixed(1)} ticks, ${timeouts} timeouts (${(timeouts/SIMS*100).toFixed(0)}%)`);
+    }
+  });
+});
