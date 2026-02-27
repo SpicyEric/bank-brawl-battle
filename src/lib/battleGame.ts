@@ -264,6 +264,7 @@ export const OVERTIME_THRESHOLD = 7; // at this score, 2-point lead required
 export const AUTO_OVERTIMES = 3; // first 3 overtimes are automatic
 export const MAX_OVERTIMES = 5; // after 5th overtime → forced draw
 export const ROUND_TIME_LIMIT = 45; // seconds
+export const PLACE_TIME_LIMIT = 15; // seconds for placement phase (difficulty 2+)
 
 export const COUNTER_MULTIPLIER = 1.4;
 export const WEAKNESS_MULTIPLIER = 0.6;
@@ -761,10 +762,11 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
 // 3 = Herausfordernd: 60% counter + some terrain awareness
 // 4 = Schwer: 80% counter + terrain + smart positioning
 // 5 = Unmöglich: 95% counter + optimal composition + terrain + positioning
-export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE_UNITS, currentGrid?: Cell[][], difficulty: number = 2): { type: UnitType; row: number; col: number }[] {
+export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE_UNITS, currentGrid?: Cell[][], difficulty: number = 2, bannedUnits: UnitType[] = []): { type: UnitType; row: number; col: number }[] {
   const placements: { type: UnitType; row: number; col: number }[] = [];
   const usedCells = new Set<string>();
   const count = maxCount;
+  const availableTypes = UNIT_TYPES.filter(t => !bannedUnits.includes(t));
 
   // Count player unit types
   const playerTypes: Record<string, number> = {};
@@ -778,7 +780,7 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
 
   for (const [pType] of sortedTypes) {
     for (const [uType, def] of Object.entries(UNIT_DEFS)) {
-      if (def.strongVs.includes(pType as UnitType)) {
+      if (def.strongVs.includes(pType as UnitType) && !bannedUnits.includes(uType as UnitType)) {
         counterPicks.push(uType as UnitType);
       }
     }
@@ -805,11 +807,11 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
       blue: ['rider', 'archer', 'frost'],
     };
 
-    const mainPool = colorUnits[counterColor];
-    
+    const mainPool = colorUnits[counterColor].filter(t => !bannedUnits.includes(t));
+    if (mainPool.length === 0) return generateAIPlacement(playerUnits, maxCount, currentGrid, difficulty, []); // fallback
     // Difficulty 5: Force at least 1 tank for shield formation
     const hasTankInPool = mainPool.includes('tank');
-    let forceTank = !hasTankInPool && Math.random() < 0.5; // 50% chance to add off-color tank
+    let forceTank = !hasTankInPool && !bannedUnits.includes('tank') && Math.random() < 0.5;
     
     for (let i = 0; i < count; i++) {
       let type: UnitType;
@@ -820,7 +822,7 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
         const pool = mainPool.filter(t => t !== 'healer' || placements.filter(p => p.type === 'healer').length < 1);
         type = pool[Math.floor(Math.random() * pool.length)];
       } else {
-        type = UNIT_TYPES[Math.floor(Math.random() * UNIT_TYPES.length)];
+        type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
       }
 
       let row: number, col: number;
@@ -851,13 +853,13 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
     let type: UnitType;
     
     // Force first unit as tank if using tank formation and no tank picked yet
-    if (shouldUseTankFormation && !tankInserted && i === 0) {
+    if (shouldUseTankFormation && !tankInserted && i === 0 && !bannedUnits.includes('tank')) {
       type = 'tank';
       tankInserted = true;
     } else if (counterPicks.length > 0 && Math.random() < counterChance) {
       type = counterPicks[Math.floor(Math.random() * counterPicks.length)];
     } else {
-      type = UNIT_TYPES[Math.floor(Math.random() * UNIT_TYPES.length)];
+      type = availableTypes[Math.floor(Math.random() * availableTypes.length)];
     }
     
     // Track if we got a tank naturally

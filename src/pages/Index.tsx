@@ -220,10 +220,12 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
       <div className="px-4 mt-3 flex-1">
         {game.phase === 'place_player' && !game.waitingForOpponent && (!isMultiplayer || game.isMyTurnToPlace) && (
           <div className="space-y-3">
-            {isMultiplayer && game.placeTimer !== undefined && (
+            {game.placeTimer !== undefined && (
               <div className="flex items-center justify-between mb-1">
                 <p className="text-xs text-muted-foreground">
-                  {game.placingPhase === 'first' ? '🎲 Du platzierst zuerst (blind)' : '👀 Du siehst die Aufstellung – reagiere!'}
+                  {isMultiplayer
+                    ? (game.placingPhase === 'first' ? '🎲 Du platzierst zuerst (blind)' : '👀 Du siehst die Aufstellung – reagiere!')
+                    : (game.playerBannedUnits?.length > 0 ? '💤 Ermüdete Einheiten rasten' : 'Platziere deine Einheiten')}
                 </p>
                 <span className={`text-sm font-mono font-bold ${game.placeTimer <= 3 ? 'text-danger animate-pulse' : 'text-warning'}`}>
                   ⏱ {game.placeTimer}s
@@ -235,10 +237,12 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
               onSelect={game.setSelectedUnit}
               placedCount={game.playerUnits.length}
               maxUnits={game.playerMaxUnits}
+              bannedUnits={game.playerBannedUnits}
+              fatigue={game.playerFatigue}
             />
             <button
               onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
-              disabled={!isMultiplayer && game.playerUnits.length < game.playerMaxUnits}
+              disabled={!isMultiplayer && !game.placeTimer && game.playerUnits.length < game.playerMaxUnits}
               className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
             >
               ✅ Bereit {isMultiplayer && game.playerUnits.length === 0 ? '(Aufgeben)' : ''}
