@@ -7,6 +7,7 @@ import {
   getActivationTurn,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
+import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 
 export function useBattleGame() {
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
@@ -231,6 +232,22 @@ export function useBattleGame() {
       }
       if (events.length > 0) {
         setBattleEvents(events);
+        // Play SFX for battle events
+        let hasKill = false;
+        let hasHit = false;
+        let hasCrit = false;
+        let hasRanged = false;
+        for (const evt of events) {
+          if (evt.type === 'kill') hasKill = true;
+          else if (evt.isStrong) hasCrit = true;
+          else hasHit = true;
+          if (evt.isRanged) hasRanged = true;
+        }
+        // Play most impactful sound (don't stack too many)
+        if (hasKill) sfxKill();
+        else if (hasCrit) sfxCriticalHit();
+        else if (hasHit) sfxHit();
+        if (hasRanged) sfxProjectile();
       }
 
       const alive = allUnits.filter(u => u.hp > 0);
