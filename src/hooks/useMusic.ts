@@ -9,6 +9,10 @@ const BATTLE_TRACKS = [
   '/music/stoischer-kreis-3.mp3',
   '/music/ewige-klinge.mp3',
   '/music/ewige-klinge-1.mp3',
+  '/music/endloser-stahl.mp3',
+  '/music/endloser-stahl-1.mp3',
+  '/music/stahlring-der-schritte.mp3',
+  '/music/stahlring-der-schritte-1.mp3',
 ];
 
 let globalAudio: HTMLAudioElement | null = null;
