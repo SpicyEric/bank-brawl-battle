@@ -96,7 +96,6 @@ function simulateBattle(playerTeam: UnitType[], enemyTeam: UnitType[], options?:
 
     for (const unit of acting) {
       if (unit.hp <= 0) continue;
-      if (unit.movedWithTank) { unit.movedWithTank = false; continue; }
       if (unit.frozen && unit.frozen > 0) { unit.frozen -= 1; continue; }
       unit.cooldown = Math.max(0, unit.cooldown - 1);
 

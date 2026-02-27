@@ -602,30 +602,9 @@ function _selectBestMove(unit: Unit, target: Unit, possibleMoves: Position[], gr
   return best;
 }
 
-// Move bonded units along with a tank that just moved
-export function moveTankFormation(tank: Unit, newPos: Position, grid: Cell[][], allUnits: Unit[]): void {
-  const dr = newPos.row - tank.row;
-  const dc = newPos.col - tank.col;
-  const bondedUnits = allUnits.filter(u =>
-    u.bondedToTankId === tank.id && !u.bondBroken && u.hp > 0 && !u.dead
-  );
-
-  for (const bonded of bondedUnits) {
-    const nr = bonded.row + dr;
-    const nc = bonded.col + dc;
-    if (nr >= 0 && nr < GRID_SIZE && nc >= 0 && nc < GRID_SIZE &&
-        grid[nr][nc].terrain !== 'water' &&
-        (!grid[nr][nc].unit || grid[nr][nc].unit!.id === tank.id || bondedUnits.some(b => b.id === grid[nr][nc].unit?.id))) {
-      grid[bonded.row][bonded.col].unit = null;
-      bonded.row = nr;
-      bonded.col = nc;
-      grid[nr][nc].unit = bonded;
-      bonded.movedWithTank = true;
-    } else {
-      // Can't follow — bond breaks
-      bonded.bondBroken = true;
-    }
-  }
+// Magnetic bond: no-op, bonds are handled in moveToward
+export function moveTankFormation(_tank: Unit, _newPos: Position, _grid: Cell[][], _allUnits: Unit[]): void {
+  // Magnetic bonds don't move units with the tank — they pull units back in moveToward
 }
 
 
@@ -660,51 +639,56 @@ function isAdjacentTo(pos: Position, target: Unit): boolean {
   return ALL_ADJACENT.some(o => pos.row === target.row + o.row && pos.col === target.col + o.col);
 }
 
-// Move toward target: terrain-aware with anti-stalemate + kiting for ranged + rigid tank formation
+// Move toward target: terrain-aware with anti-stalemate + kiting for ranged + magnetic tank bond
 export function moveToward(unit: Unit, target: Unit, grid: Cell[][], allUnits?: Unit[]): Position {
   const possibleMoves = getMoveCells(unit, grid);
   if (possibleMoves.length === 0) return { row: unit.row, col: unit.col };
 
   const isRangedKiter = RANGED_KITERS.includes(unit.type);
 
-  // --- Rigid formation: bonded units skip their own move (already moved with tank) ---
-  if (unit.movedWithTank) {
-    unit.movedWithTank = false;
-    return { row: unit.row, col: unit.col };
-  }
+  // --- Magnetic bond: bonded units get pulled back toward tank ---
+  if (unit.type !== 'tank' && unit.type !== 'healer' && allUnits) {
+    const friendlyTank = findFriendlyTank(unit, allUnits);
+    if (friendlyTank) {
+      const isBonded = unit.bondedToTankId === friendlyTank.id && !unit.bondBroken;
+      const dist2tank = distance(unit, friendlyTank);
 
-  // --- Rigid formation: when tank moves, drag all bonded units along ---
-  if (unit.type === 'tank' && allUnits) {
-    const bondedUnits = allUnits.filter(u =>
-      u.bondedToTankId === unit.id && !u.bondBroken && u.hp > 0 && !u.dead
-    );
-    if (bondedUnits.length > 0) {
-      // Filter moves to only those where ALL bonded units can follow
-      const formationMoves = possibleMoves.filter(pos => {
-        const dr = pos.row - unit.row;
-        const dc = pos.col - unit.col;
-        for (const bonded of bondedUnits) {
-          const nr = bonded.row + dr;
-          const nc = bonded.col + dc;
-          if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return false;
-          const cell = grid[nr][nc];
-          if (cell.terrain === 'water' && bonded.type !== 'dragon') return false;
-          // Cell must be empty or occupied by another formation member or the tank's old/new pos
-          if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) {
-            const isFormationMember = cell.unit.id === unit.id || bondedUnits.some(b => b.id === cell.unit!.id);
-            if (!isFormationMember) return false;
+      if (isBonded) {
+        // Bonded unit >2 fields away: 60% chance to move back toward tank
+        if (dist2tank > 2 && Math.random() < 0.6) {
+          const pullMoves = possibleMoves.filter(pos =>
+            distance(pos, friendlyTank) < dist2tank
+          );
+          // Prefer moves that also let us attack
+          const pullAttackMoves = pullMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
+          if (pullAttackMoves.length > 0) {
+            pullAttackMoves.sort((a, b) => distance(a, friendlyTank) - distance(b, friendlyTank));
+            return pullAttackMoves[0];
+          }
+          if (pullMoves.length > 0) {
+            pullMoves.sort((a, b) => distance(a, friendlyTank) - distance(b, friendlyTank));
+            return pullMoves[0];
           }
         }
-        return true;
-      });
-
-      if (formationMoves.length > 0) {
-        // Use formation moves instead of all moves for the rest of the function
-        return _selectBestMove(unit, target, formationMoves, grid, allUnits, isRangedKiter);
-      }
-      // No valid formation move — break bonds and move freely
-      for (const bonded of bondedUnits) {
-        bonded.bondBroken = true;
+        // Bonded unit adjacent (≤1): try to stay adjacent while attacking
+        if (dist2tank <= 1) {
+          const adjacentAttackMoves = possibleMoves.filter(pos =>
+            isAdjacentTo(pos, friendlyTank) && couldAttackFrom(pos, unit.type, target)
+          );
+          if (adjacentAttackMoves.length > 0) return adjacentAttackMoves[0];
+          // Can attack from here? Stay
+          if (canAttack(unit, target)) return { row: unit.row, col: unit.col };
+        }
+      } else if (!isBonded && dist2tank <= 3 && Math.random() < 0.30) {
+        // Soft pull for non-bonded units within 3 fields
+        const movesNearTank = possibleMoves.filter(pos =>
+          distance(pos, friendlyTank) < dist2tank &&
+          couldAttackFrom(pos, unit.type, target)
+        );
+        if (movesNearTank.length > 0) {
+          movesNearTank.sort((a, b) => distance(a, friendlyTank) - distance(b, friendlyTank));
+          return movesNearTank[0];
+        }
       }
     }
   }
