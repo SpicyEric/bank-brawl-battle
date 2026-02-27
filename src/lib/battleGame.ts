@@ -90,8 +90,8 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   warrior: {
     label: 'Krieger',
     emoji: '⚔️',
-    hp: 110,
-    attack: 24,
+    hp: 105,
+    attack: 23,
     cooldown: 2,
     description: 'Nahkämpfer. Bewegt sich orthogonal (1 Feld). Greift angrenzend an.',
     movePattern: ORTHOGONAL,
@@ -103,7 +103,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     label: 'Assassine',
     emoji: '🗡️',
     hp: 90,
-    attack: 30,
+    attack: 34,
     cooldown: 2,
     description: 'Bewegt sich diagonal (2 Felder). Greift diagonal angrenzend an.',
     movePattern: [
@@ -184,7 +184,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     label: 'Schildträger',
     emoji: '🛡️',
     hp: 200,
-    attack: 15,
+    attack: 19,
     cooldown: 3,
     description: 'Bewegt sich orthogonal (1 Feld). Greift angrenzend an. Zieht Feinde an.',
     movePattern: ORTHOGONAL,
@@ -197,7 +197,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     emoji: '🔮',
     hp: 85,
     attack: 30,
-    cooldown: 2,
+    cooldown: 1,
     description: 'Bewegt sich in alle Richtungen (1 Feld). Greift diagonal 2-3 Felder an.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
@@ -212,7 +212,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   healer: {
     label: 'Schamane',
     emoji: '🌿',
-    hp: 50,
+    hp: 80,
     attack: 5,
     cooldown: 2,
     description: 'Heilt Verbündete im Umkreis. Greift nur an, wenn niemand mehr zu heilen ist.',

@@ -372,7 +372,7 @@ export function useBattleGame() {
             let healed = false;
             for (const ally of healable) {
               if (canAttack(unit, ally)) {
-                const healAmt = Math.min(15, ally.maxHp - ally.hp);
+                const healAmt = Math.min(22, ally.maxHp - ally.hp);
                 ally.hp += healAmt;
                 logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
                 healed = true;
