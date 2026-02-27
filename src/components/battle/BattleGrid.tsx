@@ -10,13 +10,15 @@ interface BattleGridProps {
   battleEvents?: BattleEvent[];
   moraleBoostActive?: 'buff' | 'debuff' | null;
   opponentMoraleActive?: 'buff' | 'debuff' | null;
+  focusFireActive?: boolean;
+  sacrificeFlash?: boolean;
 }
 
 interface UnitPos { row: number; col: number }
 interface DamagePopup { id: string; row: number; col: number; damage: number; isStrong: boolean; isWeak: boolean; isKill: boolean }
 interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -28,8 +30,12 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const [warCryFlash, setWarCryFlash] = useState(false);
+  const [focusFlashAnim, setFocusFlashAnim] = useState(false);
+  const [sacrificeAnim, setSacrificeAnim] = useState(false);
   const prevMorale = useRef<'buff' | 'debuff' | null>(null);
   const prevOpponentMorale = useRef<'buff' | 'debuff' | null>(null);
+  const prevFocus = useRef(false);
+  const prevSacrifice = useRef(false);
 
   // War cry flash animation (own or opponent)
   useEffect(() => {
@@ -47,6 +53,24 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
     prevOpponentMorale.current = opponentMoraleActive ?? null;
   }, [opponentMoraleActive]);
+
+  // Focus fire flash
+  useEffect(() => {
+    if (focusFireActive && !prevFocus.current) {
+      setFocusFlashAnim(true);
+      setTimeout(() => setFocusFlashAnim(false), 500);
+    }
+    prevFocus.current = !!focusFireActive;
+  }, [focusFireActive]);
+
+  // Sacrifice flash
+  useEffect(() => {
+    if (sacrificeFlash && !prevSacrifice.current) {
+      setSacrificeAnim(true);
+      setTimeout(() => setSacrificeAnim(false), 600);
+    }
+    prevSacrifice.current = !!sacrificeFlash;
+  }, [sacrificeFlash]);
 
   // Flash effect for attack pattern on placement
   useEffect(() => {
@@ -286,6 +310,25 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       )}
       {moraleBoostActive === 'debuff' && (
         <div className="absolute inset-0 z-30 pointer-events-none rounded-xl border-2 border-danger/40 shadow-[inset_0_0_15px_hsl(var(--danger)/0.1)]" />
+      )}
+
+      {/* Focus fire overlay flash */}
+      {focusFlashAnim && (
+        <div className="absolute inset-0 z-40 pointer-events-none rounded-xl focus-fire-flash flex items-center justify-center">
+          <span className="text-5xl focus-fire-emoji">🎯</span>
+        </div>
+      )}
+
+      {/* Focus fire active border */}
+      {focusFireActive && (
+        <div className="absolute inset-0 z-30 pointer-events-none rounded-xl border-2 border-primary shadow-[inset_0_0_20px_hsl(var(--primary)/0.15),0_0_15px_hsl(var(--primary)/0.2)] animate-pulse" />
+      )}
+
+      {/* Sacrifice overlay flash */}
+      {sacrificeAnim && (
+        <div className="absolute inset-0 z-40 pointer-events-none rounded-xl sacrifice-flash flex items-center justify-center">
+          <span className="text-5xl sacrifice-emoji">💀</span>
+        </div>
       )}
     </div>
   );

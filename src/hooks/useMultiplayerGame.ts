@@ -57,6 +57,16 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const opponentMoraleTicksLeft = useRef(0);
   const opponentMoralePhase = useRef<'none' | 'buff' | 'debuff'>('none');
 
+  // Focus Fire state
+  const [focusFireUsed, setFocusFireUsed] = useState(false);
+  const [focusFireActive, setFocusFireActive] = useState(false);
+  const focusFireTicksLeft = useRef(0);
+  // Host tracks opponent focus fire
+  const opponentFocusFireTicksLeft = useRef(0);
+
+  // Sacrifice Ritual state
+  const [sacrificeUsed, setSacrificeUsed] = useState(false);
+
   // Alternating placement state
   const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(1);
   const [placingPhase, setPlacingPhase] = useState<'first' | 'second' | 'done'>('first');
@@ -154,20 +164,32 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           setEnemyUnits(data.enemyUnits || []);
           setTurnCount(data.turnCount);
           // Sync morale states from host perspective (swap for guest)
-          setMoraleBoostActive(data.enemyMorale || null); // host's "enemy" morale = guest's own
-          setOpponentMoraleActive(data.playerMorale || null); // host's "player" morale = guest's opponent
+          setMoraleBoostActive(data.enemyMorale || null);
+          setOpponentMoraleActive(data.playerMorale || null);
+          // Sync focus fire state
+          if (data.enemyFocusFire) setFocusFireActive(true);
+          else setFocusFireActive(false);
         }
       }
 
       if (action === 'war_cry') {
-        // Opponent activated war cry
         setOpponentMoraleActive('buff');
         setBattleLog(prev => ['🔥 GEGNER KRIEGSSCHREI! +25% Schaden für 3 Züge!', ...prev]);
-        // Host tracks opponent morale ticks
         if (isHost) {
           opponentMoralePhase.current = 'buff';
           opponentMoraleTicksLeft.current = 3;
         }
+      }
+
+      if (action === 'focus_fire') {
+        setBattleLog(prev => ['🎯 GEGNER FOKUSFEUER! Alle Einheiten greifen stärkstes Ziel an!', ...prev]);
+        if (isHost) {
+          opponentFocusFireTicksLeft.current = 3;
+        }
+      }
+
+      if (action === 'sacrifice') {
+        setBattleLog(prev => [`💀 GEGNER OPFERRITUAL! Einheit geopfert – alle anderen geheilt!`, ...prev]);
       }
 
       if (action === 'round_end') {
@@ -202,6 +224,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         moraleTicksLeft.current = 0;
         opponentMoralePhase.current = 'none';
         opponentMoraleTicksLeft.current = 0;
+        setFocusFireUsed(false);
+        setFocusFireActive(false);
+        focusFireTicksLeft.current = 0;
+        opponentFocusFireTicksLeft.current = 0;
+        setSacrificeUsed(false);
       }
     });
 
@@ -420,7 +447,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setPlacingPhase('done');
     setOpponentUnitsVisible([]);
     setWaitingForOpponent(false);
-    // Reset morale for battle start
+    // Reset all abilities for battle start
     setMoraleBoostUsed(false);
     setMoraleBoostActive(null);
     setOpponentMoraleActive(null);
@@ -428,6 +455,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     moraleTicksLeft.current = 0;
     opponentMoralePhase.current = 'none';
     opponentMoraleTicksLeft.current = 0;
+    setFocusFireUsed(false);
+    setFocusFireActive(false);
+    focusFireTicksLeft.current = 0;
+    opponentFocusFireTicksLeft.current = 0;
+    setSacrificeUsed(false);
 
     // Broadcast battle start
     channelRef.current?.send({
@@ -464,6 +496,68 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       // Host will pick it up via the 'war_cry' broadcast handler
     }
   }, [moraleBoostUsed, phase, isHost, myTeam]);
+
+  // Activate focus fire
+  const activateFocusFire = useCallback(() => {
+    if (focusFireUsed || phase !== 'battle') return;
+    setFocusFireUsed(true);
+    setFocusFireActive(true);
+    focusFireTicksLeft.current = 3;
+    setBattleLog(prev => ['🎯 FOKUSFEUER! Alle Einheiten greifen das stärkste Ziel an!', ...prev]);
+
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'game_sync',
+      payload: { action: 'focus_fire', data: { team: myTeam } },
+    });
+
+    if (isHost) {
+      // Already tracking locally via focusFireTicksLeft
+    }
+  }, [focusFireUsed, phase, isHost, myTeam]);
+
+  // Activate sacrifice ritual
+  const activateSacrifice = useCallback(() => {
+    if (sacrificeUsed || phase !== 'battle') return;
+    
+    // Find our units on the grid (host sees player team, guest sees enemy team)
+    const myUnits = playerUnits.filter(u => u.hp > 0 && !u.dead);
+    if (myUnits.length < 2) return;
+    
+    const weakest = myUnits.reduce((a, b) => a.hp < b.hp ? a : b);
+    setSacrificeUsed(true);
+    
+    // Apply sacrifice on grid
+    setGrid(prevGrid => {
+      const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
+      
+      if (newGrid[weakest.row][weakest.col].unit) {
+        newGrid[weakest.row][weakest.col].unit!.hp = 0;
+        (newGrid[weakest.row][weakest.col].unit as any).dead = true;
+      }
+      
+      // Heal my team units
+      const myTeamId = isHost ? 'player' : 'enemy';
+      for (const row of newGrid) {
+        for (const cell of row) {
+          if (cell.unit && cell.unit.team === myTeamId && cell.unit.hp > 0 && cell.unit.id !== weakest.id) {
+            const healAmt = Math.round(cell.unit.maxHp * 0.15);
+            cell.unit.hp = Math.min(cell.unit.maxHp, cell.unit.hp + healAmt);
+          }
+        }
+      }
+      
+      return newGrid;
+    });
+    
+    setBattleLog(prev => [`💀 OPFERRITUAL! Einheit geopfert – alle anderen geheilt!`, ...prev]);
+
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'game_sync',
+      payload: { action: 'sacrifice', data: { team: myTeam, unitId: weakest.id } },
+    });
+  }, [sacrificeUsed, phase, playerUnits, isHost, myTeam]);
 
   // Battle tick - only host runs this
   const battleTick = useCallback(() => {
@@ -502,9 +596,26 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         }
       }
 
+      // Focus fire tick-down (host tracks both)
+      if (focusFireTicksLeft.current > 0) {
+        focusFireTicksLeft.current -= 1;
+        if (focusFireTicksLeft.current <= 0) setFocusFireActive(false);
+      }
+      if (opponentFocusFireTicksLeft.current > 0) {
+        opponentFocusFireTicksLeft.current -= 1;
+      }
+
       // Damage modifiers: host's player = player1, host's enemy = player2
       const playerDmgMod = moralePhase.current === 'buff' ? 1.25 : moralePhase.current === 'debuff' ? 0.85 : 1.0;
       const enemyDmgMod = opponentMoralePhase.current === 'buff' ? 1.25 : opponentMoralePhase.current === 'debuff' ? 0.85 : 1.0;
+
+      // Focus fire targets
+      const playerFocusTarget = focusFireTicksLeft.current > 0
+        ? allUnits.filter(u => u.team === 'enemy' && u.hp > 0).sort((a, b) => b.hp - a.hp)[0] ?? null
+        : null;
+      const enemyFocusTarget = opponentFocusFireTicksLeft.current > 0
+        ? allUnits.filter(u => u.team === 'player' && u.hp > 0).sort((a, b) => b.hp - a.hp)[0] ?? null
+        : null;
 
       const logs: string[] = [];
       const events: BattleEvent[] = [];
@@ -543,7 +654,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           }
         }
 
-        const target = findTarget(unit, allUnits);
+        // Focus fire override
+        const focusOverride = unit.team === 'player' ? playerFocusTarget : unit.team === 'enemy' ? enemyFocusTarget : null;
+        const target = focusOverride ?? findTarget(unit, allUnits);
         if (!target) continue;
 
         if (!canAttack(unit, target)) {
@@ -614,6 +727,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
               // Morale states from host perspective
               playerMorale: moralePhase.current === 'none' ? null : moralePhase.current,
               enemyMorale: opponentMoralePhase.current === 'none' ? null : opponentMoralePhase.current,
+              // Focus fire states
+              playerFocusFire: focusFireTicksLeft.current > 0,
+              enemyFocusFire: opponentFocusFireTicksLeft.current > 0,
             },
           },
         });
@@ -727,6 +843,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     moraleBoostUsed,
     moraleBoostActive,
     activateMoraleBoost,
+    focusFireUsed,
+    focusFireActive,
+    activateFocusFire,
+    sacrificeUsed,
+    activateSacrifice,
     opponentMoraleActive,
     waitingForOpponent,
     isHost,

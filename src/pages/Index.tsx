@@ -9,7 +9,7 @@ import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 import { useMusic } from '@/hooks/useMusic';
 import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
-import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, setSfxMuted } from '@/lib/sfx';
+import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, sfxFocusFire, sfxSacrifice, setSfxMuted } from '@/lib/sfx';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -156,6 +156,8 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
           battleEvents={game.battleEvents}
           moraleBoostActive={game.moraleBoostActive}
           opponentMoraleActive={game.opponentMoraleActive}
+          focusFireActive={game.focusFireActive}
+          sacrificeFlash={game.sacrificeUsed}
         />
 
         {phaseOverlay && (
@@ -240,28 +242,72 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
               </div>
             </div>
 
-            {/* Kriegsschrei Button */}
-            <button
-              onClick={() => { game.activateMoraleBoost(); sfxWarCry(); }}
-              disabled={game.moraleBoostUsed}
-              className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-[0.97] ${
-                game.moraleBoostActive === 'buff'
-                  ? 'bg-warning/20 border-2 border-warning text-warning animate-pulse cursor-default'
+            {/* Ability Buttons */}
+            <div className="grid grid-cols-3 gap-2">
+              {/* Kriegsschrei */}
+              <button
+                onClick={() => { game.activateMoraleBoost(); sfxWarCry(); }}
+                disabled={game.moraleBoostUsed}
+                className={`py-2 rounded-xl font-semibold text-xs transition-all active:scale-[0.97] ${
+                  game.moraleBoostActive === 'buff'
+                    ? 'bg-warning/20 border-2 border-warning text-warning animate-pulse cursor-default'
+                    : game.moraleBoostActive === 'debuff'
+                    ? 'bg-danger/10 border-2 border-danger/40 text-danger/60 cursor-default'
+                    : game.moraleBoostUsed
+                    ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
+                    : 'bg-warning text-warning-foreground hover:opacity-90 shadow-[0_0_8px_hsl(var(--warning)/0.3)]'
+                }`}
+              >
+                {game.moraleBoostActive === 'buff'
+                  ? '🔥 AKTIV!'
                   : game.moraleBoostActive === 'debuff'
-                  ? 'bg-danger/10 border-2 border-danger/40 text-danger/60 cursor-default'
+                  ? '😮‍💨 Müde'
                   : game.moraleBoostUsed
-                  ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
-                  : 'bg-warning text-warning-foreground hover:opacity-90 shadow-[0_0_12px_hsl(var(--warning)/0.3)]'
-              }`}
-            >
-              {game.moraleBoostActive === 'buff'
-                ? '🔥 KRIEGSSCHREI AKTIV! +25% Schaden'
-                : game.moraleBoostActive === 'debuff'
-                ? '😮‍💨 Erschöpft... -15% Schaden'
-                : game.moraleBoostUsed
-                ? '🔥 Kriegsschrei verbraucht'
-                : '🔥 Kriegsschrei! (+25% → -15%)'}
-            </button>
+                  ? '🔥 ✓'
+                  : '🔥 Schrei'}
+              </button>
+
+              {/* Fokusfeuer */}
+              <button
+                onClick={() => { game.activateFocusFire(); sfxFocusFire(); }}
+                disabled={game.focusFireUsed}
+                className={`py-2 rounded-xl font-semibold text-xs transition-all active:scale-[0.97] ${
+                  game.focusFireActive
+                    ? 'bg-primary/20 border-2 border-primary text-primary animate-pulse cursor-default'
+                    : game.focusFireUsed
+                    ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
+                    : 'bg-primary text-primary-foreground hover:opacity-90 shadow-[0_0_8px_hsl(var(--primary)/0.3)]'
+                }`}
+              >
+                {game.focusFireActive
+                  ? '🎯 FEUER!'
+                  : game.focusFireUsed
+                  ? '🎯 ✓'
+                  : '🎯 Fokus'}
+              </button>
+
+              {/* Opferritual */}
+              <button
+                onClick={() => { game.activateSacrifice(); sfxSacrifice(); }}
+                disabled={game.sacrificeUsed || game.playerUnits.filter(u => u.hp > 0).length < 2}
+                className={`py-2 rounded-xl font-semibold text-xs transition-all active:scale-[0.97] ${
+                  game.sacrificeUsed
+                    ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
+                    : 'bg-danger text-danger-foreground hover:opacity-90 shadow-[0_0_8px_hsl(var(--danger)/0.3)]'
+                }`}
+              >
+                {game.sacrificeUsed ? '💀 ✓' : '💀 Opfer'}
+              </button>
+            </div>
+
+            {/* Ability info line */}
+            <div className="flex gap-1 text-[9px] text-muted-foreground justify-center">
+              <span>🔥+25%→-15%</span>
+              <span>•</span>
+              <span>🎯 Stärkstes Ziel</span>
+              <span>•</span>
+              <span>💀 Opfern=Heilen</span>
+            </div>
 
             <BattleLog logs={game.battleLog} />
           </div>

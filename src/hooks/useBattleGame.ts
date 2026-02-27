@@ -33,6 +33,14 @@ export function useBattleGame() {
   const moraleTicksLeft = useRef(0);
   const moralePhase = useRef<'none' | 'buff' | 'debuff'>('none');
 
+  // Focus Fire state
+  const [focusFireUsed, setFocusFireUsed] = useState(false);
+  const [focusFireActive, setFocusFireActive] = useState(false);
+  const focusFireTicksLeft = useRef(0);
+
+  // Sacrifice Ritual state
+  const [sacrificeUsed, setSacrificeUsed] = useState(false);
+
   // Full reset
   const resetGame = useCallback(() => {
     setGrid(generateTerrain(createEmptyGrid()));
@@ -51,6 +59,10 @@ export function useBattleGame() {
     setMoraleBoostActive(null);
     moraleTicksLeft.current = 0;
     moralePhase.current = 'none';
+    setFocusFireUsed(false);
+    setFocusFireActive(false);
+    focusFireTicksLeft.current = 0;
+    setSacrificeUsed(false);
   }, []);
 
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore);
@@ -121,6 +133,10 @@ export function useBattleGame() {
     setMoraleBoostActive(null);
     moraleTicksLeft.current = 0;
     moralePhase.current = 'none';
+    setFocusFireUsed(false);
+    setFocusFireActive(false);
+    focusFireTicksLeft.current = 0;
+    setSacrificeUsed(false);
   }, []);
 
   // Activate morale boost
@@ -132,6 +148,53 @@ export function useBattleGame() {
     setMoraleBoostActive('buff');
     setBattleLog(prev => ['🔥 KRIEGSSCHREI! +25% Schaden für 3 Züge!', ...prev]);
   }, [moraleBoostUsed, phase]);
+
+  // Activate focus fire – all units target highest HP enemy for 3 ticks
+  const activateFocusFire = useCallback(() => {
+    if (focusFireUsed || phase !== 'battle') return;
+    setFocusFireUsed(true);
+    setFocusFireActive(true);
+    focusFireTicksLeft.current = 3;
+    setBattleLog(prev => ['🎯 FOKUSFEUER! Alle Einheiten greifen das stärkste Ziel an!', ...prev]);
+  }, [focusFireUsed, phase]);
+
+  // Activate sacrifice ritual – kill weakest own unit, heal others +15%
+  const activateSacrifice = useCallback(() => {
+    if (sacrificeUsed || phase !== 'battle') return;
+    
+    // Find weakest player unit
+    const pUnits = playerUnits.filter(u => u.hp > 0 && !u.dead);
+    if (pUnits.length < 2) return; // need at least 2 units
+    
+    const weakest = pUnits.reduce((a, b) => a.hp < b.hp ? a : b);
+    
+    setSacrificeUsed(true);
+    
+    // Kill weakest and heal others
+    setGrid(prevGrid => {
+      const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
+      
+      // Kill the weakest
+      if (newGrid[weakest.row][weakest.col].unit) {
+        newGrid[weakest.row][weakest.col].unit!.hp = 0;
+        (newGrid[weakest.row][weakest.col].unit as any).dead = true;
+      }
+      
+      // Heal all other player units by 15% of maxHp
+      for (const row of newGrid) {
+        for (const cell of row) {
+          if (cell.unit && cell.unit.team === 'player' && cell.unit.hp > 0 && cell.unit.id !== weakest.id) {
+            const healAmt = Math.round(cell.unit.maxHp * 0.15);
+            cell.unit.hp = Math.min(cell.unit.maxHp, cell.unit.hp + healAmt);
+          }
+        }
+      }
+      
+      return newGrid;
+    });
+    
+    setBattleLog(prev => [`💀 OPFERRITUAL! ${UNIT_DEFS[weakest.type].emoji} geopfert – alle anderen geheilt!`, ...prev]);
+  }, [sacrificeUsed, phase, playerUnits]);
 
   // Run one battle tick
   const battleTick = useCallback(() => {
@@ -157,8 +220,21 @@ export function useBattleGame() {
         }
       }
 
+      // Focus fire tick-down
+      if (focusFireTicksLeft.current > 0) {
+        focusFireTicksLeft.current -= 1;
+        if (focusFireTicksLeft.current <= 0) {
+          setFocusFireActive(false);
+        }
+      }
+
       // Calculate player damage modifier from morale
       const playerDmgMod = moralePhase.current === 'buff' ? 1.25 : moralePhase.current === 'debuff' ? 0.85 : 1.0;
+
+      // Focus fire: determine highest HP enemy target
+      const focusTarget = focusFireTicksLeft.current > 0
+        ? allUnits.filter(u => u.team === 'enemy' && u.hp > 0).sort((a, b) => b.hp - a.hp)[0] ?? null
+        : null;
 
       const logs: string[] = [];
       const events: BattleEvent[] = [];
@@ -215,7 +291,8 @@ export function useBattleGame() {
           // No allies to heal → fall through to normal attack logic below
         }
 
-        const target = findTarget(unit, allUnits);
+        // Focus fire override: player units target highest HP enemy
+        const target = (focusTarget && unit.team === 'player') ? focusTarget : findTarget(unit, allUnits);
         if (!target) continue;
 
         if (!canAttack(unit, target)) {
@@ -381,6 +458,10 @@ export function useBattleGame() {
     setMoraleBoostActive(null);
     moraleTicksLeft.current = 0;
     moralePhase.current = 'none';
+    setFocusFireUsed(false);
+    setFocusFireActive(false);
+    focusFireTicksLeft.current = 0;
+    setSacrificeUsed(false);
 
     if (newStarts) {
       setGrid(generateTerrain(createEmptyGrid()));
@@ -407,6 +488,8 @@ export function useBattleGame() {
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
     moraleBoostUsed, moraleBoostActive, activateMoraleBoost,
+    focusFireUsed, focusFireActive, activateFocusFire,
+    sacrificeUsed, activateSacrifice,
     waitingForOpponent: false,
   };
 }
