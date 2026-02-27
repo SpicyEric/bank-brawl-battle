@@ -88,7 +88,7 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
   }, [game.phase]);
 
   return (
-    <div className="min-h-[100dvh] max-h-[100dvh] bg-background flex flex-col max-w-md mx-auto overflow-hidden">
+    <div className="min-h-[100dvh] max-h-[100dvh] bg-background flex flex-col max-w-md mx-auto overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* Scoreboard */}
       <div className="mx-3 mt-2 mb-1.5 py-1.5 px-3 rounded-lg bg-card border border-border flex items-center justify-between">
         <div className="flex items-center gap-2">

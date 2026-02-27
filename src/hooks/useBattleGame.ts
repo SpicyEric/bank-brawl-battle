@@ -20,6 +20,8 @@ export function useBattleGame() {
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [playerScore, setPlayerScore] = useState(0);
   const [enemyScore, setEnemyScore] = useState(0);
+  const playerScoreRef = useRef(0);
+  const enemyScoreRef = useRef(0);
   const [roundNumber, setRoundNumber] = useState(1);
   const [playerStarts, setPlayerStarts] = useState(true);
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -88,8 +90,8 @@ export function useBattleGame() {
     turnCountRef.current = 0;
     setBattleLog([]);
     setSelectedUnit('warrior');
-    setPlayerScore(0);
-    setEnemyScore(0);
+    setPlayerScore(0); playerScoreRef.current = 0;
+    setEnemyScore(0); enemyScoreRef.current = 0;
     setRoundNumber(1);
     setPlayerStarts(true);
     setMoraleBoostUsed(false);
@@ -519,9 +521,10 @@ export function useBattleGame() {
       setEnemyUnits(eAlive);
 
       if (eAlive.length === 0) {
-        const newPS = playerScore + 1;
+        const newPS = playerScoreRef.current + 1;
+        playerScoreRef.current = newPS;
         setPlayerScore(newPS);
-        const result = checkGameOver(newPS, enemyScore, overtimeCount);
+        const result = checkGameOver(newPS, enemyScoreRef.current, overtimeCount);
         if (result.draw) {
           setGameDraw(true);
           setPhase('game_draw');
@@ -529,9 +532,10 @@ export function useBattleGame() {
           setPhase('round_won');
         }
       } else if (pAlive.length === 0) {
-        const newES = enemyScore + 1;
+        const newES = enemyScoreRef.current + 1;
+        enemyScoreRef.current = newES;
         setEnemyScore(newES);
-        const result = checkGameOver(playerScore, newES, overtimeCount);
+        const result = checkGameOver(playerScoreRef.current, newES, overtimeCount);
         if (result.draw) {
           setGameDraw(true);
           setPhase('game_draw');
@@ -579,22 +583,26 @@ export function useBattleGame() {
     const eAlive = enemyUnits.filter(u => u.hp > 0 && !u.dead);
 
     if (pAlive.length > eAlive.length) {
-      const newPS = playerScore + 1;
+      const newPS = playerScoreRef.current + 1;
+      playerScoreRef.current = newPS;
       setPlayerScore(newPS);
-      const result = checkGameOver(newPS, enemyScore, overtimeCount);
+      const result = checkGameOver(newPS, enemyScoreRef.current, overtimeCount);
       if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
       else setPhase('round_won');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Du hast mehr Einheiten übrig!', ...prev]);
     } else if (eAlive.length > pAlive.length) {
-      const newES = enemyScore + 1;
+      const newES = enemyScoreRef.current + 1;
+      enemyScoreRef.current = newES;
       setEnemyScore(newES);
-      const result = checkGameOver(playerScore, newES, overtimeCount);
+      const result = checkGameOver(playerScoreRef.current, newES, overtimeCount);
       if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
       else setPhase('round_lost');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Der Gegner hat mehr Einheiten!', ...prev]);
     } else {
-      const newPS = playerScore + 1;
-      const newES = enemyScore + 1;
+      const newPS = playerScoreRef.current + 1;
+      const newES = enemyScoreRef.current + 1;
+      playerScoreRef.current = newPS;
+      enemyScoreRef.current = newES;
       setPlayerScore(newPS);
       setEnemyScore(newES);
       const result = checkGameOver(newPS, newES, overtimeCount);
