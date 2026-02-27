@@ -47,8 +47,18 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
   const [waitingForOpponent, setWaitingForOpponent] = useState(false);
 
+  // Morale boost state (each player has their own)
+  const [moraleBoostUsed, setMoraleBoostUsed] = useState(false);
+  const [moraleBoostActive, setMoraleBoostActive] = useState<'buff' | 'debuff' | null>(null);
+  const [opponentMoraleActive, setOpponentMoraleActive] = useState<'buff' | 'debuff' | null>(null);
+  const moraleTicksLeft = useRef(0);
+  const moralePhase = useRef<'none' | 'buff' | 'debuff'>('none');
+  // Host also tracks opponent's morale
+  const opponentMoraleTicksLeft = useRef(0);
+  const opponentMoralePhase = useRef<'none' | 'buff' | 'debuff'>('none');
+
   // Alternating placement state
-  const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(1); // who places first this round
+  const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(1);
   const [placingPhase, setPlacingPhase] = useState<'first' | 'second' | 'done'>('first');
   const [placeTimer, setPlaceTimer] = useState(PLACE_TIME_LIMIT);
   const [isMyTurnToPlace, setIsMyTurnToPlace] = useState(false);
@@ -106,10 +116,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       }
 
       if (action === 'first_placement_done') {
-        // First player finished placing — show their units and let second player place
         const firstUnits = (data.units as any[]).map((u: any) => ({ ...u } as Unit));
         setOpponentUnitsVisible(firstUnits);
-        // Add opponent units to grid
         setGrid(prev => {
           const next = prev.map(r => r.map(c => ({ ...c })));
           for (const u of firstUnits) {
@@ -122,8 +130,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       }
 
       if (action === 'first_placement_forfeit') {
-        // First player placed nothing → they lose the round
-        // The scores are already updated by the sender (host handles scoring)
         setPlayerScore(data.myScore);
         setEnemyScore(data.opponentScore);
         setPhase(data.myPhase);
@@ -147,6 +153,20 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           setPlayerUnits(data.playerUnits || []);
           setEnemyUnits(data.enemyUnits || []);
           setTurnCount(data.turnCount);
+          // Sync morale states from host perspective (swap for guest)
+          setMoraleBoostActive(data.enemyMorale || null); // host's "enemy" morale = guest's own
+          setOpponentMoraleActive(data.playerMorale || null); // host's "player" morale = guest's opponent
+        }
+      }
+
+      if (action === 'war_cry') {
+        // Opponent activated war cry
+        setOpponentMoraleActive('buff');
+        setBattleLog(prev => ['🔥 GEGNER KRIEGSSCHREI! +25% Schaden für 3 Züge!', ...prev]);
+        // Host tracks opponent morale ticks
+        if (isHost) {
+          opponentMoralePhase.current = 'buff';
+          opponentMoraleTicksLeft.current = 3;
         }
       }
 
@@ -174,6 +194,14 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setBattleTimer(ROUND_TIME_LIMIT);
         setWaitingForOpponent(false);
         setOpponentUnitsVisible([]);
+        // Reset morale for new round
+        setMoraleBoostUsed(false);
+        setMoraleBoostActive(null);
+        setOpponentMoraleActive(null);
+        moralePhase.current = 'none';
+        moraleTicksLeft.current = 0;
+        opponentMoralePhase.current = 'none';
+        opponentMoraleTicksLeft.current = 0;
       }
     });
 
@@ -392,6 +420,14 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setPlacingPhase('done');
     setOpponentUnitsVisible([]);
     setWaitingForOpponent(false);
+    // Reset morale for battle start
+    setMoraleBoostUsed(false);
+    setMoraleBoostActive(null);
+    setOpponentMoraleActive(null);
+    moralePhase.current = 'none';
+    moraleTicksLeft.current = 0;
+    opponentMoralePhase.current = 'none';
+    opponentMoraleTicksLeft.current = 0;
 
     // Broadcast battle start
     channelRef.current?.send({
@@ -403,6 +439,32 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     await updateRoom(roomId, { status: 'playing' });
   }, [roomId, grid]);
 
+  // Activate morale boost
+  const activateMoraleBoost = useCallback(() => {
+    if (moraleBoostUsed || phase !== 'battle') return;
+    setMoraleBoostUsed(true);
+    setMoraleBoostActive('buff');
+    setBattleLog(prev => ['🔥 KRIEGSSCHREI! +25% Schaden für 3 Züge!', ...prev]);
+
+    // If host, track own morale locally
+    if (isHost) {
+      moralePhase.current = 'buff';
+      moraleTicksLeft.current = 3;
+    }
+
+    // Broadcast to opponent
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'game_sync',
+      payload: { action: 'war_cry', data: { team: myTeam } },
+    });
+
+    // If guest activated, also tell host to track it
+    if (!isHost) {
+      // Host will pick it up via the 'war_cry' broadcast handler
+    }
+  }, [moraleBoostUsed, phase, isHost, myTeam]);
+
   // Battle tick - only host runs this
   const battleTick = useCallback(() => {
     if (!isHost) return;
@@ -411,6 +473,38 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
+
+      // Tick down morale for both players (host tracks both)
+      if (moralePhase.current !== 'none' && moraleTicksLeft.current > 0) {
+        moraleTicksLeft.current -= 1;
+        if (moraleTicksLeft.current <= 0) {
+          if (moralePhase.current === 'buff') {
+            moralePhase.current = 'debuff';
+            moraleTicksLeft.current = 3;
+            setMoraleBoostActive('debuff');
+          } else {
+            moralePhase.current = 'none';
+            setMoraleBoostActive(null);
+          }
+        }
+      }
+      if (opponentMoralePhase.current !== 'none' && opponentMoraleTicksLeft.current > 0) {
+        opponentMoraleTicksLeft.current -= 1;
+        if (opponentMoraleTicksLeft.current <= 0) {
+          if (opponentMoralePhase.current === 'buff') {
+            opponentMoralePhase.current = 'debuff';
+            opponentMoraleTicksLeft.current = 3;
+            setOpponentMoraleActive('debuff');
+          } else {
+            opponentMoralePhase.current = 'none';
+            setOpponentMoraleActive(null);
+          }
+        }
+      }
+
+      // Damage modifiers: host's player = player1, host's enemy = player2
+      const playerDmgMod = moralePhase.current === 'buff' ? 1.25 : moralePhase.current === 'debuff' ? 0.85 : 1.0;
+      const enemyDmgMod = opponentMoralePhase.current === 'buff' ? 1.25 : opponentMoralePhase.current === 'debuff' ? 0.85 : 1.0;
 
       const logs: string[] = [];
       const events: BattleEvent[] = [];
@@ -465,7 +559,10 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         }
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
-          const dmg = calcDamage(unit, target, newGrid);
+          let dmg = calcDamage(unit, target, newGrid);
+          // Apply morale damage modifier
+          if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
+          else dmg = Math.round(dmg * enemyDmgMod);
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
           if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) target.frozen = 1;
@@ -514,6 +611,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
               playerUnits: pAlive.map(serializeUnit),
               enemyUnits: eAlive.map(serializeUnit),
               turnCount: newTurn,
+              // Morale states from host perspective
+              playerMorale: moralePhase.current === 'none' ? null : moralePhase.current,
+              enemyMorale: opponentMoralePhase.current === 'none' ? null : opponentMoralePhase.current,
             },
           },
         });
@@ -624,13 +724,13 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     gameOver, gameWon,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
-    moraleBoostUsed: false as boolean,
-    moraleBoostActive: null as 'buff' | 'debuff' | null,
-    activateMoraleBoost: () => {},
+    moraleBoostUsed,
+    moraleBoostActive,
+    activateMoraleBoost,
+    opponentMoraleActive,
     waitingForOpponent,
     isHost,
     myRows,
-    // New placement state
     placeTimer,
     isMyTurnToPlace,
     placingPhase,
