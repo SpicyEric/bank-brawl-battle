@@ -76,17 +76,17 @@ const Multiplayer = () => {
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden">
       {/* Background image - dimmed */}
-      <img src={menuBg} alt="" className="absolute inset-0 w-full h-full object-cover" />
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-none" />
+      <img src={menuBg} alt="" className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-none transition-opacity duration-300" />
       {/* Back button */}
       <button
         onClick={() => state === 'menu' ? navigate('/') : setState('menu')}
-        className="absolute top-6 left-6 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+        className="absolute top-6 left-6 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors z-10"
       >
         <ArrowLeft size={20} />
       </button>
 
-      <div className="w-full max-w-xs">
+      <div className="w-full max-w-xs relative z-10">
         {state === 'menu' && (
           <div className="space-y-6 text-center">
             <div>

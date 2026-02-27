@@ -24,8 +24,8 @@ const SinglePlayer = () => {
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* Background image - dimmed */}
-      <img src={menuBg} alt="" className="absolute inset-0 w-full h-full object-cover" />
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-none" />
+      <img src={menuBg} alt="" className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300" />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-none transition-opacity duration-300" />
 
       {/* Back button */}
       <button

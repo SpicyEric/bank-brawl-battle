@@ -8,7 +8,7 @@ const MainMenu = () => {
   const { muted, toggleMute } = useMusic('menu');
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
+    <div className="min-h-[100dvh] flex flex-col items-end justify-end px-6 pb-24 relative overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* Background image */}
       <img
         src={menuBg}
@@ -19,7 +19,7 @@ const MainMenu = () => {
       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30 pointer-events-none" />
 
       {/* Menu buttons */}
-      <div className="w-full max-w-xs space-y-3 relative z-10">
+      <div className="w-full max-w-xs mx-auto space-y-3 relative z-10">
         <button
           onClick={() => navigate('/singleplayer')}
           className="w-full py-4 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:opacity-90 active:scale-[0.97] transition-all flex items-center justify-center gap-3 shadow-[0_0_20px_hsl(var(--primary)/0.3)]"
