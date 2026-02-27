@@ -178,7 +178,7 @@ export function useBattleGame() {
     setFocusFireUsed(true);
     setFocusFireActive(true);
     focusFireTicksLeft.current = 3;
-    setBattleLog(prev => ['🎯 FOKUSFEUER! Alle Einheiten greifen das stärkste Ziel an!', ...prev]);
+    setBattleLog(prev => ['🎯 FOKUSFEUER! Alle Einheiten greifen das schwächste Ziel an!', ...prev]);
   }, [focusFireUsed, phase]);
 
   // Activate sacrifice ritual – kill weakest own unit, heal others +15%
@@ -332,9 +332,9 @@ export function useBattleGame() {
       // Calculate enemy damage modifier from AI morale
       const enemyDmgMod = aiMoralePhase.current === 'buff' ? 1.25 : aiMoralePhase.current === 'debuff' ? 0.85 : 1.0;
 
-      // Focus fire: determine highest HP enemy target (player ability)
+      // Focus fire: determine lowest HP enemy target (player ability) – finish off weak units
       const focusTarget = focusFireTicksLeft.current > 0
-        ? allUnits.filter(u => u.team === 'enemy' && u.hp > 0).sort((a, b) => b.hp - a.hp)[0] ?? null
+        ? allUnits.filter(u => u.team === 'enemy' && u.hp > 0).sort((a, b) => a.hp - b.hp)[0] ?? null
         : null;
       // AI focus fire: determine highest HP player target
       const aiFocusTarget = aiFocusFireTicksLeft.current > 0
@@ -396,7 +396,7 @@ export function useBattleGame() {
           // No allies to heal → fall through to normal attack logic below
         }
 
-        // Focus fire override: player units target highest HP enemy, AI units target highest HP player
+        // Focus fire override: player units target lowest HP enemy, AI units target highest HP player
         const target = (focusTarget && unit.team === 'player') ? focusTarget
           : (aiFocusTarget && unit.team === 'enemy') ? aiFocusTarget
           : findTarget(unit, allUnits);
