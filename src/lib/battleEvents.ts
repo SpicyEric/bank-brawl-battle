@@ -12,4 +12,6 @@ export interface BattleEvent {
   isStrong: boolean;
   isWeak: boolean;
   isRanged: boolean; // attacker not adjacent to target
+  isAoe?: boolean; // splash damage (dragon)
+  aoeCells?: { row: number; col: number }[]; // all cells affected by AOE fire
 }
