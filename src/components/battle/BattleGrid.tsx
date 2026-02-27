@@ -9,13 +9,14 @@ interface BattleGridProps {
   lastPlaced?: { row: number; col: number; type: UnitType } | null;
   battleEvents?: BattleEvent[];
   moraleBoostActive?: 'buff' | 'debuff' | null;
+  opponentMoraleActive?: 'buff' | 'debuff' | null;
 }
 
 interface UnitPos { row: number; col: number }
 interface DamagePopup { id: string; row: number; col: number; damage: number; isStrong: boolean; isWeak: boolean; isKill: boolean }
 interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -28,8 +29,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const projCounter = useRef(0);
   const [warCryFlash, setWarCryFlash] = useState(false);
   const prevMorale = useRef<'buff' | 'debuff' | null>(null);
+  const prevOpponentMorale = useRef<'buff' | 'debuff' | null>(null);
 
-  // War cry flash animation
+  // War cry flash animation (own or opponent)
   useEffect(() => {
     if (moraleBoostActive === 'buff' && prevMorale.current !== 'buff') {
       setWarCryFlash(true);
@@ -37,6 +39,14 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
     prevMorale.current = moraleBoostActive ?? null;
   }, [moraleBoostActive]);
+
+  useEffect(() => {
+    if (opponentMoraleActive === 'buff' && prevOpponentMorale.current !== 'buff') {
+      setWarCryFlash(true);
+      setTimeout(() => setWarCryFlash(false), 600);
+    }
+    prevOpponentMorale.current = opponentMoraleActive ?? null;
+  }, [opponentMoraleActive]);
 
   // Flash effect for attack pattern on placement
   useEffect(() => {
