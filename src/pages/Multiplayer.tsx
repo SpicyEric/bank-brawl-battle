@@ -1,31 +1,54 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMusic } from '@/hooks/useMusic';
-import { createRoom, joinRoom, subscribeToRoom, updateRoom, createGameChannel } from '@/lib/multiplayer';
-import { ArrowLeft, Copy, Check, Users, Loader2 } from 'lucide-react';
+import { createRoom, joinRoom, subscribeToRoom, updateRoom, getRoomById } from '@/lib/multiplayer';
+import { ArrowLeft, Copy, Check, Users, Loader2, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import menuBg from '@/assets/menu-bg.png';
 
-type LobbyState = 'menu' | 'creating' | 'hosting' | 'joining' | 'waiting';
+type LobbyState = 'menu' | 'creating' | 'hosting' | 'joining' | 'waiting' | 'joined' | 'starting';
+type PlayerRole = 'player1' | 'player2';
 
 const Multiplayer = () => {
   const navigate = useNavigate();
-  const { muted, toggleMute } = useMusic();
   const [state, setState] = useState<LobbyState>('menu');
   const [roomCode, setRoomCode] = useState('');
   const [roomId, setRoomId] = useState('');
+  const [myRole, setMyRole] = useState<PlayerRole | null>(null);
   const [joinInput, setJoinInput] = useState('');
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState('');
   const [opponentJoined, setOpponentJoined] = useState(false);
+  const hasNavigatedRef = useRef(false);
 
-  // Create a room
+  const navigateToGame = useCallback((role: PlayerRole, nextRoomId: string) => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    navigate(`/game?mode=multi&room=${nextRoomId}&role=${role}`);
+  }, [navigate]);
+
+  const resetLobby = useCallback(() => {
+    setState('menu');
+    setRoomCode('');
+    setRoomId('');
+    setMyRole(null);
+    setJoinInput('');
+    setCopied(false);
+    setError('');
+    setOpponentJoined(false);
+    hasNavigatedRef.current = false;
+  }, []);
+
+  // Create a room (host)
   const handleCreate = useCallback(async () => {
     setState('creating');
+    setError('');
     try {
       const { roomCode, roomId } = await createRoom();
+      hasNavigatedRef.current = false;
       setRoomCode(roomCode);
       setRoomId(roomId);
+      setMyRole('player1');
+      setOpponentJoined(false);
       setState('hosting');
     } catch (e: any) {
       toast.error('Fehler beim Erstellen: ' + e.message);
@@ -33,39 +56,95 @@ const Multiplayer = () => {
     }
   }, []);
 
-  // Join a room
+  // Join a room (guest)
   const handleJoin = useCallback(async () => {
     if (joinInput.length < 5) {
       setError('Code muss 5 Zeichen lang sein');
       return;
     }
+
     setError('');
     setState('waiting');
+
     try {
-      const { roomId } = await joinRoom(joinInput);
+      const { roomId, role } = await joinRoom(joinInput);
+      hasNavigatedRef.current = false;
       setRoomId(roomId);
-      setRoomCode(joinInput.toUpperCase());
-      // Navigate to game with multiplayer params
-      navigate(`/game?mode=multi&room=${roomId}&role=player2`);
+      setRoomCode(joinInput.toUpperCase().trim());
+      setMyRole(role);
+
+      if (role === 'player1') {
+        setState('hosting');
+        return;
+      }
+
+      setOpponentJoined(true);
+      setState('joined');
+      toast.success('Raum beigetreten. Warte auf Start durch Host.');
     } catch (e: any) {
       setError(e.message);
       setState('joining');
     }
-  }, [joinInput, navigate]);
+  }, [joinInput]);
 
-  // Listen for opponent joining
+  const handleStartMatch = useCallback(async () => {
+    if (!roomId) return;
+    setState('starting');
+
+    try {
+      await updateRoom(roomId, { status: 'starting' });
+      navigateToGame('player1', roomId);
+    } catch (e: any) {
+      toast.error('Start fehlgeschlagen: ' + e.message);
+      setState('hosting');
+    }
+  }, [roomId, navigateToGame]);
+
+  // Keep room state in sync (Realtime + polling fallback)
   useEffect(() => {
-    if (state !== 'hosting' || !roomId) return;
-    const unsub = subscribeToRoom(roomId, (room) => {
+    if (!roomId || !myRole || !['hosting', 'joined', 'starting'].includes(state)) return;
+
+    let disposed = false;
+
+    const handleRoomUpdate = (room: any) => {
+      if (disposed || !room) return;
+
       if (room.player2_id) {
         setOpponentJoined(true);
-        setTimeout(() => {
-          navigate(`/game?mode=multi&room=${roomId}&role=player1`);
-        }, 1000);
+      } else if (myRole === 'player1') {
+        setOpponentJoined(false);
       }
-    });
-    return unsub;
-  }, [state, roomId, navigate]);
+
+      if (room.status === 'starting') {
+        navigateToGame(myRole, roomId);
+      }
+    };
+
+    const unsub = subscribeToRoom(roomId, handleRoomUpdate);
+    const pollId = window.setInterval(async () => {
+      try {
+        const room = await getRoomById(roomId);
+        handleRoomUpdate(room);
+      } catch {
+        // silent fallback loop
+      }
+    }, 1200);
+
+    (async () => {
+      try {
+        const room = await getRoomById(roomId);
+        handleRoomUpdate(room);
+      } catch {
+        // ignore initial fetch errors
+      }
+    })();
+
+    return () => {
+      disposed = true;
+      unsub();
+      window.clearInterval(pollId);
+    };
+  }, [state, roomId, myRole, navigateToGame]);
 
   const copyCode = () => {
     navigator.clipboard.writeText(roomCode);
@@ -75,12 +154,11 @@ const Multiplayer = () => {
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden">
-      {/* Background image - dimmed */}
       <img src={menuBg} alt="" className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300" />
       <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-none transition-opacity duration-300" />
-      {/* Back button */}
+
       <button
-        onClick={() => state === 'menu' ? navigate('/') : setState('menu')}
+        onClick={() => state === 'menu' ? navigate('/') : resetLobby()}
         className="absolute top-6 left-6 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors z-10"
       >
         <ArrowLeft size={20} />
@@ -123,9 +201,7 @@ const Multiplayer = () => {
             <div>
               <p className="text-sm text-muted-foreground mb-2">Dein Raum-Code:</p>
               <div className="flex items-center justify-center gap-2">
-                <p className="text-4xl font-mono font-black tracking-[0.3em] text-foreground">
-                  {roomCode}
-                </p>
+                <p className="text-4xl font-mono font-black tracking-[0.3em] text-foreground">{roomCode}</p>
                 <button
                   onClick={copyCode}
                   className="p-2 rounded-lg hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
@@ -135,12 +211,23 @@ const Multiplayer = () => {
               </div>
             </div>
 
-            <div className="py-4 rounded-xl bg-card border border-border">
+            <div className="py-4 px-4 rounded-xl bg-card border border-border space-y-3">
               {opponentJoined ? (
-                <div className="flex items-center justify-center gap-2 text-success font-semibold">
-                  <Users size={18} />
-                  Gegner beigetreten! Starte...
-                </div>
+                <>
+                  <div className="flex items-center justify-center gap-2 text-success font-semibold">
+                    <Users size={18} />
+                    Mitspieler ist beigetreten
+                  </div>
+                  <button
+                    onClick={handleStartMatch}
+                    className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:opacity-90 active:scale-[0.97] transition-all"
+                  >
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Play size={16} />
+                      Spiel starten
+                    </span>
+                  </button>
+                </>
               ) : (
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="animate-spin text-muted-foreground" size={20} />
@@ -185,9 +272,30 @@ const Multiplayer = () => {
             <p className="text-muted-foreground">Trete bei...</p>
           </div>
         )}
+
+        {state === 'joined' && (
+          <div className="text-center space-y-4">
+            <div className="py-4 rounded-xl bg-card border border-border">
+              <div className="flex items-center justify-center gap-2 text-success font-semibold">
+                <Users size={18} />
+                Verbunden mit Raum {roomCode}
+              </div>
+            </div>
+            <Loader2 className="animate-spin mx-auto text-primary" size={28} />
+            <p className="text-muted-foreground">Warte, bis der Host das Spiel startet...</p>
+          </div>
+        )}
+
+        {state === 'starting' && (
+          <div className="text-center space-y-4">
+            <Loader2 className="animate-spin mx-auto text-primary" size={32} />
+            <p className="text-muted-foreground">Spiel wird gestartet...</p>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
 export default Multiplayer;
+

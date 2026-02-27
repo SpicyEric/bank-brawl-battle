@@ -64,6 +64,18 @@ export async function joinRoom(roomCode: string): Promise<{ roomId: string; role
   return { roomId: room.id, role: 'player2' };
 }
 
+// Read room by id (used as fallback when realtime misses an update)
+export async function getRoomById(roomId: string) {
+  const { data, error } = await supabase
+    .from('game_rooms')
+    .select('*')
+    .eq('id', roomId)
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
 // Subscribe to room changes via Realtime
 export function subscribeToRoom(
   roomId: string,
@@ -75,7 +87,7 @@ export function subscribeToRoom(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'game_rooms', filter: `id=eq.${roomId}` },
       (payload) => {
-        onUpdate(payload.new);
+        if (payload.new) onUpdate(payload.new);
       }
     )
     .subscribe();
