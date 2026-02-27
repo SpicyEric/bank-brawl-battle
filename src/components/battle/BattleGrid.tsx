@@ -321,7 +321,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     style={{
                       filter: isFrozen
                         ? 'drop-shadow(0 0 5px hsl(210, 80%, 60%)) drop-shadow(0 0 10px hsl(210, 80%, 60%))'
-                        : unit.team === 'player'
+                        : (flipped ? unit.team === 'enemy' : unit.team === 'player')
                           ? 'drop-shadow(0 0 4px hsl(152, 60%, 48%)) drop-shadow(0 0 8px hsl(152, 60%, 48%))'
                           : 'drop-shadow(0 0 4px hsl(0, 72%, 55%)) drop-shadow(0 0 8px hsl(0, 72%, 55%))',
                     }}
@@ -332,7 +332,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   <div className="absolute bottom-0.5 left-0.5 right-0.5 h-[3px] rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
-                        isLow ? 'bg-danger' : unit.team === 'player' ? 'bg-success' : 'bg-danger'
+                        isLow ? 'bg-danger' : (flipped ? unit.team === 'enemy' : unit.team === 'player') ? 'bg-success' : 'bg-danger'
                       }`}
                       style={{ width: `${hpPercent}%` }}
                     />

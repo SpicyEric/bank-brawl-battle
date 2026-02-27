@@ -46,6 +46,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
   const [waitingForOpponent, setWaitingForOpponent] = useState(false);
+  const [opponentLeft, setOpponentLeft] = useState(false);
 
   // Morale boost state (each player has their own)
   const [moraleBoostUsed, setMoraleBoostUsed] = useState(false);
@@ -239,6 +240,41 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       supabase.removeChannel(channel);
     };
   }, [roomId, isHost]);
+
+  // Presence channel to detect opponent disconnect
+  useEffect(() => {
+    const presenceChannel = supabase.channel(`presence-${roomId}`);
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState();
+        const users = Object.values(state).flat();
+        // If we had 2+ users and now only 1, opponent left
+        if (users.length < 2 && phase !== 'place_player') {
+          // Only trigger if game has started (not in initial lobby)
+          const hasStarted = phase === 'battle' || phase === 'round_won' || phase === 'round_lost' || phase === 'round_draw';
+          if (hasStarted || placingPhase !== 'first') {
+            setOpponentLeft(true);
+          }
+        }
+      })
+      .on('presence', { event: 'leave' }, () => {
+        const state = presenceChannel.presenceState();
+        const users = Object.values(state).flat();
+        if (users.length < 2) {
+          setOpponentLeft(true);
+        }
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await presenceChannel.track({ role });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+    };
+  }, [roomId, role, phase, placingPhase]);
 
   // Host generates terrain and decides who places first
   useEffect(() => {
@@ -931,6 +967,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     activateSacrifice,
     opponentMoraleActive,
     waitingForOpponent,
+    opponentLeft,
     aiMoraleActive: null as 'buff' | 'debuff' | null,
     isHost,
     myRows,
