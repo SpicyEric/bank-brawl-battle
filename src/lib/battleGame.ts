@@ -106,9 +106,9 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     label: 'Assassine',
     emoji: '🗡️',
     hp: 90,
-    attack: 34,
-    cooldown: 2,
-    description: 'Opportunist. Wechselt zum nächsten verwundeten Ziel. Bewegt sich diagonal (2 Felder).',
+    attack: 22,
+    cooldown: 1,
+    description: 'Schneller Opportunist. Greift jede Runde an und wechselt zum nächsten verwundeten Ziel. Bewegt sich diagonal (2 Felder).',
     movePattern: [
       ...DIAGONAL,
       { row: -2, col: -2 }, { row: -2, col: 2 },
