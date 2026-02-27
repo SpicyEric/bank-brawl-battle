@@ -485,8 +485,8 @@ export function useBattleGame() {
               }
             }
 
-            // Splash damage: 50% to other enemies in the 3x3 area
-            const splashDmg = Math.round(dmg * 0.5);
+            // Splash damage: 30% to other enemies in the 3x3 area
+            const splashDmg = Math.round(dmg * 0.3);
             for (const aoePos of aoeCells) {
               const cellUnit = newGrid[aoePos.row][aoePos.col].unit;
               if (cellUnit && cellUnit.hp > 0 && !cellUnit.dead && cellUnit.team !== unit.team && cellUnit.id !== target.id) {

@@ -118,10 +118,10 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   dragon: {
     label: 'Drache',
     emoji: '🐉',
-    hp: 90,
-    attack: 30,
+    hp: 80,
+    attack: 24,
     cooldown: 3,
-    description: 'Fliegt über Hindernisse. Flächenangriff (3x3). Ignoriert Blockaden.',
+    description: 'Fliegt über Hindernisse. Flächenangriff (3x3, 30% Splash). Ignoriert Blockaden.',
     movePattern: [
       ...ALL_ADJACENT,
       { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
