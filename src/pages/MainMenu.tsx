@@ -7,7 +7,7 @@ const MainMenu = () => {
   const { muted, toggleMute } = useMusic();
 
   return (
-    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center px-6 relative overflow-hidden">
+    <div className="min-h-[100dvh] bg-background flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* Ambient glow */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[400px] h-[400px] rounded-full bg-primary/5 blur-[100px]" />
