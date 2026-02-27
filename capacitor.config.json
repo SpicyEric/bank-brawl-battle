@@ -1,9 +1,5 @@
 {
   "appId": "app.lovable.a7e06baa0dd744016831841300eaa7f0c",
   "appName": "Stoischer Ringkampf",
-  "webDir": "dist",
-  "server": {
-    "url": "https://7e06baa0-dd74-4016-8318-41300eaa7f0c.lovableproject.com?forceHideBadge=true",
-    "cleartext": true
-  }
+  "webDir": "dist"
 }
