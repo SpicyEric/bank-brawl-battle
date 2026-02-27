@@ -94,7 +94,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 105,
     attack: 23,
     cooldown: 2,
-    description: 'Nahkämpfer. Bewegt sich orthogonal (1 Feld). Greift angrenzend an.',
+    description: 'Nahkämpfer. Beißt sich an einem Ziel fest bis es besiegt ist. Bewegt sich orthogonal (1 Feld).',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: ['tank', 'mage', 'healer'],
@@ -106,7 +106,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 90,
     attack: 34,
     cooldown: 2,
-    description: 'Bewegt sich diagonal (2 Felder). Greift diagonal angrenzend an.',
+    description: 'Opportunist. Wechselt zum nächsten verwundeten Ziel. Bewegt sich diagonal (2 Felder).',
     movePattern: [
       ...DIAGONAL,
       { row: -2, col: -2 }, { row: -2, col: 2 },
@@ -119,7 +119,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   dragon: {
     label: 'Drache',
     emoji: '🐉',
-    hp: 80,
+    hp: 95,
     attack: 24,
     cooldown: 3,
     description: 'Fliegt über Hindernisse. Flächenangriff (3x3, 30% Splash). Ignoriert Blockaden.',
@@ -210,11 +210,12 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     label: 'Magier',
     emoji: '🔮',
     hp: 85,
-    attack: 30,
-    cooldown: 1,
-    description: 'Bewegt sich in alle Richtungen (1 Feld). Greift diagonal 2-3 Felder an.',
+    attack: 25,
+    cooldown: 2,
+    description: 'Versteckt sich hinter Verbündeten. Greift diagonal 1-3 Felder an.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
+      ...DIAGONAL,
       { row: -2, col: -2 }, { row: -2, col: 2 },
       { row: 2, col: -2 }, { row: 2, col: 2 },
       { row: -3, col: -3 }, { row: -3, col: 3 },
@@ -382,7 +383,7 @@ export function getMoveCells(unit: Unit, grid: Cell[][]): Position[] {
     );
 }
 
-// Find best target: column priority + frontline mechanic + tank taunt + rider target-switching
+// Find best target: column priority + frontline mechanic + tank taunt + unique behaviors
 export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
@@ -392,6 +393,27 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   if (nearbyTanks.length > 0) {
     nearbyTanks.sort((a, b) => distance(unit, a) - distance(unit, b));
     return nearbyTanks[0];
+  }
+
+  // === WARRIOR: Lock-on – keeps attacking the same target until it's dead ===
+  if (unit.type === 'warrior' && unit.lastAttackedId) {
+    const lockedTarget = enemies.find(e => e.id === unit.lastAttackedId);
+    if (lockedTarget) return lockedTarget;
+    // Target died, fall through to find a new one
+  }
+
+  // === ASSASSIN: Opportunist – prefers wounded enemies, then nearest ===
+  if (unit.type === 'assassin') {
+    // Find wounded enemies (<70% HP)
+    const wounded = enemies.filter(e => e.hp < e.maxHp * 0.7);
+    if (wounded.length > 0) {
+      // Among wounded, pick the lowest HP (finish off)
+      wounded.sort((a, b) => a.hp - b.hp);
+      return wounded[0];
+    }
+    // No wounded? Pick closest enemy
+    enemies.sort((a, b) => distance(unit, a) - distance(unit, b));
+    return enemies[0];
   }
 
   // Rider target-switching: prefer enemies it hasn't attacked last
@@ -410,7 +432,6 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
 
   // 70% chance to pick from same/adjacent column if available
   if (columnEnemies.length > 0 && Math.random() < 0.7) {
-    // Among column enemies, prefer same column over adjacent
     columnEnemies.sort((a, b) => {
       const aColDist = Math.abs(a.col - unit.col);
       const bColDist = Math.abs(b.col - unit.col);
