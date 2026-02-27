@@ -266,6 +266,42 @@ export function sfxProjectile() {
   osc.stop(t + 0.12);
 }
 
+/** War cry / morale boost – aggressive rising roar */
+export function sfxWarCry() {
+  if (sfxMuted) return;
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+
+  // Aggressive rising sawtooth
+  const osc1 = ctx.createOscillator();
+  const gain1 = ctx.createGain();
+  osc1.type = 'sawtooth';
+  osc1.frequency.setValueAtTime(150, t);
+  osc1.frequency.linearRampToValueAtTime(600, t + 0.25);
+  gain1.gain.setValueAtTime(0.18, t);
+  gain1.gain.setValueAtTime(0.18, t + 0.2);
+  gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+  osc1.connect(gain1);
+  gain1.connect(ctx.destination);
+  osc1.start(t);
+  osc1.stop(t + 0.4);
+
+  // Power chord harmony
+  const osc2 = ctx.createOscillator();
+  const gain2 = ctx.createGain();
+  osc2.type = 'square';
+  osc2.frequency.setValueAtTime(220, t + 0.05);
+  osc2.frequency.linearRampToValueAtTime(880, t + 0.3);
+  gain2.gain.setValueAtTime(0.1, t + 0.05);
+  gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
+  osc2.connect(gain2);
+  gain2.connect(ctx.destination);
+  osc2.start(t + 0.05);
+  osc2.stop(t + 0.45);
+
+  playNoise(0.15, 0.1);
+}
+
 /** Freeze effect */
 export function sfxFreeze() {
   if (sfxMuted) return;

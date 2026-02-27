@@ -9,7 +9,7 @@ import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 import { useMusic } from '@/hooks/useMusic';
 import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
-import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, setSfxMuted } from '@/lib/sfx';
+import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, setSfxMuted } from '@/lib/sfx';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -237,6 +237,30 @@ function GameUI({ game, isMultiplayer }: { game: ReturnType<typeof useBattleGame
                 <span className="text-danger">💀 {game.enemyUnits.length}</span>
               </div>
             </div>
+
+            {/* Kriegsschrei Button */}
+            <button
+              onClick={() => { game.activateMoraleBoost(); sfxWarCry(); }}
+              disabled={game.moraleBoostUsed}
+              className={`w-full py-2.5 rounded-xl font-semibold text-sm transition-all active:scale-[0.97] ${
+                game.moraleBoostActive === 'buff'
+                  ? 'bg-warning/20 border-2 border-warning text-warning animate-pulse cursor-default'
+                  : game.moraleBoostActive === 'debuff'
+                  ? 'bg-danger/10 border-2 border-danger/40 text-danger/60 cursor-default'
+                  : game.moraleBoostUsed
+                  ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
+                  : 'bg-warning text-warning-foreground hover:opacity-90 shadow-[0_0_12px_hsl(var(--warning)/0.3)]'
+              }`}
+            >
+              {game.moraleBoostActive === 'buff'
+                ? '🔥 KRIEGSSCHREI AKTIV! +25% Schaden'
+                : game.moraleBoostActive === 'debuff'
+                ? '😮‍💨 Erschöpft... -15% Schaden'
+                : game.moraleBoostUsed
+                ? '🔥 Kriegsschrei verbraucht'
+                : '🔥 Kriegsschrei! (+25% → -15%)'}
+            </button>
+
             <BattleLog logs={game.battleLog} />
           </div>
         )}

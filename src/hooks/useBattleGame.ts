@@ -27,6 +27,12 @@ export function useBattleGame() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const turnCountRef = useRef(0);
 
+  // Morale boost state
+  const [moraleBoostUsed, setMoraleBoostUsed] = useState(false);
+  const [moraleBoostActive, setMoraleBoostActive] = useState<'buff' | 'debuff' | null>(null);
+  const moraleTicksLeft = useRef(0);
+  const moralePhase = useRef<'none' | 'buff' | 'debuff'>('none');
+
   // Full reset
   const resetGame = useCallback(() => {
     setGrid(generateTerrain(createEmptyGrid()));
@@ -41,6 +47,10 @@ export function useBattleGame() {
     setEnemyScore(0);
     setRoundNumber(1);
     setPlayerStarts(true);
+    setMoraleBoostUsed(false);
+    setMoraleBoostActive(null);
+    moraleTicksLeft.current = 0;
+    moralePhase.current = 'none';
   }, []);
 
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore);
@@ -107,7 +117,21 @@ export function useBattleGame() {
     setTurnCount(0);
     turnCountRef.current = 0;
     setBattleTimer(ROUND_TIME_LIMIT);
+    setMoraleBoostUsed(false);
+    setMoraleBoostActive(null);
+    moraleTicksLeft.current = 0;
+    moralePhase.current = 'none';
   }, []);
+
+  // Activate morale boost
+  const activateMoraleBoost = useCallback(() => {
+    if (moraleBoostUsed || phase !== 'battle') return;
+    setMoraleBoostUsed(true);
+    moralePhase.current = 'buff';
+    moraleTicksLeft.current = 3;
+    setMoraleBoostActive('buff');
+    setBattleLog(prev => ['🔥 KRIEGSSCHREI! +25% Schaden für 3 Züge!', ...prev]);
+  }, [moraleBoostUsed, phase]);
 
   // Run one battle tick
   const battleTick = useCallback(() => {
@@ -115,6 +139,26 @@ export function useBattleGame() {
       const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
+
+      // Morale boost tick-down
+      if (moralePhase.current !== 'none' && moraleTicksLeft.current > 0) {
+        moraleTicksLeft.current -= 1;
+        if (moraleTicksLeft.current <= 0) {
+          if (moralePhase.current === 'buff') {
+            // Transition to debuff phase
+            moralePhase.current = 'debuff';
+            moraleTicksLeft.current = 3;
+            setMoraleBoostActive('debuff');
+          } else {
+            // Debuff expired
+            moralePhase.current = 'none';
+            setMoraleBoostActive(null);
+          }
+        }
+      }
+
+      // Calculate player damage modifier from morale
+      const playerDmgMod = moralePhase.current === 'buff' ? 1.25 : moralePhase.current === 'debuff' ? 0.85 : 1.0;
 
       const logs: string[] = [];
       const events: BattleEvent[] = [];
@@ -190,7 +234,9 @@ export function useBattleGame() {
         }
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
-          const dmg = calcDamage(unit, target, newGrid);
+          let dmg = calcDamage(unit, target, newGrid);
+          // Apply morale modifier for player units
+          if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
 
@@ -331,6 +377,10 @@ export function useBattleGame() {
     turnCountRef.current = 0;
     setBattleLog([]);
     setSelectedUnit('warrior');
+    setMoraleBoostUsed(false);
+    setMoraleBoostActive(null);
+    moraleTicksLeft.current = 0;
+    moralePhase.current = 'none';
 
     if (newStarts) {
       setGrid(generateTerrain(createEmptyGrid()));
@@ -356,6 +406,7 @@ export function useBattleGame() {
     gameOver, gameWon,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
+    moraleBoostUsed, moraleBoostActive, activateMoraleBoost,
     waitingForOpponent: false,
   };
 }
