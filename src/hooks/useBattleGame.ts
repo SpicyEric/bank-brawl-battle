@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  Unit, UnitType, Cell, Phase,
+  Unit, UnitType, Cell, Phase, ColorGroup,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateAIPlacement, getMaxUnits, generateTerrain, setBondsForPlacement, moveTankFormation,
-  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
 } from '@/lib/battleGame';
