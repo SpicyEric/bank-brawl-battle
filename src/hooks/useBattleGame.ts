@@ -966,15 +966,22 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     // Update fatigue: surviving unit types get +1 fatigue, dead ones reset to 0
     // Also, banned types reset to 0 (they rested this round)
     setPlayerFatigue(prev => {
-      const next = { ...prev };
-      const survivingTypes = new Set(playerUnits.filter(u => u.hp > 0 && !u.dead).map(u => u.type));
-      for (const t of UNIT_TYPES) {
-        if (playerBannedUnits.includes(t)) {
-          next[t] = 0; // rested this round
-        } else if (survivingTypes.has(t)) {
-          next[t] = 1; // survived → immediately banned next round
-        } else {
-          next[t] = 0; // died or wasn't used
+      const next: Record<string, number> = { ...prev };
+      if (hasRoster) {
+        const survivingSlots = new Set(
+          playerUnits.filter(u => u.hp > 0 && !u.dead && u.slotIndex !== undefined).map(u => u.slotIndex!)
+        );
+        for (let i = 0; i < 9; i++) {
+          if (playerBannedSlots.includes(i)) next[i] = 0;
+          else if (survivingSlots.has(i)) next[i] = 1;
+          else next[i] = 0;
+        }
+      } else {
+        const survivingTypes = new Set(playerUnits.filter(u => u.hp > 0 && !u.dead).map(u => u.type));
+        for (const t of UNIT_TYPES) {
+          if (playerBannedUnits.includes(t)) next[t] = 0;
+          else if (survivingTypes.has(t)) next[t] = 1;
+          else next[t] = 0;
         }
       }
       return next;
