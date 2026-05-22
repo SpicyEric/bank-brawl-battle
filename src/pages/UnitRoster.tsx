@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { UNIT_TYPES, UNIT_DEFS, UnitType, ColorGroup } from '@/lib/battleGame';
+import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 
 // Slot layout: row 0 = red (slots 0-2), row 1 = green (slots 3-5), row 2 = blue (slots 6-8)
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
 const ROSTER_SIZE = 9;
+const LONG_PRESS_MS = 400;
 
 const COLOR_RING: Record<ColorGroup, string> = {
   red: 'border-unit-red/60 bg-unit-red/10',
@@ -22,18 +24,41 @@ const COLOR_LABEL: Record<ColorGroup, string> = {
 export default function UnitRoster() {
   const navigate = useNavigate();
   const [slots, setSlots] = useState<(UnitType | null)[]>(Array(ROSTER_SIZE).fill(null));
-  const [activeSlot, setActiveSlot] = useState<number>(0);
+  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(null);
+  const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
 
-  const fillSlot = (slotIdx: number, type: UnitType) => {
-    setSlots(prev => prev.map((s, i) => (i === slotIdx ? type : s)));
-    // Auto-advance to next empty slot
-    const nextEmpty = slots.findIndex((s, i) => i !== slotIdx && s === null);
-    if (nextEmpty >= 0 && slots[slotIdx] === null) setActiveSlot(nextEmpty);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPress = useRef(false);
+
+  const startPress = useCallback((type: UnitType) => {
+    didLongPress.current = false;
+    longPressTimer.current = setTimeout(() => {
+      didLongPress.current = true;
+      setInfoUnit(type);
+    }, LONG_PRESS_MS);
+  }, []);
+  const cancelPress = useCallback(() => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  }, []);
+
+  const placedUnits = new Set(slots.filter(Boolean) as UnitType[]);
+
+  const handlePickerClick = (type: UnitType) => {
+    if (didLongPress.current) { didLongPress.current = false; return; }
+    if (placedUnits.has(type)) return;
+    setSelectedUnit(prev => (prev === type ? null : type));
   };
 
-  const clearSlot = (slotIdx: number) => {
-    setSlots(prev => prev.map((s, i) => (i === slotIdx ? null : s)));
-    setActiveSlot(slotIdx);
+  const handleSlotClick = (slotIdx: number) => {
+    const current = slots[slotIdx];
+    if (current) {
+      // Remove unit from slot → returns to picker
+      setSlots(prev => prev.map((s, i) => (i === slotIdx ? null : s)));
+      return;
+    }
+    if (!selectedUnit) return;
+    setSlots(prev => prev.map((s, i) => (i === slotIdx ? selectedUnit : s)));
+    setSelectedUnit(null);
   };
 
   const ready = slots.every(s => s !== null);
@@ -58,7 +83,9 @@ export default function UnitRoster() {
 
       {/* Top: 3 colored rows × 3 slots */}
       <div className="p-3">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">Dein Trupp · 3 Rot · 3 Grün · 3 Blau</p>
+        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
+          {selectedUnit ? `Tippe einen Slot, um ${UNIT_DEFS[selectedUnit].label} zu platzieren` : 'Dein Trupp · 3 Rot · 3 Grün · 3 Blau'}
+        </p>
         <div className="space-y-1.5">
           {rows.map(({ color, indices }) => (
             <div key={color} className="flex items-center gap-1.5">
@@ -67,14 +94,14 @@ export default function UnitRoster() {
                 {indices.map(i => {
                   const t = slots[i];
                   const def = t ? UNIT_DEFS[t] : null;
-                  const isActive = activeSlot === i;
+                  const canDrop = !t && !!selectedUnit;
                   return (
                     <button
                       key={i}
-                      onClick={() => t ? clearSlot(i) : setActiveSlot(i)}
+                      onClick={() => handleSlotClick(i)}
                       className={`aspect-square rounded-lg border-2 flex flex-col items-center justify-center transition-all relative ${
                         t ? `${COLOR_RING[color]} active:scale-[0.95]`
-                          : isActive ? `border-primary bg-primary/10 ring-1 ring-primary`
+                          : canDrop ? `border-primary bg-primary/10 ring-1 ring-primary animate-pulse`
                           : 'border-dashed border-border bg-muted/20'
                       }`}
                     >
@@ -85,7 +112,7 @@ export default function UnitRoster() {
                           <span className="text-[9px] font-semibold text-foreground mt-0.5">{def.label}</span>
                         </>
                       ) : (
-                        <span className="text-[10px] text-muted-foreground/60">Wähle…</span>
+                        <span className="text-[10px] text-muted-foreground/60">{canDrop ? 'Hier' : 'Leer'}</span>
                       )}
                     </button>
                   );
@@ -99,17 +126,38 @@ export default function UnitRoster() {
       {/* Bottom: scrollable picker of all units (color-neutral) */}
       <div className="flex-1 overflow-y-auto px-3 pb-3">
         <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-          Tippe eine Einheit → landet im aktiven Slot ({COLOR_LABEL[SLOT_COLORS[activeSlot]]})
+          Tippe Einheit → wählen · gedrückt halten = Info
         </p>
         <div className="grid grid-cols-3 gap-1.5">
           {UNIT_TYPES.map(t => {
             const def = UNIT_DEFS[t];
+            const isPlaced = placedUnits.has(t);
+            const isSelected = selectedUnit === t;
             return (
               <button
                 key={t}
-                onClick={() => fillSlot(activeSlot, t)}
-                className="relative p-1.5 rounded-lg border-2 border-border bg-card transition-all text-center active:scale-[0.95] hover:border-primary/40"
+                onClick={() => handlePickerClick(t)}
+                onTouchStart={() => !isPlaced && startPress(t)}
+                onTouchEnd={cancelPress}
+                onTouchCancel={cancelPress}
+                onMouseDown={() => !isPlaced && startPress(t)}
+                onMouseUp={cancelPress}
+                onMouseLeave={cancelPress}
+                onContextMenu={(e) => e.preventDefault()}
+                disabled={isPlaced}
+                className={`relative p-1.5 rounded-lg border-2 bg-card transition-all text-center select-none ${
+                  isPlaced
+                    ? 'border-border opacity-30 grayscale cursor-not-allowed'
+                    : isSelected
+                    ? 'border-primary ring-2 ring-primary bg-primary/10 scale-[0.97]'
+                    : 'border-border active:scale-[0.95] hover:border-primary/40'
+                }`}
               >
+                {isPlaced && (
+                  <div className="absolute inset-0 flex items-center justify-center z-10">
+                    <span className="text-base">✓</span>
+                  </div>
+                )}
                 <span className="text-xl block">{def.emoji}</span>
                 <p className="text-[9px] font-semibold text-foreground leading-tight mt-0.5">{def.label}</p>
                 <p className="text-[8px] text-muted-foreground">❤️{def.hp} ⚔️{def.attack}</p>
@@ -129,6 +177,8 @@ export default function UnitRoster() {
           {ready ? `⚔️ Bereit (${filledCount}/${ROSTER_SIZE})` : `Fülle noch ${ROSTER_SIZE - filledCount} Slots…`}
         </button>
       </div>
+
+      {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
     </div>
   );
 }
