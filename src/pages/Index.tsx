@@ -242,6 +242,7 @@ function GameUI({ game, isMultiplayer, flipped, allowedUnits }: { game: ReturnTy
               maxUnits={game.playerMaxUnits}
               bannedUnits={game.playerBannedUnits}
               fatigue={game.playerFatigue}
+              unitTypes={allowedUnits}
             />
             <button
               onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
