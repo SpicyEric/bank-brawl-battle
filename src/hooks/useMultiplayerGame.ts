@@ -3,7 +3,7 @@ import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
-  GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   MULTI_PLACE_TIME_LIMIT,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
