@@ -940,7 +940,7 @@ function hasAdjacentFriendlyTank(defender: Unit, grid: Cell[][]): boolean {
 
 // Calculate damage with counter system + terrain bonuses + shield aura
 export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): number {
-  void UNIT_DEFS[attacker.type];
+  
   const baseAtk = attacker.attack + (attacker.judgeBonus || 0);
   let dmg = baseAtk * (0.95 + Math.random() * 0.1);
 
