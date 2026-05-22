@@ -579,6 +579,21 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
 
+  // === SNIPER: always shoots lowest-HP enemy on the entire field ===
+  if (unit.type === 'sniper') {
+    return [...enemies].sort((a, b) => a.hp - b.hp)[0];
+  }
+  // === LAMB: taunts the strongest enemy ===
+  if (unit.type === 'lamb') {
+    return [...enemies].sort((a, b) => b.attack * b.hp - a.attack * a.hp)[0];
+  }
+  // === ARSONIST: prefers high-HP targets (best DoT value) ===
+  if (unit.type === 'arsonist') {
+    const sorted = [...enemies].sort((a, b) => b.hp - a.hp);
+    if (sorted[0] && distance(unit, sorted[0]) <= 6) return sorted[0];
+  }
+
+
   // Tank aggro: if any enemy tank is within distance 3, 60% chance to target it
   const nearbyTanks = enemies.filter(e => e.type === 'tank' && distance(unit, e) <= 3);
   if (nearbyTanks.length > 0 && Math.random() < 0.6) {
