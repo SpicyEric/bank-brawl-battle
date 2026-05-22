@@ -186,23 +186,53 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore);
   const enemyMaxUnits = getMaxUnits(enemyScore, playerScore);
 
+  // In slot mode: each placed instance consumes its slot for the round → can't reuse.
+  const placedSlots = new Set<number>(
+    playerUnits.map(u => u.slotIndex).filter((i): i is number => i !== undefined)
+  );
+
   // Place unit
   const placeUnit = useCallback((row: number, col: number) => {
-    if (phase !== 'place_player' || !selectedUnit) return;
-    if (playerBannedUnits.includes(selectedUnit)) return; // Fatigue ban
+    if (phase !== 'place_player') return;
     if (!PLAYER_ROWS.includes(row)) return;
     if (playerUnits.length >= playerMaxUnits) return;
     if (grid[row][col].unit) return;
-    if (grid[row][col].terrain === 'water') return; // Can't place on water
+    if (grid[row][col].terrain === 'water') return;
 
-    const unit = createUnit(selectedUnit, 'player', row, col);
+    let type: UnitType | null = null;
+    let color: ColorGroup | undefined;
+    let slotIdx: number | undefined;
+
+    if (hasRoster) {
+      if (selectedSlot === null) return;
+      if (playerBannedSlots.includes(selectedSlot)) return;
+      if (placedSlots.has(selectedSlot)) return; // each slot once per round
+      type = roster![selectedSlot];
+      color = SLOT_COLORS[selectedSlot];
+      slotIdx = selectedSlot;
+    } else {
+      if (!selectedUnit) return;
+      if (playerBannedUnits.includes(selectedUnit)) return;
+      type = selectedUnit;
+    }
+
+    const unit = createUnit(type, 'player', row, col, color, slotIdx);
     setPlayerUnits(prev => [...prev, unit]);
     setGrid(prev => {
       const next = prev.map(r => r.map(c => ({ ...c })));
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
-  }, [phase, selectedUnit, playerUnits, grid, playerMaxUnits, playerBannedUnits]);
+
+    // Auto-advance to next available slot in slot mode
+    if (hasRoster && selectedSlot !== null) {
+      const newPlaced = new Set(placedSlots);
+      newPlaced.add(selectedSlot);
+      const nextSlot = roster!.findIndex((_, i) => !newPlaced.has(i) && !playerBannedSlots.includes(i));
+      if (nextSlot >= 0) setSelectedSlot(nextSlot);
+    }
+  }, [phase, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, playerMaxUnits, playerBannedUnits, playerBannedSlots, placedSlots]);
+
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
