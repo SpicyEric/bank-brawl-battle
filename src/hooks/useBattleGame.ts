@@ -186,10 +186,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore);
   const enemyMaxUnits = getMaxUnits(enemyScore, playerScore);
 
-  // In slot mode: each placed instance consumes its slot for the round → can't reuse.
-  const placedSlots = new Set<number>(
-    playerUnits.map(u => u.slotIndex).filter((i): i is number => i !== undefined)
-  );
+  // Slot mode: slots can be reused on the battlefield (mono comps allowed).
+  // placedSlots is kept empty so the picker never disables a slot during placement.
+  const placedSlots = new Set<number>();
 
   // Place unit
   const placeUnit = useCallback((row: number, col: number) => {
@@ -206,7 +205,6 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     if (hasRoster) {
       if (selectedSlot === null) return;
       if (playerBannedSlots.includes(selectedSlot)) return;
-      if (placedSlots.has(selectedSlot)) return; // each slot once per round
       type = roster![selectedSlot];
       color = SLOT_COLORS[selectedSlot];
       slotIdx = selectedSlot;
@@ -224,13 +222,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       return next;
     });
 
-    // Auto-advance to next available slot in slot mode
-    if (hasRoster && selectedSlot !== null) {
-      const newPlaced = new Set(placedSlots);
-      newPlaced.add(selectedSlot);
-      const nextSlot = roster!.findIndex((_, i) => !newPlaced.has(i) && !playerBannedSlots.includes(i));
-      if (nextSlot >= 0) setSelectedSlot(nextSlot);
-    }
+    // Keep current slot selected so the user can place the same unit again (mono comps).
   }, [phase, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, playerMaxUnits, playerBannedUnits, playerBannedSlots, placedSlots]);
 
 
