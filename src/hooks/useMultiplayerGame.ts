@@ -864,8 +864,10 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
           const def = UNIT_DEFS[unit.type];
           const tDef = UNIT_DEFS[target.type];
-          const isStrong = def.strongVs.includes(target.type);
-          const isWeak = def.weakVs.includes(target.type);
+          const uColor = unit.color || UNIT_COLOR_GROUPS[unit.type];
+          const tColor = target.color || UNIT_COLOR_GROUPS[target.type];
+          const isStrong = (uColor === 'red' && tColor === 'green') || (uColor === 'green' && tColor === 'blue') || (uColor === 'blue' && tColor === 'red');
+          const isWeak = (tColor === 'red' && uColor === 'green') || (tColor === 'green' && uColor === 'blue') || (tColor === 'blue' && uColor === 'red');
           const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
           const dist = Math.abs(unit.row - target.row) + Math.abs(unit.col - target.col);
           logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.frozen ? ' 🧊' : ''}${target.hp <= 0 ? ' ☠️' : ''}`);
