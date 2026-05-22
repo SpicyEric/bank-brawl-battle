@@ -21,6 +21,8 @@ export interface Unit {
   col: number;
   cooldown: number;
   maxCooldown: number;
+  color?: 'red' | 'blue' | 'green'; // per-instance color (assigned from roster slot for player units)
+  slotIndex?: number; // for player units: index in the chosen roster (0..8)
   dead?: boolean;
   frozen?: number; // turns remaining frozen (can't act)
   stuckTurns?: number; // turns without attacking – used for anti-stalemate
@@ -526,7 +528,7 @@ export function getActivationTurn(row: number, team: Team): number {
   }
 }
 
-export function createUnit(type: UnitType, team: Team, row: number, col: number): Unit {
+export function createUnit(type: UnitType, team: Team, row: number, col: number, color?: 'red' | 'blue' | 'green', slotIndex?: number): Unit {
   const def = UNIT_DEFS[type];
   return {
     id: crypto.randomUUID(),
@@ -536,7 +538,14 @@ export function createUnit(type: UnitType, team: Team, row: number, col: number)
     cooldown: 0, maxCooldown: def.cooldown,
     activationTurn: getActivationTurn(row, team),
     startRow: row,
+    color: color ?? UNIT_COLOR_GROUPS[type],
+    slotIndex,
   };
+}
+
+// Effective color for RPS damage (per-instance, falls back to type default for legacy/AI units)
+export function getUnitColor(u: Unit): ColorGroup {
+  return (u.color as ColorGroup) ?? UNIT_COLOR_GROUPS[u.type];
 }
 
 export function distance(a: Position, b: Position): number {
@@ -931,13 +940,15 @@ function hasAdjacentFriendlyTank(defender: Unit, grid: Cell[][]): boolean {
 
 // Calculate damage with counter system + terrain bonuses + shield aura
 export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): number {
-  const aDef = UNIT_DEFS[attacker.type];
+  
   const baseAtk = attacker.attack + (attacker.judgeBonus || 0);
   let dmg = baseAtk * (0.95 + Math.random() * 0.1);
 
-  if (aDef.strongVs.includes(defender.type)) {
+  const aColor = getUnitColor(attacker);
+  const dColor = getUnitColor(defender);
+  if (COLOR_BEATS[aColor] === dColor) {
     dmg *= COUNTER_MULTIPLIER;
-  } else if (aDef.weakVs.includes(defender.type)) {
+  } else if (COLOR_BEATS[dColor] === aColor) {
     dmg *= WEAKNESS_MULTIPLIER;
   }
 

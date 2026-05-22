@@ -1,20 +1,27 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
-  Unit, UnitType, Cell, Phase,
+  Unit, UnitType, Cell, Phase, ColorGroup,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateAIPlacement, getMaxUnits, generateTerrain, setBondsForPlacement, moveTankFormation,
-  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 
-export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[]) {
+// Roster slots: 0..2 = red, 3..5 = green, 6..8 = blue
+const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
+
+export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
+  const hasRoster = !!(roster && roster.length === 9);
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
-  const initialSelected = (allowedUnits && allowedUnits.length > 0 ? allowedUnits[0] : 'warrior') as UnitType;
-  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(initialSelected);
+  // Slot-based selection (when roster present). Otherwise legacy type-based.
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(hasRoster ? 0 : null);
+  const initialSelected = (hasRoster ? roster![0] : 'warrior') as UnitType;
+  const [selectedUnit, setSelectedUnitState] = useState<UnitType | null>(initialSelected);
+  const setSelectedUnit = useCallback((t: UnitType | null) => setSelectedUnitState(t), []);
   const [playerUnits, setPlayerUnits] = useState<Unit[]>([]);
   const [enemyUnits, setEnemyUnits] = useState<Unit[]>([]);
   const [turnCount, setTurnCount] = useState(0);
@@ -38,15 +45,19 @@ export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[])
   const playerUnitsRef = useRef(playerUnits);
   useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
 
-  // Fatigue system: tracks how many consecutive rounds each unit type survived
+  // Fatigue system:
+  // - Slot mode (roster): key = slot index (0..8). One slot = one bench-able unit instance.
+  // - Legacy mode: key = unit type.
   const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
   const [enemyFatigue, setEnemyFatigue] = useState<Record<string, number>>({});
-  // Banned units for current round (fatigue >= 1 — units that survived last round are immediately banned)
-  // Banned units = fatigued (>=1) OR not in player's chosen roster
-  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t =>
-    (playerFatigue[t] || 0) >= 1 || (allowedUnits ? !allowedUnits.includes(t) : false)
-  );
+  const playerBannedSlots: number[] = hasRoster
+    ? roster!.map((_, i) => i).filter(i => (playerFatigue[i] || 0) >= 1)
+    : [];
+  const playerBannedUnits: UnitType[] = hasRoster
+    ? [] // not used in slot mode (picker uses bannedSlots)
+    : UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 1);
   const enemyBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (enemyFatigue[t] || 0) >= 1);
+
 
   // Morale boost state
   const [moraleBoostUsed, setMoraleBoostUsed] = useState(false);
@@ -175,23 +186,53 @@ export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[])
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore);
   const enemyMaxUnits = getMaxUnits(enemyScore, playerScore);
 
+  // In slot mode: each placed instance consumes its slot for the round → can't reuse.
+  const placedSlots = new Set<number>(
+    playerUnits.map(u => u.slotIndex).filter((i): i is number => i !== undefined)
+  );
+
   // Place unit
   const placeUnit = useCallback((row: number, col: number) => {
-    if (phase !== 'place_player' || !selectedUnit) return;
-    if (playerBannedUnits.includes(selectedUnit)) return; // Fatigue ban
+    if (phase !== 'place_player') return;
     if (!PLAYER_ROWS.includes(row)) return;
     if (playerUnits.length >= playerMaxUnits) return;
     if (grid[row][col].unit) return;
-    if (grid[row][col].terrain === 'water') return; // Can't place on water
+    if (grid[row][col].terrain === 'water') return;
 
-    const unit = createUnit(selectedUnit, 'player', row, col);
+    let type: UnitType | null = null;
+    let color: ColorGroup | undefined;
+    let slotIdx: number | undefined;
+
+    if (hasRoster) {
+      if (selectedSlot === null) return;
+      if (playerBannedSlots.includes(selectedSlot)) return;
+      if (placedSlots.has(selectedSlot)) return; // each slot once per round
+      type = roster![selectedSlot];
+      color = SLOT_COLORS[selectedSlot];
+      slotIdx = selectedSlot;
+    } else {
+      if (!selectedUnit) return;
+      if (playerBannedUnits.includes(selectedUnit)) return;
+      type = selectedUnit;
+    }
+
+    const unit = createUnit(type, 'player', row, col, color, slotIdx);
     setPlayerUnits(prev => [...prev, unit]);
     setGrid(prev => {
       const next = prev.map(r => r.map(c => ({ ...c })));
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
-  }, [phase, selectedUnit, playerUnits, grid, playerMaxUnits, playerBannedUnits]);
+
+    // Auto-advance to next available slot in slot mode
+    if (hasRoster && selectedSlot !== null) {
+      const newPlaced = new Set(placedSlots);
+      newPlaced.add(selectedSlot);
+      const nextSlot = roster!.findIndex((_, i) => !newPlaced.has(i) && !playerBannedSlots.includes(i));
+      if (nextSlot >= 0) setSelectedSlot(nextSlot);
+    }
+  }, [phase, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, playerMaxUnits, playerBannedUnits, playerBannedSlots, placedSlots]);
+
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
@@ -686,8 +727,10 @@ export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[])
 
           const def = UNIT_DEFS[unit.type];
           const tDef = UNIT_DEFS[target.type];
-          const isStrong = def.strongVs.includes(target.type);
-          const isWeak = def.weakVs.includes(target.type);
+          const uColor = unit.color || UNIT_COLOR_GROUPS[unit.type];
+          const tColor = target.color || UNIT_COLOR_GROUPS[target.type];
+          const isStrong = (uColor === 'red' && tColor === 'green') || (uColor === 'green' && tColor === 'blue') || (uColor === 'blue' && tColor === 'red');
+          const isWeak = (tColor === 'red' && uColor === 'green') || (tColor === 'green' && uColor === 'blue') || (tColor === 'blue' && uColor === 'red');
           const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
           const dist = Math.abs(unit.row - target.row) + Math.abs(unit.col - target.col);
           logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.frozen ? ' 🧊' : ''}${target.hp <= 0 ? ' ☠️' : ''}`);
@@ -923,15 +966,22 @@ export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[])
     // Update fatigue: surviving unit types get +1 fatigue, dead ones reset to 0
     // Also, banned types reset to 0 (they rested this round)
     setPlayerFatigue(prev => {
-      const next = { ...prev };
-      const survivingTypes = new Set(playerUnits.filter(u => u.hp > 0 && !u.dead).map(u => u.type));
-      for (const t of UNIT_TYPES) {
-        if (playerBannedUnits.includes(t)) {
-          next[t] = 0; // rested this round
-        } else if (survivingTypes.has(t)) {
-          next[t] = 1; // survived → immediately banned next round
-        } else {
-          next[t] = 0; // died or wasn't used
+      const next: Record<string, number> = { ...prev };
+      if (hasRoster) {
+        const survivingSlots = new Set(
+          playerUnits.filter(u => u.hp > 0 && !u.dead && u.slotIndex !== undefined).map(u => u.slotIndex!)
+        );
+        for (let i = 0; i < 9; i++) {
+          if (playerBannedSlots.includes(i)) next[i] = 0;
+          else if (survivingSlots.has(i)) next[i] = 1;
+          else next[i] = 0;
+        }
+      } else {
+        const survivingTypes = new Set(playerUnits.filter(u => u.hp > 0 && !u.dead).map(u => u.type));
+        for (const t of UNIT_TYPES) {
+          if (playerBannedUnits.includes(t)) next[t] = 0;
+          else if (survivingTypes.has(t)) next[t] = 1;
+          else next[t] = 0;
         }
       }
       return next;
@@ -1017,6 +1067,9 @@ export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[])
 
   return {
     grid, phase, selectedUnit, setSelectedUnit,
+    selectedSlot, setSelectedSlot,
+    roster: hasRoster ? roster! : undefined,
+    placedSlots: Array.from(placedSlots),
     playerUnits, enemyUnits, turnCount, battleLog, battleEvents, battleTimer,
     playerScore, enemyScore, roundNumber, playerStarts,
     playerMaxUnits, enemyMaxUnits,
@@ -1033,6 +1086,7 @@ export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[])
     acceptDraw, continueOvertime,
     // Fatigue system
     playerBannedUnits,
+    playerBannedSlots,
     playerFatigue,
     // Placement timer
     placeTimer: hasPlaceTimer ? placeTimer : undefined,

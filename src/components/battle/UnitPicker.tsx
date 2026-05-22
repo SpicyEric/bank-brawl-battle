@@ -13,9 +13,12 @@ const COLOR_BG: Record<ColorGroup, string> = {
   green: 'bg-unit-green/15',
 };
 
+const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
+
 const LONG_PRESS_MS = 400;
 
 interface UnitPickerProps {
+  // Legacy (no roster) mode
   selected: UnitType | null;
   onSelect: (type: UnitType) => void;
   placedCount: number;
@@ -23,10 +26,19 @@ interface UnitPickerProps {
   bannedUnits?: UnitType[];
   fatigue?: Record<string, number>;
   unitTypes?: UnitType[];
+  // Slot mode (when roster is given): selection by slot index
+  roster?: UnitType[]; // length 9
+  selectedSlot?: number | null;
+  onSelectSlot?: (slot: number) => void;
+  bannedSlots?: number[];
+  placedSlots?: number[]; // slots already placed this round
 }
 
-export function UnitPicker({ selected, onSelect, placedCount, maxUnits, bannedUnits = [], fatigue = {}, unitTypes }: UnitPickerProps) {
-  const types = unitTypes && unitTypes.length > 0 ? unitTypes : UNIT_TYPES;
+export function UnitPicker({
+  selected, onSelect, placedCount, maxUnits,
+  bannedUnits = [], fatigue = {}, unitTypes,
+  roster, selectedSlot = null, onSelectSlot, bannedSlots = [], placedSlots = [],
+}: UnitPickerProps) {
   const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
@@ -40,17 +52,76 @@ export function UnitPicker({ selected, onSelect, placedCount, maxUnits, bannedUn
   }, []);
 
   const cancelPress = useCallback(() => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
   }, []);
 
+  // ─── Slot mode ───────────────────────────────────────────
+  if (roster && roster.length === 9) {
+    const handleSlotClick = (idx: number) => {
+      if (didLongPress.current) { didLongPress.current = false; return; }
+      if (bannedSlots.includes(idx) || placedSlots.includes(idx)) return;
+      onSelectSlot?.(idx);
+    };
+    return (
+      <>
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground text-center">{placedCount}/{maxUnits} platziert · <span className="text-[10px] opacity-60">gedrückt halten = Info</span></p>
+          <div className="grid grid-cols-3 gap-2">
+            {roster.map((type, idx) => {
+              const def = UNIT_DEFS[type];
+              const color = SLOT_COLORS[idx];
+              const isSelected = selectedSlot === idx;
+              const isPlaced = placedSlots.includes(idx);
+              const isBanned = bannedSlots.includes(idx);
+              const disabled = isBanned || isPlaced;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => handleSlotClick(idx)}
+                  onTouchStart={() => startPress(type)}
+                  onTouchEnd={cancelPress}
+                  onTouchCancel={cancelPress}
+                  onMouseDown={() => startPress(type)}
+                  onMouseUp={cancelPress}
+                  onMouseLeave={cancelPress}
+                  onContextMenu={(e) => e.preventDefault()}
+                  disabled={disabled}
+                  className={`p-2 rounded-xl border-2 transition-all text-center relative select-none ${
+                    disabled
+                      ? `border-border bg-muted/30 opacity-40 cursor-not-allowed ${isBanned ? 'grayscale' : ''}`
+                      : isSelected
+                      ? `${COLOR_BORDER[color]} ${COLOR_BG[color]} ring-1 ring-primary`
+                      : `border-border ${COLOR_BG[color]}`
+                  }`}
+                >
+                  {(isBanned || isPlaced) && (
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                      <span className="text-lg">{isPlaced ? '✓' : '💤'}</span>
+                    </div>
+                  )}
+                  <span className="text-xl block">{def.emoji}</span>
+                  <p className="text-[10px] font-semibold text-foreground mt-1">{def.label}</p>
+                  <p className="text-[9px] text-muted-foreground">
+                    {isBanned ? 'Ermüdet' : isPlaced ? 'Platziert' : <>❤️{def.hp} ⚔️{def.attack}</>}
+                  </p>
+                  <div className={`absolute top-0.5 left-0.5 w-2 h-2 rounded-full ${
+                    color === 'red' ? 'bg-unit-red' : color === 'blue' ? 'bg-unit-blue' : 'bg-unit-green'
+                  }`} />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
+      </>
+    );
+  }
+
+  // ─── Legacy type-based mode (tutorial, multiplayer) ────────
+  const types = unitTypes && unitTypes.length > 0 ? unitTypes : UNIT_TYPES;
+
   const handleClick = useCallback((type: UnitType) => {
-    if (didLongPress.current) {
-      didLongPress.current = false;
-      return; // was a long press, don't select
-    }
+    if (didLongPress.current) { didLongPress.current = false; return; }
     onSelect(type);
   }, [onSelect]);
 
@@ -106,9 +177,7 @@ export function UnitPicker({ selected, onSelect, placedCount, maxUnits, bannedUn
         </div>
       </div>
 
-      {infoUnit && (
-        <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />
-      )}
+      {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
     </>
   );
 }

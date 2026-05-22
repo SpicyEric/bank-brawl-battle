@@ -43,12 +43,13 @@ function SinglePlayerGame() {
   const [searchParams] = useSearchParams();
   const difficulty = parseInt(searchParams.get('difficulty') || '3', 10);
   const rosterParam = searchParams.get('roster');
-  const allowedUnits = rosterParam ? (rosterParam.split(',').filter(Boolean) as UnitType[]) : undefined;
-  const game = useBattleGame(difficulty, allowedUnits);
-  return <GameUI game={game} isMultiplayer={false} allowedUnits={allowedUnits} />;
+  const roster = rosterParam ? (rosterParam.split(',').filter(Boolean) as UnitType[]) : undefined;
+  const validRoster = roster && roster.length === 9 ? roster : undefined;
+  const game = useBattleGame(difficulty, validRoster);
+  return <GameUI game={game} isMultiplayer={false} roster={validRoster} />;
 }
 
-function GameUI({ game, isMultiplayer, flipped, allowedUnits }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; allowedUnits?: UnitType[] }) {
+function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; roster?: UnitType[] }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
@@ -187,10 +188,14 @@ function GameUI({ game, isMultiplayer, flipped, allowedUnits }: { game: ReturnTy
                 setLastPlaced(null);
                 return;
               }
-              if (game.selectedUnit && !game.grid[row][col].unit && game.grid[row][col].terrain !== 'water') {
+              const canPlace = roster
+                ? (game.selectedSlot !== null && !game.placedSlots?.includes(game.selectedSlot) && !game.playerBannedSlots?.includes(game.selectedSlot))
+                : !!game.selectedUnit;
+              if (canPlace && !game.grid[row][col].unit && game.grid[row][col].terrain !== 'water') {
+                const type = roster && game.selectedSlot !== null ? roster[game.selectedSlot] : game.selectedUnit;
                 game.placeUnit(row, col);
                 sfxPlace();
-                setLastPlaced({ row, col, type: game.selectedUnit });
+                if (type) setLastPlaced({ row, col, type });
               }
               return;
             }
@@ -242,7 +247,11 @@ function GameUI({ game, isMultiplayer, flipped, allowedUnits }: { game: ReturnTy
               maxUnits={game.playerMaxUnits}
               bannedUnits={game.playerBannedUnits}
               fatigue={game.playerFatigue}
-              unitTypes={allowedUnits}
+              roster={roster}
+              selectedSlot={game.selectedSlot}
+              onSelectSlot={game.setSelectedSlot}
+              bannedSlots={game.playerBannedSlots}
+              placedSlots={game.placedSlots}
             />
             <button
               onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
