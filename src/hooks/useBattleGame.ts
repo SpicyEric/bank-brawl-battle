@@ -10,11 +10,18 @@ import {
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 
-export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[]) {
+// Roster slots: 0..2 = red, 3..5 = green, 6..8 = blue
+const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
+
+export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
+  const hasRoster = !!(roster && roster.length === 9);
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
-  const initialSelected = (allowedUnits && allowedUnits.length > 0 ? allowedUnits[0] : 'warrior') as UnitType;
-  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(initialSelected);
+  // Slot-based selection (when roster present). Otherwise legacy type-based.
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(hasRoster ? 0 : null);
+  const initialSelected = (hasRoster ? roster![0] : 'warrior') as UnitType;
+  const [selectedUnit, setSelectedUnitState] = useState<UnitType | null>(initialSelected);
+  const setSelectedUnit = useCallback((t: UnitType | null) => setSelectedUnitState(t), []);
   const [playerUnits, setPlayerUnits] = useState<Unit[]>([]);
   const [enemyUnits, setEnemyUnits] = useState<Unit[]>([]);
   const [turnCount, setTurnCount] = useState(0);
@@ -38,15 +45,19 @@ export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[])
   const playerUnitsRef = useRef(playerUnits);
   useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
 
-  // Fatigue system: tracks how many consecutive rounds each unit type survived
+  // Fatigue system:
+  // - Slot mode (roster): key = slot index (0..8). One slot = one bench-able unit instance.
+  // - Legacy mode: key = unit type.
   const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
   const [enemyFatigue, setEnemyFatigue] = useState<Record<string, number>>({});
-  // Banned units for current round (fatigue >= 1 — units that survived last round are immediately banned)
-  // Banned units = fatigued (>=1) OR not in player's chosen roster
-  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t =>
-    (playerFatigue[t] || 0) >= 1 || (allowedUnits ? !allowedUnits.includes(t) : false)
-  );
+  const playerBannedSlots: number[] = hasRoster
+    ? roster!.map((_, i) => i).filter(i => (playerFatigue[i] || 0) >= 1)
+    : [];
+  const playerBannedUnits: UnitType[] = hasRoster
+    ? [] // not used in slot mode (picker uses bannedSlots)
+    : UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 1);
   const enemyBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (enemyFatigue[t] || 0) >= 1);
+
 
   // Morale boost state
   const [moraleBoostUsed, setMoraleBoostUsed] = useState(false);
