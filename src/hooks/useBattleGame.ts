@@ -686,8 +686,10 @@ export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[])
 
           const def = UNIT_DEFS[unit.type];
           const tDef = UNIT_DEFS[target.type];
-          const isStrong = def.strongVs.includes(target.type);
-          const isWeak = def.weakVs.includes(target.type);
+          const uColor = (unit.color as any) || (await import('@/lib/battleGame')).UNIT_COLOR_GROUPS[unit.type];
+          const tColor = (target.color as any) || (await import('@/lib/battleGame')).UNIT_COLOR_GROUPS[target.type];
+          const isStrong = (uColor === 'red' && tColor === 'green') || (uColor === 'green' && tColor === 'blue') || (uColor === 'blue' && tColor === 'red');
+          const isWeak = (tColor === 'red' && uColor === 'green') || (tColor === 'green' && uColor === 'blue') || (tColor === 'blue' && uColor === 'red');
           const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
           const dist = Math.abs(unit.row - target.row) + Math.abs(unit.col - target.col);
           logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.frozen ? ' 🧊' : ''}${target.hp <= 0 ? ' ☠️' : ''}`);
