@@ -500,6 +500,22 @@ export function useBattleGame(difficulty: number = 2) {
         return true;
       }).sort((a, b) => a.maxCooldown - b.maxCooldown);
 
+      // === Burn DoT processing (Brandstifter / Arsonist) ===
+      for (const u of allUnits) {
+        if (!u.burning || u.burning.length === 0 || u.hp <= 0) continue;
+        let totalBurn = 0;
+        u.burning = u.burning.filter(b => {
+          totalBurn += b.dmg;
+          b.turns -= 1;
+          return b.turns > 0;
+        });
+        if (totalBurn > 0) {
+          u.hp = Math.max(0, u.hp - totalBurn);
+          logs.push(`🔥 ${UNIT_DEFS[u.type].emoji} brennt: -${totalBurn} ❤️${u.hp <= 0 ? ' ☠️' : ''}`);
+          if (u.hp <= 0) (u as any).dead = true;
+        }
+      }
+
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
 
