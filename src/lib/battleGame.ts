@@ -932,7 +932,8 @@ function hasAdjacentFriendlyTank(defender: Unit, grid: Cell[][]): boolean {
 // Calculate damage with counter system + terrain bonuses + shield aura
 export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): number {
   const aDef = UNIT_DEFS[attacker.type];
-  let dmg = attacker.attack * (0.95 + Math.random() * 0.1);
+  const baseAtk = attacker.attack + (attacker.judgeBonus || 0);
+  let dmg = baseAtk * (0.95 + Math.random() * 0.1);
 
   if (aDef.strongVs.includes(defender.type)) {
     dmg *= COUNTER_MULTIPLIER;
@@ -940,20 +941,28 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
     dmg *= WEAKNESS_MULTIPLIER;
   }
 
+  const attackerTerrain = grid?.[attacker.row]?.[attacker.col]?.terrain;
+  const defenderTerrain = grid?.[defender.row]?.[defender.col]?.terrain;
+  const dist = Math.abs(attacker.row - defender.row) + Math.abs(attacker.col - defender.col);
+  const isRanged = dist > 1;
+
   // Hill bonus: attacker on hill deals +15% damage
-  if (grid && grid[attacker.row][attacker.col].terrain === 'hill') {
-    dmg *= 1.15;
-  }
+  if (attackerTerrain === 'hill') dmg *= 1.15;
 
   // Forest bonus: defender in forest takes -20% damage
-  if (grid && grid[defender.row][defender.col].terrain === 'forest') {
-    dmg *= 0.8;
-  }
+  if (defenderTerrain === 'forest') dmg *= 0.8;
 
-// Shield aura: defender adjacent to friendly tank takes -20% damage (tanks also protect each other)
-  if (grid && hasAdjacentFriendlyTank(defender, grid)) {
-    dmg *= 0.8;
-  }
+  // Ranger: +100% damage when standing in forest
+  if (attacker.type === 'ranger' && attackerTerrain === 'forest') dmg *= 2.0;
+
+  // Waterwalker: -30% incoming damage on water
+  if (defender.type === 'waterwalker' && defenderTerrain === 'water') dmg *= 0.7;
+
+  // Mountaineer: immune to ranged damage while on a hill
+  if (defender.type === 'mountaineer' && defenderTerrain === 'hill' && isRanged) dmg = 0;
+
+  // Shield aura: defender adjacent to friendly tank takes -20% damage
+  if (grid && hasAdjacentFriendlyTank(defender, grid)) dmg *= 0.8;
 
   return Math.floor(dmg);
 }
