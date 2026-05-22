@@ -255,9 +255,179 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: ['rider', 'archer', 'frost'],
     weakVs: ['warrior', 'assassin', 'dragon'],
   },
+  // ===== NEW UNITS v2 =====
+  // Behaviors that fit cleanly into the engine are implemented in calcDamage/battleTick.
+  // Mechanics marked "(geplant)" in the description are currently approximated via stats/patterns.
+  banshee: {
+    label: 'Banshee', emoji: '👻', hp: 70, attack: 16, cooldown: 2,
+    description: 'Diagonale Bewegung in alle Richtungen. (geplant: bleibt als Geist nach Tod aktiv.)',
+    movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
+    attackPattern: DIAGONAL,
+    strongVs: [], weakVs: [],
+  },
+  vampire: {
+    label: 'Vampir', emoji: '🧛', hp: 80, attack: 19, cooldown: 2,
+    description: 'Lifesteal 30%. Bei Overheal explodiert er sofort für 25 Splash an angrenzende Feinde.',
+    movePattern: DIAGONAL,
+    attackPattern: DIAGONAL,
+    strongVs: [], weakVs: [],
+  },
+  vulkanit: {
+    label: 'Vulkanit', emoji: '🌋', hp: 90, attack: 20, cooldown: 3,
+    description: 'Schwerer Nahkämpfer. (geplant: verwandelt Hügel zu Lava-Feldern, die Schaden verursachen.)',
+    movePattern: ALL_ADJACENT,
+    attackPattern: ALL_ADJACENT,
+    strongVs: [], weakVs: [],
+  },
+  shadowblade: {
+    label: 'Schattenklinge', emoji: '🥷', hp: 60, attack: 20, cooldown: 2,
+    description: 'Schneller Diagonal-Springer. (geplant: Stealth außerhalb Angriffsreichweite, +50% erster Angriff.)',
+    movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
+    attackPattern: DIAGONAL,
+    strongVs: [], weakVs: [],
+  },
+  stormrunner: {
+    label: 'Sturmläufer', emoji: '⚡', hp: 55, attack: 16, cooldown: 1,
+    description: 'Greift jede Runde an. 2 Felder orthogonale Bewegung pro Zug.',
+    movePattern: [...ORTHOGONAL, { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 }],
+    attackPattern: ORTHOGONAL,
+    strongVs: [], weakVs: [],
+  },
+  arsonist: {
+    label: 'Brandstifter', emoji: '🔥', hp: 65, attack: 4, cooldown: 2,
+    description: 'Geringer Sofortschaden, zündet aber an: 5 Schaden pro Runde für 4 Runden. Stapelbar.',
+    movePattern: ALL_ADJACENT,
+    attackPattern: ALL_ADJACENT,
+    strongVs: [], weakVs: [],
+  },
+  lightning: {
+    label: 'Blitzmagier', emoji: '🌩️', hp: 75, attack: 18, cooldown: 2,
+    description: 'Angriff springt auf alle Feinde im Radius 1 ums Primärziel (50% Schaden).',
+    movePattern: ALL_ADJACENT,
+    attackPattern: [
+      ...ORTHOGONAL,
+      { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
+    ],
+    strongVs: [], weakVs: [],
+  },
+  mirror: {
+    label: 'Spiegelkämpfer', emoji: '🪞', hp: 75, attack: 14, cooldown: 2,
+    description: 'Orthogonaler Nahkämpfer. (geplant: 30% Schadensreflektion, AoE-Explosion bei Tod.)',
+    movePattern: ORTHOGONAL,
+    attackPattern: ORTHOGONAL,
+    strongVs: [], weakVs: [],
+  },
+  lamb: {
+    label: 'Opferlamm', emoji: '🐑', hp: 120, attack: 5, cooldown: 5,
+    description: 'Sehr zäh, wenig Schaden. Zieht Aggro auf sich (Taunt). (geplant: Heilung bei Tod.)',
+    movePattern: ORTHOGONAL,
+    attackPattern: ORTHOGONAL,
+    strongVs: [], weakVs: [],
+  },
+  judge: {
+    label: 'Richter', emoji: '⚖️', hp: 100, attack: 8, cooldown: 2,
+    description: 'Pro gefallenem Verbündeten: +8 ATK permanent in dieser Runde.',
+    movePattern: ORTHOGONAL,
+    attackPattern: ORTHOGONAL,
+    strongVs: [], weakVs: [],
+  },
+  icegolem: {
+    label: 'Eisgolem', emoji: '🧊', hp: 200, attack: 25, cooldown: 4,
+    description: 'Riesiger Tank. (geplant: bewegt sich nur jede 2. Runde, verlangsamt Nahkampf-Angreifer.)',
+    movePattern: ORTHOGONAL,
+    attackPattern: ORTHOGONAL,
+    strongVs: [], weakVs: [],
+  },
+  ranger: {
+    label: 'Waldläufer', emoji: '🪵', hp: 70, attack: 14, cooldown: 2,
+    description: 'Im Wald: +100% Schaden. Bewegt sich in alle 8 Richtungen.',
+    movePattern: ALL_ADJACENT,
+    attackPattern: ALL_ADJACENT,
+    strongVs: [], weakVs: [],
+  },
+  mountaineer: {
+    label: 'Bergkrieger', emoji: '🪨', hp: 130, attack: 21, cooldown: 3,
+    description: 'Auf Hügeln: immun gegen Fernkampf-Schaden.',
+    movePattern: ORTHOGONAL,
+    attackPattern: ORTHOGONAL,
+    strongVs: [], weakVs: [],
+  },
+  cloner: {
+    label: 'Kloner', emoji: '🧬', hp: 90, attack: 12, cooldown: 2,
+    description: 'Solider Allrounder. (geplant: spawnt alle 4 Runden einen Klon.)',
+    movePattern: ORTHOGONAL,
+    attackPattern: ORTHOGONAL,
+    strongVs: [], weakVs: [],
+  },
+  magnetiker: {
+    label: 'Magnetiker', emoji: '🧲', hp: 80, attack: 12, cooldown: 2,
+    description: 'Orthogonaler Nahkämpfer. (geplant: zieht Gegner heran, AoE bei Cluster.)',
+    movePattern: ORTHOGONAL,
+    attackPattern: ORTHOGONAL,
+    strongVs: [], weakVs: [],
+  },
+  spiderqueen: {
+    label: 'Spinnenkönigin', emoji: '🕷️', hp: 70, attack: 15, cooldown: 2,
+    description: 'Bewegt sich in alle 8 Richtungen (bis 2 Felder). (geplant: verlangsamt Feinde mit Netzen.)',
+    movePattern: [
+      ...ALL_ADJACENT,
+      { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
+      { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 },
+    ],
+    attackPattern: ALL_ADJACENT,
+    strongVs: [], weakVs: [],
+  },
+  waterwalker: {
+    label: 'Wasserwandler', emoji: '🌊', hp: 85, attack: 19, cooldown: 2,
+    description: 'Auf Wasserfeldern: -30% erlittener Schaden, doppelte Bewegung. Kann Wasser betreten.',
+    movePattern: ALL_ADJACENT,
+    attackPattern: ALL_ADJACENT,
+    strongVs: [], weakVs: [],
+  },
+  doppelganger: {
+    label: 'Doppelgänger', emoji: '👥', hp: 85, attack: 17, cooldown: 2,
+    description: 'Diagonale Bewegung. (geplant: spawnt ein Phantom-Duplikat.)',
+    movePattern: DIAGONAL,
+    attackPattern: DIAGONAL,
+    strongVs: [], weakVs: [],
+  },
+  sniper: {
+    label: 'Scharfschütze', emoji: '🎯', hp: 50, attack: 30, cooldown: 3,
+    description: 'Bewegt sich nie. Greift immer die Einheit mit niedrigstem HP auf dem ganzen Feld an.',
+    movePattern: [],
+    attackPattern: (() => {
+      const p: Position[] = [];
+      for (let dr = -GRID_SIZE; dr <= GRID_SIZE; dr++) for (let dc = -GRID_SIZE; dc <= GRID_SIZE; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        p.push({ row: dr, col: dc });
+      }
+      return p;
+    })(),
+    strongVs: [], weakVs: [],
+  },
+  chaindancer: {
+    label: 'Kettentänzer', emoji: '🪢', hp: 65, attack: 22, cooldown: 3,
+    description: 'Hohe Schadensspitzen. Diagonale Bewegung bis 2 Felder. (geplant: Kettenangriff durch 3 Feinde.)',
+    movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
+    attackPattern: DIAGONAL,
+    strongVs: [], weakVs: [],
+  },
 };
 
-export const UNIT_TYPES: UnitType[] = ['warrior', 'assassin', 'dragon', 'tank', 'mage', 'healer', 'rider', 'archer', 'frost'];
+// Auto-populate strongVs/weakVs for ALL units based on color group (RPS).
+{
+  const colorMembers: Record<ColorGroup, UnitType[]> = { red: [], green: [], blue: [] };
+  (Object.keys(UNIT_COLOR_GROUPS) as UnitType[]).forEach(t => colorMembers[UNIT_COLOR_GROUPS[t]].push(t));
+  (Object.keys(UNIT_DEFS) as UnitType[]).forEach(t => {
+    const myColor = UNIT_COLOR_GROUPS[t];
+    const beats = COLOR_BEATS[myColor];
+    const losesTo = (Object.keys(COLOR_BEATS) as ColorGroup[]).find(k => COLOR_BEATS[k] === myColor)!;
+    UNIT_DEFS[t].strongVs = colorMembers[beats];
+    UNIT_DEFS[t].weakVs = colorMembers[losesTo];
+  });
+}
+
+export const UNIT_TYPES: UnitType[] = Object.keys(UNIT_DEFS) as UnitType[];
 export const BASE_UNITS = 5;
 export const MAX_UNITS = 7; // absolute cap
 
