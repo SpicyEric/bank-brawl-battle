@@ -10,10 +10,11 @@ import {
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 
-export function useBattleGame(difficulty: number = 2) {
+export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[]) {
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
-  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>('warrior');
+  const initialSelected = (allowedUnits && allowedUnits.length > 0 ? allowedUnits[0] : 'warrior') as UnitType;
+  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(initialSelected);
   const [playerUnits, setPlayerUnits] = useState<Unit[]>([]);
   const [enemyUnits, setEnemyUnits] = useState<Unit[]>([]);
   const [turnCount, setTurnCount] = useState(0);
