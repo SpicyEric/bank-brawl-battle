@@ -109,7 +109,7 @@ export function subscribeToRoom(
 export async function updateRoom(roomId: string, updates: Record<string, any>) {
   const { error } = await supabase
     .from('game_rooms')
-    .update(updates)
+    .update(updates as any)
     .eq('id', roomId);
   if (error) throw error;
 }

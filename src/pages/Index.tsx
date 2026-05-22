@@ -41,12 +41,14 @@ function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | '
 
 function SinglePlayerGame() {
   const [searchParams] = useSearchParams();
-  const difficulty = parseInt(searchParams.get('difficulty') || '2', 10);
-  const game = useBattleGame(difficulty);
-  return <GameUI game={game} isMultiplayer={false} />;
+  const difficulty = parseInt(searchParams.get('difficulty') || '3', 10);
+  const rosterParam = searchParams.get('roster');
+  const allowedUnits = rosterParam ? (rosterParam.split(',').filter(Boolean) as UnitType[]) : undefined;
+  const game = useBattleGame(difficulty, allowedUnits);
+  return <GameUI game={game} isMultiplayer={false} allowedUnits={allowedUnits} />;
 }
 
-function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean }) {
+function GameUI({ game, isMultiplayer, flipped, allowedUnits }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; allowedUnits?: UnitType[] }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
@@ -240,6 +242,7 @@ function GameUI({ game, isMultiplayer, flipped }: { game: ReturnType<typeof useB
               maxUnits={game.playerMaxUnits}
               bannedUnits={game.playerBannedUnits}
               fatigue={game.playerFatigue}
+              unitTypes={allowedUnits}
             />
             <button
               onClick={() => { game.confirmPlacement(); sfxConfirm(); }}

@@ -22,9 +22,11 @@ interface UnitPickerProps {
   maxUnits: number;
   bannedUnits?: UnitType[];
   fatigue?: Record<string, number>;
+  unitTypes?: UnitType[];
 }
 
-export function UnitPicker({ selected, onSelect, placedCount, maxUnits, bannedUnits = [], fatigue = {} }: UnitPickerProps) {
+export function UnitPicker({ selected, onSelect, placedCount, maxUnits, bannedUnits = [], fatigue = {}, unitTypes }: UnitPickerProps) {
+  const types = unitTypes && unitTypes.length > 0 ? unitTypes : UNIT_TYPES;
   const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
@@ -57,7 +59,7 @@ export function UnitPicker({ selected, onSelect, placedCount, maxUnits, bannedUn
       <div className="space-y-2">
         <p className="text-xs text-muted-foreground text-center">{placedCount}/{maxUnits} platziert · <span className="text-[10px] opacity-60">gedrückt halten = Info</span></p>
         <div className="grid grid-cols-3 gap-2">
-          {UNIT_TYPES.map(type => {
+          {types.map(type => {
             const def = UNIT_DEFS[type];
             const color = UNIT_COLOR_GROUPS[type];
             const isSelected = selected === type;

@@ -60,7 +60,7 @@ const SinglePlayer = () => {
 
               {/* Vs KI */}
               <button
-                onClick={() => setSubMenu('difficulty')}
+                onClick={() => navigate('/roster')}
                 className="w-full py-4 px-4 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:opacity-90 active:scale-[0.97] transition-all flex items-center gap-3 shadow-[0_0_20px_hsl(var(--primary)/0.3)]"
               >
                 <Swords size={20} className="shrink-0" />

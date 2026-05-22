@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import SinglePlayer from "./pages/SinglePlayer";
 import Tutorial from "./pages/Tutorial";
 import Multiplayer from "./pages/Multiplayer";
+import UnitRoster from "./pages/UnitRoster";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -23,6 +24,7 @@ const App = () => (
           <Route path="/singleplayer" element={<SinglePlayer />} />
           <Route path="/tutorial" element={<Tutorial />} />
           <Route path="/game" element={<Index />} />
+          <Route path="/roster" element={<UnitRoster />} />
           <Route path="/multiplayer" element={<Multiplayer />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

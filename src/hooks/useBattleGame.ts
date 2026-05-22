@@ -10,10 +10,11 @@ import {
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 
-export function useBattleGame(difficulty: number = 2) {
+export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[]) {
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
-  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>('warrior');
+  const initialSelected = (allowedUnits && allowedUnits.length > 0 ? allowedUnits[0] : 'warrior') as UnitType;
+  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(initialSelected);
   const [playerUnits, setPlayerUnits] = useState<Unit[]>([]);
   const [enemyUnits, setEnemyUnits] = useState<Unit[]>([]);
   const [turnCount, setTurnCount] = useState(0);
@@ -41,7 +42,10 @@ export function useBattleGame(difficulty: number = 2) {
   const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
   const [enemyFatigue, setEnemyFatigue] = useState<Record<string, number>>({});
   // Banned units for current round (fatigue >= 1 — units that survived last round are immediately banned)
-  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 1);
+  // Banned units = fatigued (>=1) OR not in player's chosen roster
+  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t =>
+    (playerFatigue[t] || 0) >= 1 || (allowedUnits ? !allowedUnits.includes(t) : false)
+  );
   const enemyBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (enemyFatigue[t] || 0) >= 1);
 
   // Morale boost state
@@ -500,6 +504,22 @@ export function useBattleGame(difficulty: number = 2) {
         return true;
       }).sort((a, b) => a.maxCooldown - b.maxCooldown);
 
+      // === Burn DoT processing (Brandstifter / Arsonist) ===
+      for (const u of allUnits) {
+        if (!u.burning || u.burning.length === 0 || u.hp <= 0) continue;
+        let totalBurn = 0;
+        u.burning = u.burning.filter(b => {
+          totalBurn += b.dmg;
+          b.turns -= 1;
+          return b.turns > 0;
+        });
+        if (totalBurn > 0) {
+          u.hp = Math.max(0, u.hp - totalBurn);
+          logs.push(`🔥 ${UNIT_DEFS[u.type].emoji} brennt: -${totalBurn} ❤️${u.hp <= 0 ? ' ☠️' : ''}`);
+          if (u.hp <= 0) (u as any).dead = true;
+        }
+      }
+
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
 
@@ -619,6 +639,51 @@ export function useBattleGame(difficulty: number = 2) {
             didFreeze = true;
           }
 
+          // === NEW UNIT EFFECTS ===
+          // Vampire: lifesteal 30%, explode at overheal
+          if (unit.type === 'vampire' && dmg > 0) {
+            const heal = Math.round(dmg * 0.3);
+            unit.hp = Math.min(unit.maxHp + 30, unit.hp + heal); // allow brief overheal cap
+            if (unit.hp > unit.maxHp) {
+              // Explode for 25 splash to adjacent enemies, then revert to maxHp
+              for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                const ar = unit.row + dr, ac = unit.col + dc;
+                if (ar < 0 || ar >= GRID_SIZE || ac < 0 || ac >= GRID_SIZE) continue;
+                const cu = newGrid[ar][ac].unit;
+                if (cu && cu.hp > 0 && !cu.dead && cu.team !== unit.team) {
+                  cu.hp = Math.max(0, cu.hp - 25);
+                  if (cu.hp <= 0) (cu as any).dead = true;
+                }
+              }
+              logs.push(`🧛 ${unit.team === 'player' ? '👤' : '💀'} Vampir EXPLODIERT! (Splash 25)`);
+              unit.hp = unit.maxHp;
+            }
+          }
+
+          // Arsonist: apply burning DoT stack (5 dmg / turn, 4 turns)
+          if (unit.type === 'arsonist' && target.hp > 0) {
+            target.burning = [...(target.burning || []), { dmg: 5, turns: 4 }];
+          }
+
+          // Judge: +8 ATK for each fallen ally — recalculated below at end of tick.
+
+          // Lightning: chain to adjacent enemies for 50% damage
+          if (unit.type === 'lightning') {
+            const chainDmg = Math.round(dmg * 0.5);
+            for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              const ar = target.row + dr, ac = target.col + dc;
+              if (ar < 0 || ar >= GRID_SIZE || ac < 0 || ac >= GRID_SIZE) continue;
+              const cu = newGrid[ar][ac].unit;
+              if (cu && cu.hp > 0 && !cu.dead && cu.team !== unit.team && cu.id !== target.id) {
+                cu.hp = Math.max(0, cu.hp - chainDmg);
+                if (cu.hp <= 0) (cu as any).dead = true;
+                logs.push(`⚡ Blitz → ${UNIT_DEFS[cu.type].emoji} ${chainDmg} (Kettenblitz)`);
+              }
+            }
+          }
+
           const def = UNIT_DEFS[unit.type];
           const tDef = UNIT_DEFS[target.type];
           const isStrong = def.strongVs.includes(target.type);
@@ -710,6 +775,15 @@ export function useBattleGame(difficulty: number = 2) {
           }
         }
       }
+
+      // === Judge: +8 ATK per fallen ally (recomputed each tick) ===
+      for (const u of allUnits) {
+        if (u.type !== 'judge' || u.hp <= 0) continue;
+        const fallenAllies = allUnits.filter(a => a.team === u.team && a.dead && a.id !== u.id).length
+          + (u.team === 'player' ? (playerUnits.length - allUnits.filter(a => a.team === 'player' && a.hp > 0).length) : 0);
+        u.judgeBonus = Math.max(u.judgeBonus || 0, fallenAllies * 8);
+      }
+
 
       if (logs.length > 0) {
         setBattleLog(prev => [...logs, ...prev].slice(0, 40));
