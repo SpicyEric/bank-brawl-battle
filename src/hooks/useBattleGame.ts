@@ -186,10 +186,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore);
   const enemyMaxUnits = getMaxUnits(enemyScore, playerScore);
 
-  // In slot mode: each placed instance consumes its slot for the round → can't reuse.
-  const placedSlots = new Set<number>(
-    playerUnits.map(u => u.slotIndex).filter((i): i is number => i !== undefined)
-  );
+  // Slot mode: slots can be reused on the battlefield (mono comps allowed).
+  // placedSlots is kept empty so the picker never disables a slot during placement.
+  const placedSlots = new Set<number>();
 
   // Place unit
   const placeUnit = useCallback((row: number, col: number) => {
