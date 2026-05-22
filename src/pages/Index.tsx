@@ -247,7 +247,11 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
               maxUnits={game.playerMaxUnits}
               bannedUnits={game.playerBannedUnits}
               fatigue={game.playerFatigue}
-              unitTypes={allowedUnits}
+              roster={roster}
+              selectedSlot={game.selectedSlot}
+              onSelectSlot={game.setSelectedSlot}
+              bannedSlots={game.playerBannedSlots}
+              placedSlots={game.placedSlots}
             />
             <button
               onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
