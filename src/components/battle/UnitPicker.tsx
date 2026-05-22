@@ -22,9 +22,11 @@ interface UnitPickerProps {
   maxUnits: number;
   bannedUnits?: UnitType[];
   fatigue?: Record<string, number>;
+  unitTypes?: UnitType[];
 }
 
-export function UnitPicker({ selected, onSelect, placedCount, maxUnits, bannedUnits = [], fatigue = {} }: UnitPickerProps) {
+export function UnitPicker({ selected, onSelect, placedCount, maxUnits, bannedUnits = [], fatigue = {}, unitTypes }: UnitPickerProps) {
+  const types = unitTypes && unitTypes.length > 0 ? unitTypes : UNIT_TYPES;
   const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
