@@ -188,10 +188,14 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
                 setLastPlaced(null);
                 return;
               }
-              if (game.selectedUnit && !game.grid[row][col].unit && game.grid[row][col].terrain !== 'water') {
+              const canPlace = roster
+                ? (game.selectedSlot !== null && !game.placedSlots?.includes(game.selectedSlot) && !game.playerBannedSlots?.includes(game.selectedSlot))
+                : !!game.selectedUnit;
+              if (canPlace && !game.grid[row][col].unit && game.grid[row][col].terrain !== 'water') {
+                const type = roster && game.selectedSlot !== null ? roster[game.selectedSlot] : game.selectedUnit;
                 game.placeUnit(row, col);
                 sfxPlace();
-                setLastPlaced({ row, col, type: game.selectedUnit });
+                if (type) setLastPlaced({ row, col, type });
               }
               return;
             }
