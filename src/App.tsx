@@ -24,6 +24,7 @@ const App = () => (
           <Route path="/singleplayer" element={<SinglePlayer />} />
           <Route path="/tutorial" element={<Tutorial />} />
           <Route path="/game" element={<Index />} />
+          <Route path="/roster" element={<UnitRoster />} />
           <Route path="/multiplayer" element={<Multiplayer />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
