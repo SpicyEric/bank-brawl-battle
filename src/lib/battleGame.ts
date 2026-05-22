@@ -30,6 +30,8 @@ export interface Unit {
   bondedToTankId?: string; // if placed adjacent to a tank, bonded for rigid formation
   bondBroken?: boolean; // once bond breaks (blocked move), unit moves freely
   movedWithTank?: boolean; // set to true when unit already moved this tick via tank formation
+  burning?: { dmg: number; turns: number }[]; // active burn DoT stacks (arsonist)
+  judgeBonus?: number; // extra ATK accrued by judge from fallen allies
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
