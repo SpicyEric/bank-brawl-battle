@@ -42,7 +42,10 @@ export function useBattleGame(difficulty: number = 2, allowedUnits?: UnitType[])
   const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
   const [enemyFatigue, setEnemyFatigue] = useState<Record<string, number>>({});
   // Banned units for current round (fatigue >= 1 — units that survived last round are immediately banned)
-  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 1);
+  // Banned units = fatigued (>=1) OR not in player's chosen roster
+  const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t =>
+    (playerFatigue[t] || 0) >= 1 || (allowedUnits ? !allowedUnits.includes(t) : false)
+  );
   const enemyBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (enemyFatigue[t] || 0) >= 1);
 
   // Morale boost state
