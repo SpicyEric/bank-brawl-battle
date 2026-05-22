@@ -339,7 +339,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isEnemyZone = flipped ? PLAYER_ROWS.includes(cell.row) : cell.row < 3;
           const unit = cell.unit;
           const def = unit ? UNIT_DEFS[unit.type] : null;
-          const colorGroup = unit && !unit.dead ? UNIT_COLOR_GROUPS[unit.type] : null;
+          const colorGroup = unit && !unit.dead ? (unit.color || UNIT_COLOR_GROUPS[unit.type]) : null;
           const showColorDot = colorGroup && (alwaysShowColorDots || phase === 'place_player' || phase === 'place_enemy');
           const hpPercent = unit && !unit.dead ? (unit.hp / unit.maxHp) * 100 : 0;
           const isLow = unit && !unit.dead ? unit.hp / unit.maxHp < 0.3 : false;
