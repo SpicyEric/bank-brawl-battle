@@ -1067,6 +1067,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
 
   return {
     grid, phase, selectedUnit, setSelectedUnit,
+    selectedSlot, setSelectedSlot,
+    roster: hasRoster ? roster! : undefined,
+    placedSlots: Array.from(placedSlots),
     playerUnits, enemyUnits, turnCount, battleLog, battleEvents, battleTimer,
     playerScore, enemyScore, roundNumber, playerStarts,
     playerMaxUnits, enemyMaxUnits,
@@ -1083,6 +1086,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     acceptDraw, continueOvertime,
     // Fatigue system
     playerBannedUnits,
+    playerBannedSlots,
     playerFatigue,
     // Placement timer
     placeTimer: hasPlaceTimer ? placeTimer : undefined,
