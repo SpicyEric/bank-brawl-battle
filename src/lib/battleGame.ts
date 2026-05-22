@@ -87,6 +87,13 @@ export const UNIT_COLOR_GROUPS: Record<UnitType, ColorGroup> = {
   tank: 'green',
   mage: 'green',
   healer: 'green',
+  // New (v2)
+  banshee: 'red', vampire: 'red', vulkanit: 'red', shadowblade: 'red',
+  stormrunner: 'red', arsonist: 'red', lightning: 'red',
+  mirror: 'green', lamb: 'green', judge: 'green', icegolem: 'green',
+  ranger: 'green', mountaineer: 'green', cloner: 'green',
+  magnetiker: 'blue', spiderqueen: 'blue', waterwalker: 'blue',
+  doppelganger: 'blue', sniper: 'blue', chaindancer: 'blue',
 };
 
 // Red > Green > Blue > Red (rock-paper-scissors)
