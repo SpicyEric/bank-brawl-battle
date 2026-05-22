@@ -21,6 +21,8 @@ export interface Unit {
   col: number;
   cooldown: number;
   maxCooldown: number;
+  color?: 'red' | 'blue' | 'green'; // per-instance color (assigned from roster slot for player units)
+  slotIndex?: number; // for player units: index in the chosen roster (0..8)
   dead?: boolean;
   frozen?: number; // turns remaining frozen (can't act)
   stuckTurns?: number; // turns without attacking – used for anti-stalemate
