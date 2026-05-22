@@ -944,9 +944,11 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   const baseAtk = attacker.attack + (attacker.judgeBonus || 0);
   let dmg = baseAtk * (0.95 + Math.random() * 0.1);
 
-  if (aDef.strongVs.includes(defender.type)) {
+  const aColor = getUnitColor(attacker);
+  const dColor = getUnitColor(defender);
+  if (COLOR_BEATS[aColor] === dColor) {
     dmg *= COUNTER_MULTIPLIER;
-  } else if (aDef.weakVs.includes(defender.type)) {
+  } else if (COLOR_BEATS[dColor] === aColor) {
     dmg *= WEAKNESS_MULTIPLIER;
   }
 
