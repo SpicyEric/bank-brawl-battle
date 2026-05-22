@@ -397,7 +397,8 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     movePattern: [],
     attackPattern: (() => {
       const p: Position[] = [];
-      for (let dr = -GRID_SIZE; dr <= GRID_SIZE; dr++) for (let dc = -GRID_SIZE; dc <= GRID_SIZE; dc++) {
+      const N = 8;
+      for (let dr = -N; dr <= N; dr++) for (let dc = -N; dc <= N; dc++) {
         if (dr === 0 && dc === 0) continue;
         p.push({ row: dr, col: dc });
       }
