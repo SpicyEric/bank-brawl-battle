@@ -43,12 +43,13 @@ function SinglePlayerGame() {
   const [searchParams] = useSearchParams();
   const difficulty = parseInt(searchParams.get('difficulty') || '3', 10);
   const rosterParam = searchParams.get('roster');
-  const allowedUnits = rosterParam ? (rosterParam.split(',').filter(Boolean) as UnitType[]) : undefined;
-  const game = useBattleGame(difficulty, allowedUnits);
-  return <GameUI game={game} isMultiplayer={false} allowedUnits={allowedUnits} />;
+  const roster = rosterParam ? (rosterParam.split(',').filter(Boolean) as UnitType[]) : undefined;
+  const validRoster = roster && roster.length === 9 ? roster : undefined;
+  const game = useBattleGame(difficulty, validRoster);
+  return <GameUI game={game} isMultiplayer={false} roster={validRoster} />;
 }
 
-function GameUI({ game, isMultiplayer, flipped, allowedUnits }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; allowedUnits?: UnitType[] }) {
+function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; roster?: UnitType[] }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
