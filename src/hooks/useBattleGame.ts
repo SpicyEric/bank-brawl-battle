@@ -222,13 +222,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       return next;
     });
 
-    // Auto-advance to next available slot in slot mode
-    if (hasRoster && selectedSlot !== null) {
-      const newPlaced = new Set(placedSlots);
-      newPlaced.add(selectedSlot);
-      const nextSlot = roster!.findIndex((_, i) => !newPlaced.has(i) && !playerBannedSlots.includes(i));
-      if (nextSlot >= 0) setSelectedSlot(nextSlot);
-    }
+    // Keep current slot selected so the user can place the same unit again (mono comps).
   }, [phase, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, playerMaxUnits, playerBannedUnits, playerBannedSlots, placedSlots]);
 
 
