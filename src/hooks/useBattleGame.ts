@@ -205,7 +205,6 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     if (hasRoster) {
       if (selectedSlot === null) return;
       if (playerBannedSlots.includes(selectedSlot)) return;
-      if (placedSlots.has(selectedSlot)) return; // each slot once per round
       type = roster![selectedSlot];
       color = SLOT_COLORS[selectedSlot];
       slotIdx = selectedSlot;
