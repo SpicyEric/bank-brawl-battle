@@ -1,4 +1,10 @@
-export type UnitType = 'warrior' | 'rider' | 'archer' | 'assassin' | 'mage' | 'tank' | 'dragon' | 'healer' | 'frost';
+export type UnitType =
+  | 'warrior' | 'rider' | 'archer' | 'assassin' | 'mage' | 'tank' | 'dragon' | 'healer' | 'frost'
+  // New units (v2):
+  | 'banshee' | 'magnetiker' | 'vulkanit' | 'mirror' | 'doppelganger'
+  | 'spiderqueen' | 'judge' | 'waterwalker' | 'chaindancer' | 'shadowblade'
+  | 'lamb' | 'vampire' | 'icegolem' | 'stormrunner' | 'ranger'
+  | 'arsonist' | 'lightning' | 'mountaineer' | 'sniper' | 'cloner';
 export type Team = 'player' | 'enemy';
 export type Phase = 'place_player' | 'place_enemy' | 'battle' | 'round_won' | 'round_lost' | 'round_draw' | 'game_draw';
 
