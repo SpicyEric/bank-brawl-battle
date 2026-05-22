@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import SinglePlayer from "./pages/SinglePlayer";
 import Tutorial from "./pages/Tutorial";
 import Multiplayer from "./pages/Multiplayer";
+import UnitRoster from "./pages/UnitRoster";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
