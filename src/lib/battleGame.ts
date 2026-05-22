@@ -528,7 +528,7 @@ export function getActivationTurn(row: number, team: Team): number {
   }
 }
 
-export function createUnit(type: UnitType, team: Team, row: number, col: number): Unit {
+export function createUnit(type: UnitType, team: Team, row: number, col: number, color?: 'red' | 'blue' | 'green', slotIndex?: number): Unit {
   const def = UNIT_DEFS[type];
   return {
     id: crypto.randomUUID(),
@@ -538,7 +538,14 @@ export function createUnit(type: UnitType, team: Team, row: number, col: number)
     cooldown: 0, maxCooldown: def.cooldown,
     activationTurn: getActivationTurn(row, team),
     startRow: row,
+    color: color ?? UNIT_COLOR_GROUPS[type],
+    slotIndex,
   };
+}
+
+// Effective color for RPS damage (per-instance, falls back to type default for legacy/AI units)
+export function getUnitColor(u: Unit): ColorGroup {
+  return (u.color as ColorGroup) ?? UNIT_COLOR_GROUPS[u.type];
 }
 
 export function distance(a: Position, b: Position): number {
