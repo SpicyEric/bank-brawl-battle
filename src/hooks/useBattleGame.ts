@@ -808,9 +808,16 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             });
           }
 
+          // Apply post-attack specials (mirror reflect, magnet, spider web, shadowblade bonus, vulkanit lava, icegolem freeze-on-hit)
+          applyPostAttackEffects(unit, target, dmg, newGrid, logs);
+
           if (target.hp <= 0) {
-            target.type = target.type;
-            (target as any).dead = true;
+            const stillAlive = applyDeathEffects(target, allUnits, newGrid, logs);
+            if (!stillAlive) (target as any).dead = true;
+          }
+          if (unit.hp <= 0) {
+            const stillAlive = applyDeathEffects(unit, allUnits, newGrid, logs);
+            if (!stillAlive) (unit as any).dead = true;
           }
         }
       }
