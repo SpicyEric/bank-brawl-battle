@@ -81,10 +81,7 @@ export default function UnitRoster() {
       </div>
 
       {/* Top: 3 colored rows × 3 slots */}
-      <div className="p-3">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-          {selectedUnit ? `Tippe einen Slot, um ${UNIT_DEFS[selectedUnit].label} zu platzieren` : 'Dein Trupp · 3 Rot · 3 Grün · 3 Blau'}
-        </p>
+      <div className="p-3 pt-2">
         <div className="space-y-1.5">
           {rows.map(({ color, indices }) => (
             <div key={color} className="flex items-center gap-1.5">
