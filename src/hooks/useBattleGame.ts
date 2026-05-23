@@ -191,8 +191,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   // placedSlots is kept empty so the picker never disables a slot during placement.
   const placedSlots = new Set<number>();
 
-  // Place unit
-  const placeUnit = useCallback((row: number, col: number) => {
+  // Place unit (optionally overriding the selected slot — used by drag-and-drop)
+  const placeUnit = useCallback((row: number, col: number, overrideSlot?: number) => {
     if (phase !== 'place_player') return;
     if (!PLAYER_ROWS.includes(row)) return;
     if (playerUnits.length >= playerMaxUnits) return;
@@ -204,11 +204,12 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     let slotIdx: number | undefined;
 
     if (hasRoster) {
-      if (selectedSlot === null) return;
-      if (playerBannedSlots.includes(selectedSlot)) return;
-      type = roster![selectedSlot];
-      color = SLOT_COLORS[selectedSlot];
-      slotIdx = selectedSlot;
+      const useSlot = overrideSlot !== undefined ? overrideSlot : selectedSlot;
+      if (useSlot === null || useSlot === undefined) return;
+      if (playerBannedSlots.includes(useSlot)) return;
+      type = roster![useSlot];
+      color = SLOT_COLORS[useSlot];
+      slotIdx = useSlot;
     } else {
       if (!selectedUnit) return;
       if (playerBannedUnits.includes(selectedUnit)) return;
