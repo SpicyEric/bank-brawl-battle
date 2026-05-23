@@ -808,6 +808,44 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           </div>
         );
       })}
+
+      {/* Chain effects: lightning bolts / chaindancer chain – flashing SVG between cells */}
+      {chainEffects.map(chain => {
+        const color = chain.color === 'lightning' ? 'hsl(55, 100%, 65%)' : 'hsl(280, 90%, 70%)';
+        const glow  = chain.color === 'lightning' ? 'hsl(55, 100%, 75%)' : 'hsl(290, 100%, 80%)';
+        const segments: { x1: number; y1: number; x2: number; y2: number }[] = [];
+        for (let i = 0; i < chain.cells.length - 1; i++) {
+          const a = chain.cells[i], b = chain.cells[i + 1];
+          segments.push({
+            x1: a.col * cellSize + cellSize / 2,
+            y1: visualRow(a.row) * cellSize + cellSize / 2,
+            x2: b.col * cellSize + cellSize / 2,
+            y2: visualRow(b.row) * cellSize + cellSize / 2,
+          });
+        }
+        return (
+          <svg key={chain.id} className="absolute inset-0 z-40 pointer-events-none w-full h-full chain-flash" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <filter id={`chain-glow-${chain.id}`} x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="0.6" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            {segments.map((s, i) => (
+              <g key={i} filter={`url(#chain-glow-${chain.id})`}>
+                <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={glow} strokeWidth="1.4" opacity="0.55" />
+                <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={color} strokeWidth="0.7" strokeDasharray="2 1" />
+              </g>
+            ))}
+            {chain.cells.map((c, i) => (
+              <circle key={`c-${i}`} cx={c.col * cellSize + cellSize / 2} cy={visualRow(c.row) * cellSize + cellSize / 2} r="2.2" fill={glow} opacity="0.9" />
+            ))}
+          </svg>
+        );
+      })}
     </div>
   );
 }
