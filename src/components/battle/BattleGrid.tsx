@@ -391,8 +391,26 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     transition: offset ? 'none' : 'transform 580ms ease-out',
                   }}
                 >
+                  {/* Persistent freeze overlay – stays visible the entire time the unit is frozen */}
+                  {isFrozen && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm"
+                      style={{
+                        background: 'linear-gradient(135deg, hsl(210 80% 60% / 0.45), hsl(195 90% 65% / 0.30))',
+                        boxShadow: 'inset 0 0 10px hsl(210 80% 70% / 0.6)',
+                      }}
+                    />
+                  )}
+                  {/* Persistent burn overlay – flickering fire while burning stacks active */}
+                  {isBurning && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm animate-pulse"
+                      style={{
+                        background: 'linear-gradient(135deg, hsl(15 90% 50% / 0.30), hsl(35 95% 55% / 0.20))',
+                        boxShadow: 'inset 0 0 8px hsl(20 95% 55% / 0.5)',
+                      }}
+                    />
+                  )}
                   <span
-                    className={`text-base sm:text-lg leading-none select-none ${isFrozen ? 'opacity-60' : ''}`}
+                    className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''}`}
                     style={{
                       filter: isFrozen
                         ? 'drop-shadow(0 0 5px hsl(210, 80%, 60%)) drop-shadow(0 0 10px hsl(210, 80%, 60%))'
@@ -403,6 +421,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   >
                     {def?.emoji}
                     {isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🧊</span>}
+                    {isBurning && !isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🔥</span>}
                   </span>
                   <div className="absolute bottom-0.5 left-0.5 right-0.5 h-[3px] rounded-full bg-muted overflow-hidden">
                     <div
