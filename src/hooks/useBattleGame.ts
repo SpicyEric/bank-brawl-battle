@@ -554,6 +554,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         }
       }
 
+      // === Lava field DoT (Vulkanit) ===
+      processLavaTick(newGrid, logs);
+      // === Banshee ghost timer tick-down ===
+      processGhostTick(allUnits, newGrid, logs);
+
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
 
