@@ -54,6 +54,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
   const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
   const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ row: number; col: number; type: UnitType } | null>(null);
   const [phaseOverlay, setPhaseOverlay] = useState<string | null>(null);
   const [overlaySubtext, setOverlaySubtext] = useState<string | null>(null);
   const [nextRoundCountdown, setNextRoundCountdown] = useState<number | null>(null);
@@ -208,6 +209,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
           opponentMoraleActive={game.opponentMoraleActive || game.aiMoraleActive}
           focusFireActive={game.focusFireActive}
           sacrificeFlash={game.sacrificeUsed}
+          dragPreview={dragPreview}
         />
 
         {phaseOverlay && (
@@ -252,6 +254,32 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
               onSelectSlot={game.setSelectedSlot}
               bannedSlots={game.playerBannedSlots}
               placedSlots={game.placedSlots}
+              onDragHover={(row, col, type) => {
+                if (row === null || col === null || !type) { setDragPreview(null); return; }
+                // Only show preview on valid placement zones
+                const isPlayerRow = roster
+                  ? (flipped ? row < 3 : [5, 6, 7].includes(row))
+                  : [5, 6, 7].includes(row);
+                const targetCell = game.grid[row]?.[col];
+                if (!isPlayerRow || !targetCell || targetCell.unit || targetCell.terrain === 'water') {
+                  setDragPreview(null);
+                  return;
+                }
+                setDragPreview({ row, col, type });
+              }}
+              onDragDrop={(row, col, slotIdx) => {
+                setDragPreview(null);
+                if (!roster) return;
+                const cell = game.grid[row]?.[col];
+                if (!cell || cell.unit || cell.terrain === 'water') return;
+                const playerRows = [5, 6, 7];
+                if (!playerRows.includes(row)) return;
+                const type = roster[slotIdx];
+                game.setSelectedSlot(slotIdx);
+                game.placeUnit(row, col, slotIdx);
+                sfxPlace();
+                setLastPlaced({ row, col, type });
+              }}
             />
             <button
               onClick={() => { game.confirmPlacement(); sfxConfirm(); }}

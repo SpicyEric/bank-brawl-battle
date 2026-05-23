@@ -18,6 +18,8 @@ interface BattleGridProps {
   showZoneColors?: boolean;
   /** Flip the grid vertically (for player2 in multiplayer) */
   flipped?: boolean;
+  /** While the player is dragging a unit, show alternating attack/move preview around this cell */
+  dragPreview?: { row: number; col: number; type: UnitType } | null;
 }
 
 interface UnitPos { row: number; col: number }
@@ -28,7 +30,7 @@ interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,22 +91,64 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     prevSacrifice.current = !!sacrificeFlash;
   }, [sacrificeFlash]);
 
-  // Flash effect for attack pattern on placement
+  // Flash effect for attack + move pattern on placement (impact)
+  const [moveFlashCells, setMoveFlashCells] = useState<Set<string>>(new Set());
+  const [impactCell, setImpactCell] = useState<string | null>(null);
   useEffect(() => {
     if (!lastPlaced) return;
     const def = UNIT_DEFS[lastPlaced.type];
-    const cells = new Set<string>();
+    const atk = new Set<string>();
+    const mv = new Set<string>();
     for (const p of def.attackPattern) {
       const r = lastPlaced.row + p.row;
       const c = lastPlaced.col + p.col;
-      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
-        cells.add(`${r}-${c}`);
-      }
+      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) atk.add(`${r}-${c}`);
     }
-    setFlashCells(cells);
+    for (const p of def.movePattern) {
+      const r = lastPlaced.row + p.row;
+      const c = lastPlaced.col + p.col;
+      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) mv.add(`${r}-${c}`);
+    }
+    setFlashCells(atk);
+    setMoveFlashCells(mv);
+    setImpactCell(`${lastPlaced.row}-${lastPlaced.col}`);
     if (flashTimer.current) clearTimeout(flashTimer.current);
-    flashTimer.current = setTimeout(() => setFlashCells(new Set()), 800);
+    flashTimer.current = setTimeout(() => {
+      setFlashCells(new Set());
+      setMoveFlashCells(new Set());
+      setImpactCell(null);
+    }, 750);
   }, [lastPlaced]);
+
+  // Alternating attack/move blink while dragging a unit over a cell
+  const [dragBlinkMode, setDragBlinkMode] = useState<'attack' | 'move'>('attack');
+  useEffect(() => {
+    if (!dragPreview) { setDragBlinkMode('attack'); return; }
+    setDragBlinkMode('attack');
+    const id = setInterval(() => {
+      setDragBlinkMode(m => (m === 'attack' ? 'move' : 'attack'));
+    }, 450);
+    return () => clearInterval(id);
+  }, [dragPreview]);
+
+  // Compute drag preview cells (attack vs move pattern around the hovered cell)
+  let dragAttackCells = new Set<string>();
+  let dragMoveCells = new Set<string>();
+  let dragOriginKey: string | null = null;
+  if (dragPreview) {
+    const def = UNIT_DEFS[dragPreview.type];
+    dragOriginKey = `${dragPreview.row}-${dragPreview.col}`;
+    for (const p of def.attackPattern) {
+      const r = dragPreview.row + p.row;
+      const c = dragPreview.col + p.col;
+      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) dragAttackCells.add(`${r}-${c}`);
+    }
+    for (const p of def.movePattern) {
+      const r = dragPreview.row + p.row;
+      const c = dragPreview.col + p.col;
+      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) dragMoveCells.add(`${r}-${c}`);
+    }
+  }
 
   // Detect unit movements
   useEffect(() => {
@@ -344,6 +388,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const hpPercent = unit && !unit.dead ? (unit.hp / unit.maxHp) * 100 : 0;
           const isLow = unit && !unit.dead ? unit.hp / unit.maxHp < 0.3 : false;
           const isFlashing = flashCells.has(`${cell.row}-${cell.col}`);
+          const isMoveFlashing = moveFlashCells.has(`${cell.row}-${cell.col}`);
           const isShaking = shakeCells.has(`${cell.row}-${cell.col}`);
           const isDead = unit?.dead;
           const isFrozen = unit ? (unit.frozen ?? 0) > 0 : false;
@@ -352,6 +397,10 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const cellKey = `${cell.row}-${cell.col}`;
           const terrain = cell.terrain || 'none';
           const hasTerrain = terrain !== 'none' && TERRAIN_DEFS[terrain];
+          const isImpact = impactCell === cellKey;
+          const isDragOrigin = dragOriginKey === cellKey;
+          const showDragAttack = !isDragOrigin && dragBlinkMode === 'attack' && dragAttackCells.has(cellKey);
+          const showDragMove   = !isDragOrigin && dragBlinkMode === 'move'   && dragMoveCells.has(cellKey);
 
           // Slide offset
           const offset = unit && !isDead ? slideOffsets.get(unit.id) : null;
@@ -362,6 +411,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           return (
             <button
               key={cellKey}
+              data-cell-row={cell.row}
+              data-cell-col={cell.col}
               onClick={() => onCellClick(cell.row, cell.col)}
               className={`aspect-square flex flex-col items-center justify-center relative overflow-visible
                 ${isPlayerZone && (isPlacing || showZoneColors) && !unit && terrain !== 'water' ? 'bg-primary/5' : ''} ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'hover:bg-primary/15 cursor-pointer' : isPlayerZone && isPlacing && terrain === 'water' ? 'cursor-not-allowed' : ''}
@@ -371,7 +422,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                 ${!unit && terrain === 'hill' ? 'bg-[hsl(35,25%,18%)]' : ''}
                 ${!unit && terrain === 'water' ? 'bg-[hsl(210,40%,18%)]' : ''}
                 ${isDead ? 'bg-muted/40' : ''}
-                ${isFlashing ? 'flash-attack' : ''}
+                ${isFlashing ? 'placement-attack-flash' : ''}
+                ${isMoveFlashing && !isFlashing ? 'placement-move-flash' : ''}
                 ${isShaking ? 'shake-hit' : ''}
                 transition-colors duration-200
               `}
@@ -380,6 +432,12 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {cell.lavaTicks && cell.lavaTicks > 0 && (
                 <div className="absolute inset-0 z-0 pointer-events-none cell-lava" />
               )}
+              {/* Drag preview overlays */}
+              {showDragAttack && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-attack" />}
+              {showDragMove && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-move" />}
+              {isDragOrigin && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-origin" />}
+              {/* Placement impact */}
+              {isImpact && <div className="placement-impact" />}
               {/* Terrain emoji (show when no unit or unit is dead) */}
               {hasTerrain && (!unit || isDead) && (
                 <span className="text-[10px] opacity-50 select-none">{TERRAIN_DEFS[terrain].emoji}</span>
