@@ -9,9 +9,11 @@ const COLOR_LABEL: Record<ColorGroup, string> = {
 interface UnitInfoModalProps {
   unitType: UnitType;
   onClose: () => void;
+  /** Hide color affiliation (badge + strong/weak section) – used in roster where units are color-neutral */
+  hideColorInfo?: boolean;
 }
 
-export function UnitInfoModal({ unitType, onClose }: UnitInfoModalProps) {
+export function UnitInfoModal({ unitType, onClose, hideColorInfo }: UnitInfoModalProps) {
   const def = UNIT_DEFS[unitType];
   const colorGroup = UNIT_COLOR_GROUPS[unitType];
   const beats = COLOR_BEATS[colorGroup];
