@@ -414,9 +414,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     />
                   )}
                   <span
-                    className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''}`}
+                    className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''} ${unit.ghost && unit.ghost > 0 ? 'ghost-active' : ''}`}
                     style={{
-                      filter: isFrozen
+                      filter: unit.ghost && unit.ghost > 0
+                        ? undefined
+                        : isFrozen
                         ? 'drop-shadow(0 0 5px hsl(210, 80%, 60%)) drop-shadow(0 0 10px hsl(210, 80%, 60%))'
                         : (flipped ? unit.team === 'enemy' : unit.team === 'player')
                           ? 'drop-shadow(0 0 4px hsl(152, 60%, 48%)) drop-shadow(0 0 8px hsl(152, 60%, 48%))'
