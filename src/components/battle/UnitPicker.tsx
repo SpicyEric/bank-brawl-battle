@@ -42,6 +42,7 @@ export function UnitPicker({
   selected, onSelect, placedCount, maxUnits,
   bannedUnits = [], fatigue = {}, unitTypes,
   roster, selectedSlot = null, onSelectSlot, bannedSlots = [], placedSlots = [],
+  onDragHover, onDragDrop,
 }: UnitPickerProps) {
   const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
