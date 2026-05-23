@@ -216,7 +216,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 75,
     attack: 14,
     cooldown: 2,
-    description: 'Friert Gegner 1 Runde ein. Greift orthogonal bis 2 Felder an.',
+    description: 'Friert Gegner 3 Runden ein (50% Schadenseinbruch, keine Bewegung). Greift orthogonal bis 2 Felder an.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
