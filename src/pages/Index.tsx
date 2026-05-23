@@ -64,6 +64,11 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
   // Sync SFX mute with music mute
   useEffect(() => { setSfxMuted(muted); }, [muted]);
 
+  // Clear any in-flight drag preview when leaving placement phase (prevents stuck glow if user holds while round starts)
+  useEffect(() => {
+    if (game.phase !== 'place_player') setDragPreview(null);
+  }, [game.phase]);
+
   useEffect(() => {
     if (game.phase === prevPhase.current) return;
     prevPhase.current = game.phase;
