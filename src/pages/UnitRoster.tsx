@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { UNIT_TYPES, UNIT_DEFS, UnitType, ColorGroup } from '@/lib/battleGame';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
+import { UnitGlyph } from '@/components/UnitGlyph';
 
 // Slot layout: row 0 = red (slots 0-2), row 1 = green (slots 3-5), row 2 = blue (slots 6-8)
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
@@ -102,7 +103,7 @@ export default function UnitRoster() {
                     >
                       {def ? (
                         <>
-                          <span className="text-2xl">{def.emoji}</span>
+                          <UnitGlyph type={t!} className="w-7 h-7" />
                           <span className="text-[9px] font-semibold text-foreground mt-0.5">{def.label}</span>
                         </>
                       ) : (
@@ -152,7 +153,7 @@ export default function UnitRoster() {
                     <span className="text-base">✓</span>
                   </div>
                 )}
-                <span className="text-xl block">{def.emoji}</span>
+                <UnitGlyph type={t} className="w-6 h-6 mx-auto block" />
                 <p className="text-[9px] font-semibold text-foreground leading-tight mt-0.5">{def.label}</p>
                 <p className="text-[8px] text-muted-foreground">❤️{def.hp} ⚔️{def.attack}</p>
               </button>
