@@ -53,6 +53,8 @@ export interface Cell {
   col: number;
   unit: Unit | null;
   terrain: TerrainType;
+  lavaTicks?: number; // vulkanit lava: ticks remaining
+  lavaOwnerTeam?: Team; // immune team
 }
 
 // Movement patterns: relative offsets the unit can move to per turn
