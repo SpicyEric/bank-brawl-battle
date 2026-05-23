@@ -47,6 +47,11 @@ export function UnitPicker({
   const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
+  const dragStart = useRef<{ x: number; y: number; idx: number; type: UnitType } | null>(null);
+  const draggedSlotIdx = useRef<number | null>(null);
+  const lastHover = useRef<{ row: number; col: number } | null>(null);
+  const isDragging = useRef(false);
+  const [dragGhost, setDragGhost] = useState<{ x: number; y: number; emoji: string } | null>(null);
 
   const startPress = useCallback((type: UnitType) => {
     didLongPress.current = false;
