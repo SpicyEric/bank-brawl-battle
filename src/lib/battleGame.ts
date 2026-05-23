@@ -269,7 +269,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // Mechanics marked "(geplant)" in the description are currently approximated via stats/patterns.
   banshee: {
     label: 'Banshee', emoji: '👻', hp: 70, attack: 16, cooldown: 2,
-    description: 'Diagonale Bewegung in alle Richtungen. (geplant: bleibt als Geist nach Tod aktiv.)',
+    description: 'Diagonale Bewegung. Bleibt nach dem Tod 3 Runden als Geist aktiv (+10 ATK).',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -283,14 +283,14 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   vulkanit: {
     label: 'Vulkanit', emoji: '🌋', hp: 90, attack: 20, cooldown: 3,
-    description: 'Schwerer Nahkämpfer. (geplant: verwandelt Hügel zu Lava-Feldern, die Schaden verursachen.)',
+    description: 'Erzeugt nach jedem Angriff Lava-Felder um das Ziel (5 Schaden / Runde, 2 Runden).',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   shadowblade: {
     label: 'Schattenklinge', emoji: '🥷', hp: 60, attack: 20, cooldown: 2,
-    description: 'Schneller Diagonal-Springer. (geplant: Stealth außerhalb Angriffsreichweite, +50% erster Angriff.)',
+    description: 'Erster Angriff +50% Schaden (Stealth-Bonus). Schneller Diagonal-Springer.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -321,14 +321,14 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   mirror: {
     label: 'Spiegelkämpfer', emoji: '🪞', hp: 75, attack: 14, cooldown: 2,
-    description: 'Orthogonaler Nahkämpfer. (geplant: 30% Schadensreflektion, AoE-Explosion bei Tod.)',
+    description: 'Reflektiert 30% des erlittenen Schadens. Explodiert beim Tod für 20 Schaden im Umkreis.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
   lamb: {
     label: 'Opferlamm', emoji: '🐑', hp: 120, attack: 5, cooldown: 5,
-    description: 'Sehr zäh, wenig Schaden. Zieht Aggro auf sich (Taunt). (geplant: Heilung bei Tod.)',
+    description: 'Sehr zäh, wenig Schaden. Zieht Aggro auf sich. Heilt beim Tod alle Verbündeten um 30% HP.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
@@ -342,7 +342,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   icegolem: {
     label: 'Eisgolem', emoji: '🧊', hp: 200, attack: 25, cooldown: 4,
-    description: 'Riesiger Tank. (geplant: bewegt sich nur jede 2. Runde, verlangsamt Nahkampf-Angreifer.)',
+    description: 'Riesiger Tank. Bewegt sich nur jede zweite Runde. 25% Chance, Angreifer einzufrieren.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
