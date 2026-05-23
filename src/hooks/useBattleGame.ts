@@ -629,7 +629,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         if (!canAttack(unit, target)) {
           // Track stuck turns for anti-stalemate
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const newPos = moveToward(unit, target, newGrid, allUnits);
+          const skipMove = shouldSkipMove(unit);
+          const newPos = skipMove ? { row: unit.row, col: unit.col } : moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             // If tank, move bonded units first
             if (unit.type === 'tank') {
