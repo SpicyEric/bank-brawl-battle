@@ -898,7 +898,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
-    battleRef.current = setInterval(battleTick, 1350);
+    battleRef.current = setInterval(battleTick, 675);
     timerRef.current = setInterval(() => {
       setBattleTimer(prev => {
         if (prev <= 1) {

@@ -366,7 +366,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       // Freeze is from frost (ranged), so delay after projectile
       setTimeout(() => {
         setFreezeEffects(prev => [...prev, ...newFreezes]);
-        setTimeout(() => setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id))), 1350);
+        setTimeout(() => setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id))), 675);
       }, PROJECTILE_FLIGHT_TIME);
     }
   };
