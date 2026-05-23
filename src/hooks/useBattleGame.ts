@@ -289,6 +289,20 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
 
   // Start battle
   const startBattle = useCallback(() => {
+    // Spawn doppelganger phantoms at the start of the round
+    setGrid(prevGrid => {
+      const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
+      const allUnits: Unit[] = [];
+      for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
+      const logs: string[] = [];
+      const phantoms = spawnDoppelgangerPhantoms(allUnits, newGrid, logs);
+      if (phantoms.length > 0) {
+        setPlayerUnits(prev => [...prev, ...phantoms.filter(p => p.team === 'player')]);
+        setEnemyUnits(prev => [...prev, ...phantoms.filter(p => p.team === 'enemy')]);
+        if (logs.length > 0) setBattleLog(prev => [...logs, ...prev]);
+      }
+      return newGrid;
+    });
     setPhase('battle');
     setBattleLog([]);
     setTurnCount(0);
