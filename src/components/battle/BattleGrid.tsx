@@ -383,6 +383,25 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         setTimeout(() => setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id))), 675);
       }, PROJECTILE_FLIGHT_TIME);
     }
+
+    // --- Chain effects (lightning chains + chaindancer) ---
+    const newChains: ChainEffect[] = [];
+    for (const evt of events) {
+      if (!evt.chainCells || evt.chainCells.length < 2) continue;
+      chainCounter.current += 1;
+      newChains.push({
+        id: `chain-${chainCounter.current}`,
+        cells: evt.chainCells,
+        color: evt.type === 'chain' ? 'chaindancer' : 'lightning',
+      });
+    }
+    if (newChains.length > 0) {
+      const delay = newChains[0].color === 'lightning' ? PROJECTILE_FLIGHT_TIME : 0;
+      setTimeout(() => {
+        setChainEffects(prev => [...prev, ...newChains]);
+        setTimeout(() => setChainEffects(prev => prev.filter(c => !newChains.find(nc => nc.id === c.id))), 900);
+      }, delay);
+    }
   };
 
   const cellSize = 100 / GRID_SIZE;
