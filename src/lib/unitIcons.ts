@@ -1,6 +1,8 @@
 import type { UnitType } from './battleGame';
 
 const STORAGE_KEY = 'unitIconMap.v1';
+const ATTACK_KEY = 'unitAttackIconMap.v1';
+const CLONE_KEY = 'unitCloneIconMap.v1';
 
 export type UnitIconMap = Partial<Record<UnitType, string>>; // value = icon filename e.g. "icon042.png"
 
@@ -13,29 +15,61 @@ export function iconUrl(filename: string): string {
   return `/unit-icons/${filename}`;
 }
 
-let cache: UnitIconMap | null = null;
+interface Caches {
+  unit: UnitIconMap | null;
+  attack: UnitIconMap | null;
+  clone: UnitIconMap | null;
+}
+const cache: Caches = { unit: null, attack: null, clone: null };
 const listeners = new Set<() => void>();
 
-export function loadIconMap(): UnitIconMap {
-  if (cache) return cache;
+function load(key: string): UnitIconMap {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    cache = raw ? JSON.parse(raw) : {};
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : {};
   } catch {
-    cache = {};
+    return {};
   }
-  return cache!;
+}
+
+export function loadIconMap(): UnitIconMap {
+  if (!cache.unit) cache.unit = load(STORAGE_KEY);
+  return cache.unit!;
+}
+export function loadAttackIconMap(): UnitIconMap {
+  if (!cache.attack) cache.attack = load(ATTACK_KEY);
+  return cache.attack!;
+}
+export function loadCloneIconMap(): UnitIconMap {
+  if (!cache.clone) cache.clone = load(CLONE_KEY);
+  return cache.clone!;
 }
 
 export function saveIconMap(map: UnitIconMap) {
-  cache = { ...map };
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cache)); } catch {}
+  cache.unit = { ...map };
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cache.unit)); } catch {}
+  listeners.forEach(l => l());
+}
+export function saveAttackIconMap(map: UnitIconMap) {
+  cache.attack = { ...map };
+  try { localStorage.setItem(ATTACK_KEY, JSON.stringify(cache.attack)); } catch {}
+  listeners.forEach(l => l());
+}
+export function saveCloneIconMap(map: UnitIconMap) {
+  cache.clone = { ...map };
+  try { localStorage.setItem(CLONE_KEY, JSON.stringify(cache.clone)); } catch {}
   listeners.forEach(l => l());
 }
 
 export function getUnitIcon(type: UnitType): string | null {
-  const map = loadIconMap();
-  return map[type] ?? null;
+  return loadIconMap()[type] ?? null;
+}
+export function getAttackIcon(type: UnitType | string | undefined): string | null {
+  if (!type) return null;
+  return loadAttackIconMap()[type as UnitType] ?? null;
+}
+export function getCloneIcon(type: UnitType): string | null {
+  return loadCloneIconMap()[type] ?? null;
 }
 
 export function subscribeIconMap(cb: () => void): () => void {
