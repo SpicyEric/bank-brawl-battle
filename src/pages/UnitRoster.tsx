@@ -10,15 +10,14 @@ const ROSTER_SIZE = 9;
 const LONG_PRESS_MS = 400;
 
 const COLOR_RING: Record<ColorGroup, string> = {
-  red: 'border-unit-red/60 bg-unit-red/10',
-  green: 'border-unit-green/60 bg-unit-green/10',
-  blue: 'border-unit-blue/60 bg-unit-blue/10',
+  red: 'border-unit-red/40 bg-unit-red/15',
+  green: 'border-unit-green/40 bg-unit-green/15',
+  blue: 'border-unit-blue/40 bg-unit-blue/15',
 };
-const COLOR_DOT: Record<ColorGroup, string> = {
-  red: 'bg-unit-red', green: 'bg-unit-green', blue: 'bg-unit-blue',
-};
-const COLOR_LABEL: Record<ColorGroup, string> = {
-  red: '🔴 Rot', green: '🟢 Grün', blue: '🔵 Blau',
+const COLOR_EMPTY: Record<ColorGroup, string> = {
+  red: 'border-unit-red/30 bg-unit-red/10',
+  green: 'border-unit-green/30 bg-unit-green/10',
+  blue: 'border-unit-blue/30 bg-unit-blue/10',
 };
 
 export default function UnitRoster() {
@@ -82,14 +81,10 @@ export default function UnitRoster() {
       </div>
 
       {/* Top: 3 colored rows × 3 slots */}
-      <div className="p-3">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-          {selectedUnit ? `Tippe einen Slot, um ${UNIT_DEFS[selectedUnit].label} zu platzieren` : 'Dein Trupp · 3 Rot · 3 Grün · 3 Blau'}
-        </p>
+      <div className="p-3 pt-2">
         <div className="space-y-1.5">
           {rows.map(({ color, indices }) => (
             <div key={color} className="flex items-center gap-1.5">
-              <span className="text-[9px] font-bold w-9 shrink-0 uppercase" style={{ color: `hsl(var(--unit-${color}))` }}>{COLOR_LABEL[color]}</span>
               <div className="grid grid-cols-3 gap-1.5 flex-1">
                 {indices.map(i => {
                   const t = slots[i];
@@ -102,10 +97,9 @@ export default function UnitRoster() {
                       className={`aspect-square rounded-lg border-2 flex flex-col items-center justify-center transition-all relative ${
                         t ? `${COLOR_RING[color]} active:scale-[0.95]`
                           : canDrop ? `border-primary bg-primary/10 ring-1 ring-primary animate-pulse`
-                          : 'border-dashed border-border bg-muted/20'
+                          : `${COLOR_EMPTY[color]} border-dashed`
                       }`}
                     >
-                      <div className={`absolute top-0.5 left-0.5 w-1.5 h-1.5 rounded-full ${COLOR_DOT[color]}`} />
                       {def ? (
                         <>
                           <span className="text-2xl">{def.emoji}</span>
@@ -125,8 +119,8 @@ export default function UnitRoster() {
 
       {/* Bottom: scrollable picker of all units (color-neutral) */}
       <div className="flex-1 overflow-y-auto px-3 pb-3">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-          Tippe Einheit → wählen · gedrückt halten = Info
+        <p className="text-[10px] text-muted-foreground text-center mb-1.5 opacity-60">
+          Gedrückt halten = Info
         </p>
         <div className="grid grid-cols-3 gap-1.5">
           {UNIT_TYPES.map(t => {
