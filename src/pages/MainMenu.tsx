@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useMusic } from '@/hooks/useMusic';
-import { Swords, Users, Volume2, VolumeX } from 'lucide-react';
+import { Swords, Users, Volume2, VolumeX, Settings } from 'lucide-react';
 import menuBg from '@/assets/menu-bg.png';
 
 const MainMenu = () => {
@@ -31,6 +31,14 @@ const MainMenu = () => {
         >
           <Users size={20} />
           Multiplayer
+        </button>
+
+        <button
+          onClick={() => navigate('/admin')}
+          className="w-full py-3 rounded-xl bg-card/80 backdrop-blur-sm border border-dashed border-border text-muted-foreground font-semibold text-sm hover:text-foreground active:scale-[0.97] transition-all flex items-center justify-center gap-2"
+        >
+          <Settings size={16} />
+          Admin (Icons)
         </button>
       </div>
 
