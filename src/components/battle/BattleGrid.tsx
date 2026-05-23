@@ -403,6 +403,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isShaking = shakeCells.has(`${cell.row}-${cell.col}`);
           const isDead = unit?.dead;
           const isFrozen = unit ? (unit.frozen ?? 0) > 0 : false;
+          const isWebbed = unit ? (unit.webbed ?? 0) > 0 : false;
+          const isPhantom = unit ? !!unit.isPhantom && (unit.phantom ?? 0) > 0 : false;
           const isBurning = unit ? !!(unit.burning && unit.burning.length > 0 && !unit.dead) : false;
           const isInactive = unit && !isDead && unit.activationTurn !== undefined && unit.activationTurn > 0 && phase === 'place_player';
           const cellKey = `${cell.row}-${cell.col}`;
