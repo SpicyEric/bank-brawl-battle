@@ -837,7 +837,28 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             isAoe: unit.type === 'dragon',
             aoeCells: aoeCells,
             isFrozen: didFreeze,
+            chainCells: lightningChainCells,
           });
+
+          // Emit a separate chain event for the chaindancer (visual chain through diagonal enemies)
+          if (chaindancerCells && chaindancerCells.length > 1) {
+            events.push({
+              type: 'chain',
+              attackerId: unit.id,
+              attackerRow: unit.row,
+              attackerCol: unit.col,
+              attackerEmoji: '🪢',
+              attackerType: unit.type,
+              targetId: target.id,
+              targetRow: target.row,
+              targetCol: target.col,
+              damage: 0,
+              isStrong: false, isWeak: false,
+              isRanged: false,
+              chainCells: chaindancerCells,
+            });
+          }
+
 
           // Emit freeze event for ice animation
           if (didFreeze) {
