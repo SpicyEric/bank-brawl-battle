@@ -5,6 +5,8 @@ export interface BattleEvent {
   attackerRow: number;
   attackerCol: number;
   attackerEmoji: string;
+  /** Unit type of the attacker (used to look up custom attack icons). */
+  attackerType?: string;
   targetId: string;
   targetRow: number;
   targetCol: number;

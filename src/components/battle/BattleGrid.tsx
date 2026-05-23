@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType, TERRAIN_DEFS } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { UnitGlyph } from '@/components/UnitGlyph';
+import { getAttackIcon, iconUrl } from '@/lib/unitIcons';
 
 interface BattleGridProps {
   grid: Cell[][];
@@ -26,7 +27,7 @@ interface BattleGridProps {
 interface UnitPos { row: number; col: number }
 interface DamagePopup { id: string; row: number; col: number; damage: number; isStrong: boolean; isWeak: boolean; isKill: boolean }
 interface HealPopup { id: string; row: number; col: number; healAmount: number }
-interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string; type?: 'arrow' | 'magic' | 'frost' | 'default' }
+interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string; iconFile?: string | null; type?: 'arrow' | 'magic' | 'frost' | 'default' | 'custom' | 'heal' }
 interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
@@ -219,11 +220,16 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       else meleeDamageEvents.push(evt);
     }
 
-    // --- Phase 1: Launch projectiles immediately (after movement delay already applied) ---
+    // --- Phase 1: Launch projectiles for ranged attacks (and for melee if a custom attack icon is set) ---
     const newProjs: Projectile[] = [];
-    for (const evt of rangedDamageEvents) {
+    for (const evt of [...rangedDamageEvents, ...meleeDamageEvents]) {
+      const customIcon = getAttackIcon(evt.attackerType);
+      const isRanged = evt.isRanged;
+      // Skip melee projectile only if no custom icon (keep existing snappy melee feel)
+      if (!isRanged && !customIcon) continue;
       projCounter.current += 1;
-      const projType: Projectile['type'] = evt.attackerEmoji === '🏹' ? 'arrow'
+      const projType: Projectile['type'] = customIcon ? 'custom'
+        : evt.attackerEmoji === '🏹' ? 'arrow'
         : evt.attackerEmoji === '🔮' ? 'magic'
         : evt.attackerEmoji === '🥶' ? 'frost'
         : 'default';
@@ -232,19 +238,23 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         fromRow: evt.attackerRow, fromCol: evt.attackerCol,
         toRow: evt.targetRow, toCol: evt.targetCol,
         emoji: projType === 'arrow' ? '➴' : projType === 'magic' ? '✦' : projType === 'frost' ? '❄' : evt.attackerEmoji === '🐉' ? '🔥' : '⚡',
+        iconFile: customIcon,
         type: projType,
       });
     }
     // Heal projectiles
     const healProjs: Projectile[] = [];
     for (const evt of healEvents) {
-      if (evt.isRanged) {
+      const customIcon = getAttackIcon(evt.attackerType);
+      if (evt.isRanged || customIcon) {
         projCounter.current += 1;
         healProjs.push({
           id: `proj-${projCounter.current}`,
           fromRow: evt.attackerRow, fromCol: evt.attackerCol,
           toRow: evt.targetRow, toCol: evt.targetCol,
           emoji: '✨',
+          iconFile: customIcon,
+          type: customIcon ? 'custom' : 'heal',
         });
       }
     }
@@ -573,6 +583,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         const projClass = p.type === 'arrow' ? 'projectile-arrow'
           : p.type === 'magic' ? 'projectile-magic'
           : p.type === 'frost' ? 'projectile-frost'
+          : p.type === 'custom' ? 'projectile-magic'
           : 'projectile-fly';
         return (
           <div
@@ -585,11 +596,21 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               '--to-y': `${toY}%`,
             } as React.CSSProperties}
           >
-            <span className={`text-xs drop-shadow-lg ${
-              p.type === 'magic' ? 'text-sm magic-proj-glow' :
-              p.type === 'frost' ? 'frost-proj-glow' :
-              p.type === 'arrow' ? 'arrow-proj-trail' : ''
-            }`}>{p.emoji}</span>
+            {p.iconFile ? (
+              <img
+                src={iconUrl(p.iconFile)}
+                alt=""
+                draggable={false}
+                className="w-5 h-5 drop-shadow-lg"
+                style={{ imageRendering: 'pixelated', filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.6))' }}
+              />
+            ) : (
+              <span className={`text-xs drop-shadow-lg ${
+                p.type === 'magic' ? 'text-sm magic-proj-glow' :
+                p.type === 'frost' ? 'frost-proj-glow' :
+                p.type === 'arrow' ? 'arrow-proj-trail' : ''
+              }`}>{p.emoji}</span>
+            )}
           </div>
         );
       })}
