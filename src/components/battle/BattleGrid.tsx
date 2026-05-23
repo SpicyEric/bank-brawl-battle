@@ -376,6 +376,10 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                 transition-colors duration-200
               `}
             >
+              {/* Lava overlay – persistent */}
+              {cell.lavaTicks && cell.lavaTicks > 0 && (
+                <div className="absolute inset-0 z-0 pointer-events-none cell-lava" />
+              )}
               {/* Terrain emoji (show when no unit or unit is dead) */}
               {hasTerrain && (!unit || isDead) && (
                 <span className="text-[10px] opacity-50 select-none">{TERRAIN_DEFS[terrain].emoji}</span>
