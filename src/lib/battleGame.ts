@@ -34,6 +34,9 @@ export interface Unit {
   movedWithTank?: boolean; // set to true when unit already moved this tick via tank formation
   burning?: { dmg: number; turns: number }[]; // active burn DoT stacks (arsonist)
   judgeBonus?: number; // extra ATK accrued by judge from fallen allies
+  ghost?: number; // banshee: turns remaining as ghost after death
+  firstAttackUsed?: boolean; // shadowblade: first attack bonus consumed
+  skipNextMove?: boolean; // icegolem: alternate-turn movement
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
