@@ -388,6 +388,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const hpPercent = unit && !unit.dead ? (unit.hp / unit.maxHp) * 100 : 0;
           const isLow = unit && !unit.dead ? unit.hp / unit.maxHp < 0.3 : false;
           const isFlashing = flashCells.has(`${cell.row}-${cell.col}`);
+          const isMoveFlashing = moveFlashCells.has(`${cell.row}-${cell.col}`);
           const isShaking = shakeCells.has(`${cell.row}-${cell.col}`);
           const isDead = unit?.dead;
           const isFrozen = unit ? (unit.frozen ?? 0) > 0 : false;
@@ -396,6 +397,10 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const cellKey = `${cell.row}-${cell.col}`;
           const terrain = cell.terrain || 'none';
           const hasTerrain = terrain !== 'none' && TERRAIN_DEFS[terrain];
+          const isImpact = impactCell === cellKey;
+          const isDragOrigin = dragOriginKey === cellKey;
+          const showDragAttack = !isDragOrigin && dragBlinkMode === 'attack' && dragAttackCells.has(cellKey);
+          const showDragMove   = !isDragOrigin && dragBlinkMode === 'move'   && dragMoveCells.has(cellKey);
 
           // Slide offset
           const offset = unit && !isDead ? slideOffsets.get(unit.id) : null;
@@ -406,6 +411,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           return (
             <button
               key={cellKey}
+              data-cell-row={cell.row}
+              data-cell-col={cell.col}
               onClick={() => onCellClick(cell.row, cell.col)}
               className={`aspect-square flex flex-col items-center justify-center relative overflow-visible
                 ${isPlayerZone && (isPlacing || showZoneColors) && !unit && terrain !== 'water' ? 'bg-primary/5' : ''} ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'hover:bg-primary/15 cursor-pointer' : isPlayerZone && isPlacing && terrain === 'water' ? 'cursor-not-allowed' : ''}
@@ -415,7 +422,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                 ${!unit && terrain === 'hill' ? 'bg-[hsl(35,25%,18%)]' : ''}
                 ${!unit && terrain === 'water' ? 'bg-[hsl(210,40%,18%)]' : ''}
                 ${isDead ? 'bg-muted/40' : ''}
-                ${isFlashing ? 'flash-attack' : ''}
+                ${isFlashing ? 'placement-attack-flash' : ''}
+                ${isMoveFlashing && !isFlashing ? 'placement-move-flash' : ''}
                 ${isShaking ? 'shake-hit' : ''}
                 transition-colors duration-200
               `}
@@ -424,6 +432,12 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {cell.lavaTicks && cell.lavaTicks > 0 && (
                 <div className="absolute inset-0 z-0 pointer-events-none cell-lava" />
               )}
+              {/* Drag preview overlays */}
+              {showDragAttack && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-attack" />}
+              {showDragMove && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-move" />}
+              {isDragOrigin && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-origin" />}
+              {/* Placement impact */}
+              {isImpact && <div className="placement-impact" />}
               {/* Terrain emoji (show when no unit or unit is dead) */}
               {hasTerrain && (!unit || isDead) && (
                 <span className="text-[10px] opacity-50 select-none">{TERRAIN_DEFS[terrain].emoji}</span>
