@@ -566,11 +566,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
 
-        // Frozen units can't act, just tick down
-        if (unit.frozen && unit.frozen > 0) {
-          unit.frozen -= 1;
+        // Webbed: can't act at all (spiderqueen net)
+        if (unit.webbed && unit.webbed > 0) {
+          unit.webbed -= 1;
           continue;
         }
+        // Frozen: skip movement, but still allowed to attack at 50% dmg (handled below)
+        const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
+        if (isFrozenNow) unit.frozen = (unit.frozen || 0) - 1;
 
         unit.cooldown = Math.max(0, unit.cooldown - 1);
 
@@ -584,7 +587,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             let healed = false;
             for (const ally of healable) {
               if (canAttack(unit, ally)) {
-                const healAmt = Math.min(22, ally.maxHp - ally.hp);
+                const healAmt = Math.min(28, ally.maxHp - ally.hp);
                 ally.hp += healAmt;
                 logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
                 healed = true;

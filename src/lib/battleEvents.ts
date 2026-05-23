@@ -1,6 +1,6 @@
 // Battle events emitted during combat for animations
 export interface BattleEvent {
-  type: 'hit' | 'kill' | 'heal' | 'freeze';
+  type: 'hit' | 'kill' | 'heal' | 'freeze' | 'web' | 'chain' | 'spawn';
   attackerId: string;
   attackerRow: number;
   attackerCol: number;
@@ -18,4 +18,6 @@ export interface BattleEvent {
   aoeCells?: { row: number; col: number }[]; // all cells affected by AOE fire
   healAmount?: number; // healing done (shaman)
   isFrozen?: boolean; // target got frozen by this attack
+  /** Cells that get a lightning-chain flash (Blitzmagier). */
+  chainCells?: { row: number; col: number }[];
 }

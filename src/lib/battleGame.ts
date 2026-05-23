@@ -24,7 +24,8 @@ export interface Unit {
   color?: 'red' | 'blue' | 'green'; // per-instance color (assigned from roster slot for player units)
   slotIndex?: number; // for player units: index in the chosen roster (0..8)
   dead?: boolean;
-  frozen?: number; // turns remaining frozen (can't act)
+  frozen?: number; // turns remaining frozen (can't move, attacks at 50% dmg)
+  webbed?: number; // turns remaining webbed (spiderqueen) – same as frozen, distinct visual
   stuckTurns?: number; // turns without attacking – used for anti-stalemate
   activationTurn?: number; // turn number when this unit becomes active (staggered rows)
   startRow?: number; // the row the unit was originally placed on
@@ -37,6 +38,11 @@ export interface Unit {
   ghost?: number; // banshee: turns remaining as ghost after death
   firstAttackUsed?: boolean; // shadowblade: first attack bonus consumed
   skipNextMove?: boolean; // icegolem: alternate-turn movement
+  isClone?: boolean; // spawned by cloner; clones cannot spawn more clones
+  cloneTimer?: number; // cloner spawn cooldown countdown
+  phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
+  isPhantom?: boolean; // doppelganger phantom flag
+  doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -210,7 +216,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 75,
     attack: 14,
     cooldown: 2,
-    description: 'Friert Gegner 1 Runde ein. Greift orthogonal bis 2 Felder an.',
+    description: 'Friert Gegner 3 Runden ein (50% Schadenseinbruch, keine Bewegung). Greift orthogonal bis 2 Felder an.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
@@ -255,7 +261,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 75,
     attack: 10,
     cooldown: 2,
-    description: 'Heilt Verbündete im Umkreis (2 Felder). Greift nur an, wenn niemand mehr zu heilen ist.',
+    description: 'Heilt Verbündete im Umkreis von 2 Feldern (+28 HP). Greift nur an, wenn niemand mehr zu heilen ist.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ALL_ADJACENT,
@@ -283,14 +289,14 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   vulkanit: {
     label: 'Vulkanit', emoji: '🌋', hp: 90, attack: 20, cooldown: 3,
-    description: 'Erzeugt nach jedem Angriff Lava-Felder um das Ziel (5 Schaden / Runde, 2 Runden).',
+    description: 'Hinterlässt nach jedem Angriff ein Lava-Plus (5 Felder) um das Ziel (8 Schaden / Runde, 3 Runden).',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   shadowblade: {
     label: 'Schattenklinge', emoji: '🥷', hp: 60, attack: 20, cooldown: 2,
-    description: 'Erster Angriff +50% Schaden (Stealth-Bonus). Schneller Diagonal-Springer.',
+    description: 'Backstab-Bonus alle 3 Ticks: nächster Angriff +60% Schaden. Schneller Diagonal-Springer.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -304,14 +310,14 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   arsonist: {
     label: 'Brandstifter', emoji: '🔥', hp: 65, attack: 4, cooldown: 2,
-    description: 'Geringer Sofortschaden, zündet aber an: 5 Schaden pro Runde für 4 Runden. Stapelbar.',
+    description: 'Geringer Sofortschaden, zündet aber an: 6 Schaden pro Runde für 4 Runden. Stapelbar.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   lightning: {
     label: 'Blitzmagier', emoji: '🌩️', hp: 75, attack: 18, cooldown: 2,
-    description: 'Angriff springt auf alle Feinde im Radius 1 ums Primärziel (50% Schaden).',
+    description: 'Kettenblitz: springt auf alle Feinde im Radius 2 ums Primärziel (50% Schaden).',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
@@ -328,7 +334,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   lamb: {
     label: 'Opferlamm', emoji: '🐑', hp: 120, attack: 5, cooldown: 5,
-    description: 'Sehr zäh, wenig Schaden. Zieht Aggro auf sich. Heilt beim Tod alle Verbündeten um 30% HP.',
+    description: 'Provoziert! Wird immer als Primärziel anvisiert. Heilt beim Tod alle Verbündeten um 30% HP.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
@@ -349,7 +355,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   ranger: {
     label: 'Waldläufer', emoji: '🪵', hp: 70, attack: 14, cooldown: 2,
-    description: 'Im Wald: +100% Schaden. Bewegt sich in alle 8 Richtungen.',
+    description: 'Sucht aktiv Wälder auf und verteidigt sie (+100% Schaden im Wald). Bewegt sich in alle 8 Richtungen.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
@@ -363,7 +369,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   cloner: {
     label: 'Kloner', emoji: '🧬', hp: 90, attack: 12, cooldown: 2,
-    description: 'Solider Allrounder. (geplant: spawnt alle 4 Runden einen Klon.)',
+    description: 'Spawnt alle 4 Ticks einen Klon (ein neuer Kämpfer). Klone können sich nicht weiter klonen.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
@@ -377,7 +383,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   spiderqueen: {
     label: 'Spinnenkönigin', emoji: '🕷️', hp: 70, attack: 15, cooldown: 2,
-    description: 'Bewegt sich in alle 8 Richtungen (bis 2 Felder). 30% Chance, Ziel mit Netz einzufrieren.',
+    description: 'Bewegt sich in alle 8 Richtungen (bis 2 Felder). 35% Chance, Ziel im Netz zu fangen (3 Runden).',
     movePattern: [
       ...ALL_ADJACENT,
       { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
@@ -388,21 +394,21 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   waterwalker: {
     label: 'Wasserwandler', emoji: '🌊', hp: 85, attack: 19, cooldown: 2,
-    description: 'Auf Wasserfeldern: -30% erlittener Schaden, doppelte Bewegung. Kann Wasser betreten.',
+    description: 'Strebt aktiv ins Wasser. Auf Wasser: -30% erlittener Schaden, bleibt stehen und verteidigt seinen Tümpel.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   doppelganger: {
     label: 'Doppelgänger', emoji: '👥', hp: 85, attack: 17, cooldown: 2,
-    description: 'Diagonale Bewegung. (geplant: spawnt ein Phantom-Duplikat.)',
+    description: 'Spawnt zu Beginn der Runde ein Phantom-Duplikat (5 Ticks unverwundbar). Gegner unterscheiden Original und Phantom nicht.',
     movePattern: DIAGONAL,
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
   },
   sniper: {
-    label: 'Scharfschütze', emoji: '🎯', hp: 50, attack: 30, cooldown: 3,
-    description: 'Bewegt sich nie. Greift immer die Einheit mit niedrigstem HP auf dem ganzen Feld an.',
+    label: 'Scharfschütze', emoji: '🎯', hp: 50, attack: 35, cooldown: 3,
+    description: 'Bewegt sich nie. Greift immer die Einheit mit niedrigstem HP auf dem ganzen Feld an. Hoher Schaden.',
     movePattern: [],
     attackPattern: (() => {
       const p: Position[] = [];
@@ -417,7 +423,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   chaindancer: {
     label: 'Kettentänzer', emoji: '🪢', hp: 65, attack: 22, cooldown: 3,
-    description: 'Hohe Schadensspitzen. Diagonale Bewegung bis 2 Felder. (geplant: Kettenangriff durch 3 Feinde.)',
+    description: 'Kettenangriff: Schaden springt diagonal durch bis zu 3 Feinde (jeweils 70% Schaden). Diagonale Bewegung bis 2 Felder.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -593,11 +599,16 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
 
+  // === LAMB TAUNT: any enemy lamb is ALWAYS the primary target (provokes everyone). ===
+  const enemyLamb = enemies.find(e => e.type === 'lamb');
+  if (enemyLamb && unit.type !== 'sniper' && unit.type !== 'healer') {
+    return enemyLamb;
+  }
   // === SNIPER: always shoots lowest-HP enemy on the entire field ===
   if (unit.type === 'sniper') {
     return [...enemies].sort((a, b) => a.hp - b.hp)[0];
   }
-  // === LAMB: taunts the strongest enemy ===
+  // === LAMB (own lamb): taunts the strongest enemy ===
   if (unit.type === 'lamb') {
     return [...enemies].sort((a, b) => b.attack * b.hp - a.attack * a.hp)[0];
   }
@@ -1249,10 +1260,10 @@ export function applyPostAttackEffects(
     }
   }
 
-  // Spiderqueen: 30% chance to web (freeze 1 turn)
-  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.30) {
-    target.frozen = Math.max(target.frozen || 0, 1);
-    logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} verlangsamt`);
+  // Spiderqueen: 35% chance to web target for 3 turns (separate field, distinct visual)
+  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.35) {
+    target.webbed = Math.max(target.webbed || 0, 3);
+    logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} 3 Runden gefangen`);
   }
 
   // Magnetiker: pull adjacent enemies one step closer after attack
@@ -1278,13 +1289,13 @@ export function applyPostAttackEffects(
     logs.push(`🧲 Magnetiker zieht Feinde heran`);
   }
 
-  // Vulkanit: spawn lava in 8 neighbors of target for 2 ticks
+  // Vulkanit: spawn lava in a 5-tile PLUS pattern on the target (center + 4 orthogonal), 3 ticks
   if (attacker.type === 'vulkanit') {
-    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
+    const plus: [number, number][] = [[0,0],[-1,0],[1,0],[0,-1],[0,1]];
+    for (const [dr, dc] of plus) {
       const r = target.row + dr, c = target.col + dc;
       if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
-      grid[r][c].lavaTicks = 2;
+      grid[r][c].lavaTicks = 3;
       grid[r][c].lavaOwnerTeam = attacker.team;
     }
   }
@@ -1335,8 +1346,8 @@ export function processLavaTick(grid: Cell[][], logs: string[]): void {
     if (!cell.lavaTicks) continue;
     const u = cell.unit;
     if (u && u.hp > 0 && !u.dead && u.team !== cell.lavaOwnerTeam) {
-      u.hp = Math.max(0, u.hp - 5);
-      logs.push(`🌋 Lava → ${UNIT_DEFS[u.type].emoji} 5${u.hp <= 0 ? ' ☠️' : ''}`);
+      u.hp = Math.max(0, u.hp - 8);
+      logs.push(`🌋 Lava → ${UNIT_DEFS[u.type].emoji} 8${u.hp <= 0 ? ' ☠️' : ''}`);
       if (u.hp <= 0) (u as any).dead = true;
     }
     cell.lavaTicks -= 1;
