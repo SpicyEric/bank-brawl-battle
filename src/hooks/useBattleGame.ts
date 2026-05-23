@@ -281,7 +281,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     });
 
     setPhase('place_enemy');
-  }, [playerUnits, enemyBannedUnits]);
+  }, [playerUnits, enemyUnits, enemyBannedUnits, enemyMaxUnits, grid, difficulty]);
 
   // Keep confirmPlacementRef in sync for auto-confirm timer
   useEffect(() => { confirmPlacementRef.current = confirmPlacement; }, [confirmPlacement]);
