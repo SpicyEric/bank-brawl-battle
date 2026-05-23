@@ -1260,10 +1260,10 @@ export function applyPostAttackEffects(
     }
   }
 
-  // Spiderqueen: 30% chance to web (freeze 1 turn)
-  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.30) {
-    target.frozen = Math.max(target.frozen || 0, 1);
-    logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} verlangsamt`);
+  // Spiderqueen: 35% chance to web target for 3 turns (separate field, distinct visual)
+  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.35) {
+    target.webbed = Math.max(target.webbed || 0, 3);
+    logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} 3 Runden gefangen`);
   }
 
   // Magnetiker: pull adjacent enemies one step closer after attack
@@ -1289,13 +1289,13 @@ export function applyPostAttackEffects(
     logs.push(`🧲 Magnetiker zieht Feinde heran`);
   }
 
-  // Vulkanit: spawn lava in 8 neighbors of target for 2 ticks
+  // Vulkanit: spawn lava in a 5-tile PLUS pattern on the target (center + 4 orthogonal), 3 ticks
   if (attacker.type === 'vulkanit') {
-    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
+    const plus: [number, number][] = [[0,0],[-1,0],[1,0],[0,-1],[0,1]];
+    for (const [dr, dc] of plus) {
       const r = target.row + dr, c = target.col + dc;
       if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
-      grid[r][c].lavaTicks = 2;
+      grid[r][c].lavaTicks = 3;
       grid[r][c].lavaOwnerTeam = attacker.team;
     }
   }
