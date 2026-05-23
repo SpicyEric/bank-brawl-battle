@@ -1,4 +1,5 @@
 import { UnitType, UNIT_DEFS, UNIT_COLOR_GROUPS, COLOR_BEATS, ColorGroup, getPatternDisplay } from '@/lib/battleGame';
+import { UnitGlyph } from '@/components/UnitGlyph';
 
 const COLOR_LABEL: Record<ColorGroup, string> = {
   red: '🔴 Rot',
@@ -27,7 +28,7 @@ export function UnitInfoModal({ unitType, onClose, hideColorInfo }: UnitInfoModa
       <div className="bg-card border border-border rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-xl" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center gap-3">
-          <span className="text-3xl">{def.emoji}</span>
+          <UnitGlyph type={unitType} className="w-10 h-10" />
           <div>
             <div className="flex items-center gap-2">
               <h2 className="font-bold text-foreground text-lg">{def.label}</h2>

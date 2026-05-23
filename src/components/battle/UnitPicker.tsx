@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { UnitType, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, ColorGroup } from '@/lib/battleGame';
 import { UnitInfoModal } from './UnitInfoModal';
+import { UnitGlyph } from '@/components/UnitGlyph';
+import { getUnitIcon, iconUrl } from '@/lib/unitIcons';
 
 
 const COLOR_BORDER: Record<ColorGroup, string> = {
@@ -51,7 +53,7 @@ export function UnitPicker({
   const draggedSlotIdx = useRef<number | null>(null);
   const lastHover = useRef<{ row: number; col: number } | null>(null);
   const isDragging = useRef(false);
-  const [dragGhost, setDragGhost] = useState<{ x: number; y: number; emoji: string } | null>(null);
+  const [dragGhost, setDragGhost] = useState<{ x: number; y: number; emoji: string; type: UnitType } | null>(null);
 
   const startPress = useCallback((type: UnitType) => {
     didLongPress.current = false;
@@ -105,7 +107,7 @@ export function UnitPicker({
         cancelPress();
       }
       if (!isDragging.current) return;
-      setDragGhost({ x: e.clientX, y: e.clientY, emoji: UNIT_DEFS[dragStart.current.type].emoji });
+      setDragGhost({ x: e.clientX, y: e.clientY, emoji: UNIT_DEFS[dragStart.current.type].emoji, type: dragStart.current.type });
       const cell = findCellAtPoint(e.clientX, e.clientY);
       if (cell) {
         lastHover.current = cell;
@@ -177,7 +179,7 @@ export function UnitPicker({
                       <span className="text-lg">{isPlaced ? '✓' : '💤'}</span>
                     </div>
                   )}
-                  <span className="text-xl block">{def.emoji}</span>
+                  <UnitGlyph type={type} className="block mx-auto w-6 h-6" />
                   <p className="text-[10px] font-semibold text-foreground mt-1">{def.label}</p>
                   <p className="text-[9px] text-muted-foreground">
                     {isBanned ? 'Ermüdet' : isPlaced ? 'Platziert' : <>❤️{def.hp} ⚔️{def.attack}</>}
@@ -191,7 +193,7 @@ export function UnitPicker({
           </div>
         </div>
         {dragGhost && (
-          <div className="drag-ghost" style={{ left: dragGhost.x, top: dragGhost.y }}>{dragGhost.emoji}</div>
+          <div className="drag-ghost" style={{ left: dragGhost.x, top: dragGhost.y }}>{getUnitIcon(dragGhost.type) ? <img src={iconUrl(getUnitIcon(dragGhost.type)!)} alt="" className="w-8 h-8" style={{ imageRendering: 'pixelated' }} /> : dragGhost.emoji}</div>
         )}
         {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
       </>
@@ -243,7 +245,7 @@ export function UnitPicker({
                     <span className="text-lg">💤</span>
                   </div>
                 )}
-                <span className="text-xl block">{def.emoji}</span>
+                <UnitGlyph type={type} className="block mx-auto w-6 h-6" />
                 <p className="text-[10px] font-semibold text-foreground mt-1">{def.label}</p>
                 <p className="text-[9px] text-muted-foreground">
                   {isBanned ? 'Ermüdet' : <>❤️{def.hp} ⚔️{def.attack}</>}

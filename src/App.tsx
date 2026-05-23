@@ -9,6 +9,7 @@ import SinglePlayer from "./pages/SinglePlayer";
 import Tutorial from "./pages/Tutorial";
 import Multiplayer from "./pages/Multiplayer";
 import UnitRoster from "./pages/UnitRoster";
+import AdminIcons from "./pages/AdminIcons";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/game" element={<Index />} />
           <Route path="/roster" element={<UnitRoster />} />
           <Route path="/multiplayer" element={<Multiplayer />} />
+          <Route path="/admin" element={<AdminIcons />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
