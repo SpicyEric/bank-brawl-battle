@@ -64,17 +64,19 @@ export function UnitInfoModal({ unitType, onClose, hideColorInfo }: UnitInfoModa
           <PatternGrid title="Angriff" grid={attackGrid} center={center} color="bg-danger/60" />
         </div>
 
-        {/* Color counter info */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-semibold" style={{ color: `hsl(var(--unit-${colorGroup}))` }}>💪 Stark gegen:</span>
-            <span className="text-foreground">{COLOR_LABEL[beats]}</span>
+        {/* Color counter info – hidden in roster (units are color-neutral until placed) */}
+        {!hideColorInfo && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-semibold" style={{ color: `hsl(var(--unit-${colorGroup}))` }}>💪 Stark gegen:</span>
+              <span className="text-foreground">{COLOR_LABEL[beats]}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-semibold" style={{ color: `hsl(var(--unit-${losesTo}))` }}>😰 Schwach gegen:</span>
+              <span className="text-foreground">{COLOR_LABEL[losesTo]}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-semibold" style={{ color: `hsl(var(--unit-${losesTo}))` }}>😰 Schwach gegen:</span>
-            <span className="text-foreground">{COLOR_LABEL[losesTo]}</span>
-          </div>
-        </div>
+        )}
 
         <button
           onClick={onClose}
