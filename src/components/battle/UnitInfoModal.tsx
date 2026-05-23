@@ -9,9 +9,11 @@ const COLOR_LABEL: Record<ColorGroup, string> = {
 interface UnitInfoModalProps {
   unitType: UnitType;
   onClose: () => void;
+  /** Hide color affiliation (badge + strong/weak section) – used in roster where units are color-neutral */
+  hideColorInfo?: boolean;
 }
 
-export function UnitInfoModal({ unitType, onClose }: UnitInfoModalProps) {
+export function UnitInfoModal({ unitType, onClose, hideColorInfo }: UnitInfoModalProps) {
   const def = UNIT_DEFS[unitType];
   const colorGroup = UNIT_COLOR_GROUPS[unitType];
   const beats = COLOR_BEATS[colorGroup];
@@ -29,10 +31,12 @@ export function UnitInfoModal({ unitType, onClose }: UnitInfoModalProps) {
           <div>
             <div className="flex items-center gap-2">
               <h2 className="font-bold text-foreground text-lg">{def.label}</h2>
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                backgroundColor: `hsl(var(--unit-${colorGroup}) / 0.2)`,
-                color: `hsl(var(--unit-${colorGroup}))`,
-              }}>{COLOR_LABEL[colorGroup]}</span>
+              {!hideColorInfo && (
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                  backgroundColor: `hsl(var(--unit-${colorGroup}) / 0.2)`,
+                  color: `hsl(var(--unit-${colorGroup}))`,
+                }}>{COLOR_LABEL[colorGroup]}</span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">{def.description}</p>
           </div>
@@ -60,17 +64,19 @@ export function UnitInfoModal({ unitType, onClose }: UnitInfoModalProps) {
           <PatternGrid title="Angriff" grid={attackGrid} center={center} color="bg-danger/60" />
         </div>
 
-        {/* Color counter info */}
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-semibold" style={{ color: `hsl(var(--unit-${colorGroup}))` }}>💪 Stark gegen:</span>
-            <span className="text-foreground">{COLOR_LABEL[beats]}</span>
+        {/* Color counter info – hidden in roster (units are color-neutral until placed) */}
+        {!hideColorInfo && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-semibold" style={{ color: `hsl(var(--unit-${colorGroup}))` }}>💪 Stark gegen:</span>
+              <span className="text-foreground">{COLOR_LABEL[beats]}</span>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-semibold" style={{ color: `hsl(var(--unit-${losesTo}))` }}>😰 Schwach gegen:</span>
+              <span className="text-foreground">{COLOR_LABEL[losesTo]}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-semibold" style={{ color: `hsl(var(--unit-${losesTo}))` }}>😰 Schwach gegen:</span>
-            <span className="text-foreground">{COLOR_LABEL[losesTo]}</span>
-          </div>
-        </div>
+        )}
 
         <button
           onClick={onClose}

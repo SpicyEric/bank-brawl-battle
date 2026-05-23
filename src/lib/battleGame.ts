@@ -596,38 +596,60 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   if (unit.type === 'lamb') {
     return [...enemies].sort((a, b) => b.attack * b.hp - a.attack * a.hp)[0];
   }
-  // === ARSONIST: prefers high-HP targets (best DoT value) ===
+  // === VAMPIRE: always targets enemy with HIGHEST HP (nearest among ties) ===
+  if (unit.type === 'vampire') {
+    return [...enemies].sort((a, b) => b.hp - a.hp || distance(unit, a) - distance(unit, b))[0];
+  }
+  // === BANSHEE: always nearest enemy ===
+  if (unit.type === 'banshee') {
+    return [...enemies].sort((a, b) => distance(unit, a) - distance(unit, b))[0];
+  }
+  // === ARSONIST: prefer high-HP non-burning targets ===
   if (unit.type === 'arsonist') {
-    const sorted = [...enemies].sort((a, b) => b.hp - a.hp);
+    const nonBurning = enemies.filter(e => !e.burning || e.burning.length === 0);
+    const pool = nonBurning.length > 0 ? nonBurning : enemies;
+    const sorted = [...pool].sort((a, b) => b.hp - a.hp);
     if (sorted[0] && distance(unit, sorted[0]) <= 6) return sorted[0];
   }
 
-
-  // Tank aggro: if any enemy tank is within distance 3, 60% chance to target it
+  // Tank aggro
   const nearbyTanks = enemies.filter(e => e.type === 'tank' && distance(unit, e) <= 3);
   if (nearbyTanks.length > 0 && Math.random() < 0.6) {
     nearbyTanks.sort((a, b) => distance(unit, a) - distance(unit, b));
     return nearbyTanks[0];
   }
 
-  // === WARRIOR: Lock-on – keeps attacking the same target until it's dead ===
-  if (unit.type === 'warrior' && unit.lastAttackedId) {
-    const lockedTarget = enemies.find(e => e.id === unit.lastAttackedId);
-    if (lockedTarget) return lockedTarget;
+  // === WARRIOR / STORMRUNNER: lock-on – keeps attacking same target until it dies ===
+  if ((unit.type === 'warrior' || unit.type === 'stormrunner') && unit.lastAttackedId) {
+    const locked = enemies.find(e => e.id === unit.lastAttackedId);
+    if (locked) return locked;
   }
 
-  // === ASSASSIN: Opportunist – prefers wounded enemies, then nearest ===
-  if (unit.type === 'assassin') {
-    const wounded = enemies.filter(e => e.hp < e.maxHp * 0.7);
-    if (wounded.length > 0) {
-      wounded.sort((a, b) => a.hp - b.hp);
-      return wounded[0];
+  // === ARCHER: lock-on while max-distance kiting ===
+  if (unit.type === 'archer' && unit.lastAttackedId) {
+    const locked = enemies.find(e => e.id === unit.lastAttackedId);
+    if (locked) return locked;
+  }
+
+  // === ASSASSIN / FROST / MAGE: switch target after every attack ===
+  if ((unit.type === 'assassin' || unit.type === 'frost' || unit.type === 'mage') &&
+      unit.lastAttackedId && enemies.length > 1) {
+    const others = enemies.filter(e => e.id !== unit.lastAttackedId);
+    if (others.length > 0) {
+      // Assassin: prefer wounded among other targets; frost/mage: nearest
+      if (unit.type === 'assassin') {
+        const wounded = others.filter(e => e.hp < e.maxHp * 0.7);
+        if (wounded.length > 0) {
+          wounded.sort((a, b) => a.hp - b.hp);
+          return wounded[0];
+        }
+      }
+      others.sort((a, b) => distance(unit, a) - distance(unit, b));
+      return others[0];
     }
-    enemies.sort((a, b) => distance(unit, a) - distance(unit, b));
-    return enemies[0];
   }
 
-  // Rider target-switching: prefer enemies it hasn't attacked last
+  // Rider target-switching
   if (unit.type === 'rider' && unit.lastAttackedId && enemies.length > 1) {
     const otherEnemies = enemies.filter(e => e.id !== unit.lastAttackedId);
     if (otherEnemies.length > 0) {
@@ -740,7 +762,8 @@ function terrainScore(pos: Position, grid: Cell[][]): number {
 function _selectBestMove(unit: Unit, target: Unit, possibleMoves: Position[], grid: Cell[][], allUnits: Unit[] | undefined, isRangedKiter: boolean): Position {
   // If can already attack, consider kiting or staying
   if (canAttack(unit, target)) {
-    if (isRangedKiter && (unit.stuckTurns || 0) < 3) {
+    // Ranged kiters: always try to maximize distance while still being able to attack.
+    if (isRangedKiter) {
       const kiteMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
       if (kiteMoves.length > 0) {
         kiteMoves.sort((a, b) => {

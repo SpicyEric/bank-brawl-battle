@@ -172,7 +172,7 @@ export default function UnitRoster() {
         </button>
       </div>
 
-      {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
+      {infoUnit && <UnitInfoModal unitType={infoUnit} hideColorInfo onClose={() => setInfoUnit(null)} />}
     </div>
   );
 }

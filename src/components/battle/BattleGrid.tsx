@@ -347,6 +347,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isShaking = shakeCells.has(`${cell.row}-${cell.col}`);
           const isDead = unit?.dead;
           const isFrozen = unit ? (unit.frozen ?? 0) > 0 : false;
+          const isBurning = unit ? !!(unit.burning && unit.burning.length > 0 && !unit.dead) : false;
           const isInactive = unit && !isDead && unit.activationTurn !== undefined && unit.activationTurn > 0 && phase === 'place_player';
           const cellKey = `${cell.row}-${cell.col}`;
           const terrain = cell.terrain || 'none';
@@ -390,8 +391,26 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     transition: offset ? 'none' : 'transform 580ms ease-out',
                   }}
                 >
+                  {/* Persistent freeze overlay – stays visible the entire time the unit is frozen */}
+                  {isFrozen && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm"
+                      style={{
+                        background: 'linear-gradient(135deg, hsl(210 80% 60% / 0.45), hsl(195 90% 65% / 0.30))',
+                        boxShadow: 'inset 0 0 10px hsl(210 80% 70% / 0.6)',
+                      }}
+                    />
+                  )}
+                  {/* Persistent burn overlay – flickering fire while burning stacks active */}
+                  {isBurning && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm animate-pulse"
+                      style={{
+                        background: 'linear-gradient(135deg, hsl(15 90% 50% / 0.30), hsl(35 95% 55% / 0.20))',
+                        boxShadow: 'inset 0 0 8px hsl(20 95% 55% / 0.5)',
+                      }}
+                    />
+                  )}
                   <span
-                    className={`text-base sm:text-lg leading-none select-none ${isFrozen ? 'opacity-60' : ''}`}
+                    className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''}`}
                     style={{
                       filter: isFrozen
                         ? 'drop-shadow(0 0 5px hsl(210, 80%, 60%)) drop-shadow(0 0 10px hsl(210, 80%, 60%))'
@@ -402,6 +421,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   >
                     {def?.emoji}
                     {isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🧊</span>}
+                    {isBurning && !isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🔥</span>}
                   </span>
                   <div className="absolute bottom-0.5 left-0.5 right-0.5 h-[3px] rounded-full bg-muted overflow-hidden">
                     <div
@@ -437,18 +457,19 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         })}
       </div>
 
-      {/* Shield bond connections during placement */}
-      {(isPlacing || phase === 'place_enemy') && (() => {
-        const bonds: { tankRow: number; tankCol: number; unitRow: number; unitCol: number }[] = [];
-        const tanks = grid.flat().filter(c => c.unit && !c.unit.dead && c.unit.type === 'tank' && c.unit.team === 'player');
+      {/* Shield bond connections – visible during placement AND combat */}
+      {(isPlacing || phase === 'place_enemy' || phase === 'battle') && (() => {
+        const bonds: { tankRow: number; tankCol: number; unitRow: number; unitCol: number; team: 'player' | 'enemy' }[] = [];
+        const tanks = grid.flat().filter(c => c.unit && !c.unit.dead && c.unit.type === 'tank');
         for (const tankCell of tanks) {
+          const tank = tankCell.unit!;
           for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }, { row: -1, col: -1 }, { row: -1, col: 1 }, { row: 1, col: -1 }, { row: 1, col: 1 }]) {
             const r = tankCell.row + offset.row;
             const c = tankCell.col + offset.col;
             if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
               const neighbor = grid[r][c];
-              if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === 'player' && neighbor.unit.id !== tankCell.unit!.id) {
-                bonds.push({ tankRow: tankCell.row, tankCol: tankCell.col, unitRow: r, unitCol: c });
+              if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === tank.team && neighbor.unit.id !== tank.id) {
+                bonds.push({ tankRow: tankCell.row, tankCol: tankCell.col, unitRow: r, unitCol: c, team: tank.team });
               }
             }
           }
@@ -458,18 +479,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const y1 = visualRow(b.tankRow) * cellSize + cellSize / 2;
           const x2 = b.unitCol * cellSize + cellSize / 2;
           const y2 = visualRow(b.unitRow) * cellSize + cellSize / 2;
+          const isOwnTeam = flipped ? b.team === 'enemy' : b.team === 'player';
+          const color = isOwnTeam ? 'hsl(152, 60%, 48%)' : 'hsl(0, 72%, 55%)';
           return (
             <svg key={`bond-${i}`} className="absolute inset-0 z-20 pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
               <line
                 x1={x1} y1={y1} x2={x2} y2={y2}
-                stroke="hsl(152, 60%, 48%)"
+                stroke={color}
                 strokeWidth="0.6"
                 strokeDasharray="1.5,1"
                 opacity="0.7"
               >
                 <animate attributeName="stroke-dashoffset" from="0" to="-5" dur="1.5s" repeatCount="indefinite" />
               </line>
-              <circle cx={(x1 + x2) / 2} cy={(y1 + y2) / 2} r="1.2" fill="hsl(152, 60%, 48%)" opacity="0.8">
+              <circle cx={(x1 + x2) / 2} cy={(y1 + y2) / 2} r="1.2" fill={color} opacity="0.8">
                 <animate attributeName="opacity" values="0.4;0.9;0.4" dur="1.5s" repeatCount="indefinite" />
               </circle>
             </svg>
