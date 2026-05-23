@@ -741,7 +741,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           // Judge: +8 ATK for each fallen ally — recalculated below at end of tick.
 
           // Lightning: chain to adjacent enemies for 50% damage
+          let lightningChainCells: { row: number; col: number }[] | undefined;
           if (unit.type === 'lightning') {
+            lightningChainCells = [{ row: target.row, col: target.col }];
             const chainDmg = Math.round(dmg * 0.5);
             for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
               if (dr === 0 && dc === 0) continue;
@@ -749,12 +751,21 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
               if (ar < 0 || ar >= GRID_SIZE || ac < 0 || ac >= GRID_SIZE) continue;
               const cu = newGrid[ar][ac].unit;
               if (cu && cu.hp > 0 && !cu.dead && cu.team !== unit.team && cu.id !== target.id) {
+                if (cu.isPhantom && (cu.phantom ?? 0) > 0) continue;
                 cu.hp = Math.max(0, cu.hp - chainDmg);
                 if (cu.hp <= 0) (cu as any).dead = true;
+                lightningChainCells.push({ row: ar, col: ac });
                 logs.push(`⚡ Blitz → ${UNIT_DEFS[cu.type].emoji} ${chainDmg} (Kettenblitz)`);
               }
             }
           }
+
+          // Chaindancer: chain attack through up to 2 additional diagonal enemies (70% dmg)
+          let chaindancerCells: { row: number; col: number }[] | undefined;
+          if (unit.type === 'chaindancer') {
+            chaindancerCells = applyChainAttack(unit, target, dmg, newGrid, logs);
+          }
+
 
           const def = UNIT_DEFS[unit.type];
           const tDef = UNIT_DEFS[target.type];
