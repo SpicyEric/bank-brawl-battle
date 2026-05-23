@@ -577,6 +577,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       processLavaTick(newGrid, logs);
       // === Banshee ghost timer tick-down ===
       processGhostTick(allUnits, newGrid, logs);
+      // === Doppelganger phantom timers ===
+      tickPhantomTimers(allUnits, newGrid, logs);
+
+
 
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
