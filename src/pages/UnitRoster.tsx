@@ -10,15 +10,14 @@ const ROSTER_SIZE = 9;
 const LONG_PRESS_MS = 400;
 
 const COLOR_RING: Record<ColorGroup, string> = {
-  red: 'border-unit-red/60 bg-unit-red/10',
-  green: 'border-unit-green/60 bg-unit-green/10',
-  blue: 'border-unit-blue/60 bg-unit-blue/10',
+  red: 'border-unit-red/40 bg-unit-red/15',
+  green: 'border-unit-green/40 bg-unit-green/15',
+  blue: 'border-unit-blue/40 bg-unit-blue/15',
 };
-const COLOR_DOT: Record<ColorGroup, string> = {
-  red: 'bg-unit-red', green: 'bg-unit-green', blue: 'bg-unit-blue',
-};
-const COLOR_LABEL: Record<ColorGroup, string> = {
-  red: '🔴 Rot', green: '🟢 Grün', blue: '🔵 Blau',
+const COLOR_EMPTY: Record<ColorGroup, string> = {
+  red: 'border-unit-red/30 bg-unit-red/10',
+  green: 'border-unit-green/30 bg-unit-green/10',
+  blue: 'border-unit-blue/30 bg-unit-blue/10',
 };
 
 export default function UnitRoster() {
