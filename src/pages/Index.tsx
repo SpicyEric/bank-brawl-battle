@@ -269,17 +269,16 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
               }}
               onDragDrop={(row, col, slotIdx) => {
                 setDragPreview(null);
+                if (!roster) return;
+                const cell = game.grid[row]?.[col];
+                if (!cell || cell.unit || cell.terrain === 'water') return;
+                const playerRows = [5, 6, 7];
+                if (!playerRows.includes(row)) return;
+                const type = roster[slotIdx];
                 game.setSelectedSlot(slotIdx);
-                // Defer to next tick so selectedSlot is in state when placeUnit reads it
-                setTimeout(() => {
-                  const cell = game.grid[row]?.[col];
-                  if (!cell || cell.unit || cell.terrain === 'water') return;
-                  if (!roster) return;
-                  const type = roster[slotIdx];
-                  game.placeUnit(row, col);
-                  sfxPlace();
-                  setLastPlaced({ row, col, type });
-                }, 0);
+                game.placeUnit(row, col, slotIdx);
+                sfxPlace();
+                setLastPlaced({ row, col, type });
               }}
             />
             <button
