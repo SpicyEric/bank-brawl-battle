@@ -795,6 +795,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
                 events.push({
                   type: 'heal',
                   attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: '🌿',
+                  attackerType: unit.type,
                   targetId: ally.id, targetRow: ally.row, targetCol: ally.col,
                   damage: 0, isStrong: false, isWeak: false,
                   isRanged: Math.abs(unit.row - ally.row) + Math.abs(unit.col - ally.col) > 1,
@@ -896,6 +897,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
                 events.push({
                   type: cellUnit.hp <= 0 ? 'kill' : 'hit',
                   attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: '🔥',
+                  attackerType: unit.type,
                   targetId: cellUnit.id, targetRow: aoePos.row, targetCol: aoePos.col,
                   damage: splashDmg, isStrong: false, isWeak: false, isRanged: false, isAoe: true,
                 });
@@ -907,6 +909,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           events.push({
             type: target.hp <= 0 ? 'kill' : 'hit',
             attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: def.emoji,
+            attackerType: unit.type,
             targetId: target.id, targetRow: target.row, targetCol: target.col,
             damage: dmg, isStrong, isWeak, isRanged: dist > 1,
             isAoe: unit.type === 'dragon', aoeCells, isFrozen: didFreeze,
@@ -917,6 +920,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             events.push({
               type: 'freeze',
               attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: '🥶',
+              attackerType: unit.type,
               targetId: target.id, targetRow: target.row, targetCol: target.col,
               damage: 0, isStrong: false, isWeak: false, isRanged: dist > 1,
             });
