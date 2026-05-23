@@ -33,6 +33,9 @@ interface UnitPickerProps {
   onSelectSlot?: (slot: number) => void;
   bannedSlots?: number[];
   placedSlots?: number[]; // slots already placed this round
+  // Drag-and-drop placement (slot mode)
+  onDragHover?: (row: number | null, col: number | null, type: UnitType | null) => void;
+  onDragDrop?: (row: number, col: number, slotIdx: number) => void;
 }
 
 export function UnitPicker({
