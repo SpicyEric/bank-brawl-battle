@@ -103,7 +103,7 @@ export default function UnitRoster() {
                     >
                       {def ? (
                         <>
-                          <span className="text-2xl">{def.emoji}</span>
+                          <UnitGlyph type={t!} className="w-7 h-7" />
                           <span className="text-[9px] font-semibold text-foreground mt-0.5">{def.label}</span>
                         </>
                       ) : (
