@@ -153,7 +153,7 @@ export default function UnitRoster() {
                     <span className="text-base">✓</span>
                   </div>
                 )}
-                <span className="text-xl block">{def.emoji}</span>
+                <UnitGlyph type={t} className="w-6 h-6 mx-auto block" />
                 <p className="text-[9px] font-semibold text-foreground leading-tight mt-0.5">{def.label}</p>
                 <p className="text-[8px] text-muted-foreground">❤️{def.hp} ⚔️{def.attack}</p>
               </button>
