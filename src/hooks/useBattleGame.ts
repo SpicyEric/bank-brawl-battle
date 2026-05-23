@@ -684,7 +684,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         }
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
+          // Phantoms (doppelganger phantom): completely invulnerable
+          if (target.isPhantom && (target.phantom ?? 0) > 0) {
+            unit.cooldown = unit.maxCooldown;
+            continue;
+          }
           let dmg = calcDamage(unit, target, newGrid);
+          // Frozen attacker: 50% damage penalty
+          if (isFrozenNow) dmg = Math.round(dmg * 0.5);
           // Apply morale modifier + shield wall
           if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
           else {
