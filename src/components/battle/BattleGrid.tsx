@@ -18,6 +18,8 @@ interface BattleGridProps {
   showZoneColors?: boolean;
   /** Flip the grid vertically (for player2 in multiplayer) */
   flipped?: boolean;
+  /** While the player is dragging a unit, show alternating attack/move preview around this cell */
+  dragPreview?: { row: number; col: number; type: UnitType } | null;
 }
 
 interface UnitPos { row: number; col: number }
