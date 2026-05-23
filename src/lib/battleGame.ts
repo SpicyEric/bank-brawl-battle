@@ -1214,3 +1214,164 @@ export function getPatternDisplay(pattern: Position[], gridSize: number = 5): bo
   }
   return display;
 }
+
+// ============= UNIT SPECIAL EFFECTS (shared between SP / MP) =============
+
+/** Apply post-attack effects: mirror reflect, magnet pull, spider web, shadowblade bonus,
+ *  icegolem freeze-on-hit, vulkanit lava spawn. */
+export function applyPostAttackEffects(
+  attacker: Unit, target: Unit, dmg: number,
+  grid: Cell[][], logs: string[]
+): void {
+  // Shadowblade: first attack +50% bonus damage
+  if (attacker.type === 'shadowblade' && !attacker.firstAttackUsed && target.hp > 0) {
+    const bonus = Math.round(dmg * 0.5);
+    target.hp = Math.max(0, target.hp - bonus);
+    if (target.hp <= 0) (target as any).dead = true;
+    attacker.firstAttackUsed = true;
+    logs.push(`🥷 Schattenklinge Erstangriff +${bonus}`);
+  }
+
+  // Mirror reflect 30% to attacker
+  if (target.type === 'mirror' && target.hp > 0 && dmg > 0) {
+    const refl = Math.max(1, Math.round(dmg * 0.3));
+    attacker.hp = Math.max(0, attacker.hp - refl);
+    if (attacker.hp <= 0) (attacker as any).dead = true;
+    logs.push(`🪞 Reflektion → ${UNIT_DEFS[attacker.type].emoji} ${refl}`);
+  }
+
+  // Icegolem: 25% chance to freeze melee attacker for 1 turn
+  if (target.type === 'icegolem' && attacker.hp > 0 && Math.random() < 0.25) {
+    const dist = Math.abs(attacker.row - target.row) + Math.abs(attacker.col - target.col);
+    if (dist <= 2) {
+      attacker.frozen = Math.max(attacker.frozen || 0, 1);
+      logs.push(`🧊 Eisgolem friert ${UNIT_DEFS[attacker.type].emoji} ein`);
+    }
+  }
+
+  // Spiderqueen: 30% chance to web (freeze 1 turn)
+  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.30) {
+    target.frozen = Math.max(target.frozen || 0, 1);
+    logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} verlangsamt`);
+  }
+
+  // Magnetiker: pull adjacent enemies one step closer after attack
+  if (attacker.type === 'magnetiker') {
+    for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      if (Math.abs(dr) <= 1 && Math.abs(dc) <= 1) continue; // only pull from >1
+      const r = attacker.row + dr, c = attacker.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const cu = grid[r][c].unit;
+      if (!cu || cu.team === attacker.team || cu.hp <= 0 || cu.dead) continue;
+      const sr = Math.sign(attacker.row - r);
+      const sc = Math.sign(attacker.col - c);
+      const nr = r + sr, nc = c + sc;
+      if (nr === attacker.row && nc === attacker.col) continue;
+      if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
+      if (grid[nr][nc].unit) continue;
+      if (grid[nr][nc].terrain === 'water' && cu.type !== 'waterwalker') continue;
+      grid[r][c].unit = null;
+      cu.row = nr; cu.col = nc;
+      grid[nr][nc].unit = cu;
+    }
+    logs.push(`🧲 Magnetiker zieht Feinde heran`);
+  }
+
+  // Vulkanit: spawn lava in 8 neighbors of target for 2 ticks
+  if (attacker.type === 'vulkanit') {
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = target.row + dr, c = target.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      grid[r][c].lavaTicks = 2;
+      grid[r][c].lavaOwnerTeam = attacker.team;
+    }
+  }
+}
+
+/** Apply death-trigger effects: mirror explosion, lamb heal, banshee ghost.
+ *  Returns true if the unit should NOT be marked dead yet (e.g. banshee turned ghost). */
+export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[][], logs: string[]): boolean {
+  // Banshee → ghost form (3 turns +10 ATK)
+  if (deadUnit.type === 'banshee' && deadUnit.ghost === undefined) {
+    deadUnit.ghost = 3;
+    deadUnit.hp = 1;
+    (deadUnit as any).dead = false;
+    deadUnit.attack += 10;
+    logs.push(`👻 Banshee erhebt sich als Geist (+10 ATK, 3 Runden)`);
+    return true; // not really dead
+  }
+  // Mirror death explosion: 20 dmg to adjacent enemies
+  if (deadUnit.type === 'mirror') {
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = deadUnit.row + dr, c = deadUnit.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const cu = grid[r][c].unit;
+      if (cu && cu.team !== deadUnit.team && cu.hp > 0 && !cu.dead) {
+        cu.hp = Math.max(0, cu.hp - 20);
+        if (cu.hp <= 0) (cu as any).dead = true;
+        logs.push(`🪞 Spiegel-Explosion → ${UNIT_DEFS[cu.type].emoji} 20`);
+      }
+    }
+  }
+  // Lamb: heal all allies +30% maxHp
+  if (deadUnit.type === 'lamb') {
+    const allies = allUnits.filter(u => u.team === deadUnit.team && u.hp > 0 && !u.dead && u.id !== deadUnit.id);
+    for (const a of allies) {
+      const heal = Math.round(a.maxHp * 0.30);
+      a.hp = Math.min(a.maxHp, a.hp + heal);
+    }
+    if (allies.length > 0) logs.push(`🐑 Opferlamm heilt ${allies.length} Verbündete (+30%)`);
+  }
+  return false;
+}
+
+/** Tick down lava fields and damage enemies standing on them. */
+export function processLavaTick(grid: Cell[][], logs: string[]): void {
+  for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+    const cell = grid[r][c];
+    if (!cell.lavaTicks) continue;
+    const u = cell.unit;
+    if (u && u.hp > 0 && !u.dead && u.team !== cell.lavaOwnerTeam) {
+      u.hp = Math.max(0, u.hp - 5);
+      logs.push(`🌋 Lava → ${UNIT_DEFS[u.type].emoji} 5${u.hp <= 0 ? ' ☠️' : ''}`);
+      if (u.hp <= 0) (u as any).dead = true;
+    }
+    cell.lavaTicks -= 1;
+    if (cell.lavaTicks <= 0) {
+      cell.lavaTicks = undefined;
+      cell.lavaOwnerTeam = undefined;
+    }
+  }
+}
+
+/** Tick down banshee ghost timers; mark dead when ghost expires. */
+export function processGhostTick(units: Unit[], grid: Cell[][], logs: string[]): void {
+  for (const u of units) {
+    if (u.ghost !== undefined && u.ghost > 0) {
+      u.ghost -= 1;
+      if (u.ghost <= 0) {
+        u.hp = 0;
+        (u as any).dead = true;
+        if (grid[u.row]?.[u.col]?.unit?.id === u.id) {
+          grid[u.row][u.col].unit = u;
+        }
+        logs.push(`👻 Geist verblasst`);
+      }
+    }
+  }
+}
+
+/** Icegolem alternates movement; returns true if this unit should skip its move this tick. */
+export function shouldSkipMove(unit: Unit): boolean {
+  if (unit.type !== 'icegolem') return false;
+  if (unit.skipNextMove) {
+    unit.skipNextMove = false;
+    return true;
+  }
+  unit.skipNextMove = true;
+  return false;
+}
+
