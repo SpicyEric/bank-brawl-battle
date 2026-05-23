@@ -1002,7 +1002,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       if (battleRef.current) clearInterval(battleRef.current);
       return;
     }
-    battleRef.current = setInterval(battleTick, 1350);
+    battleRef.current = setInterval(battleTick, 675);
     return () => { if (battleRef.current) clearInterval(battleRef.current); };
   }, [phase, isHost, battleTick]);
 
