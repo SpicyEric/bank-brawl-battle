@@ -24,7 +24,8 @@ export interface Unit {
   color?: 'red' | 'blue' | 'green'; // per-instance color (assigned from roster slot for player units)
   slotIndex?: number; // for player units: index in the chosen roster (0..8)
   dead?: boolean;
-  frozen?: number; // turns remaining frozen (can't act)
+  frozen?: number; // turns remaining frozen (can't move, attacks at 50% dmg)
+  webbed?: number; // turns remaining webbed (spiderqueen) – same as frozen, distinct visual
   stuckTurns?: number; // turns without attacking – used for anti-stalemate
   activationTurn?: number; // turn number when this unit becomes active (staggered rows)
   startRow?: number; // the row the unit was originally placed on
@@ -37,6 +38,11 @@ export interface Unit {
   ghost?: number; // banshee: turns remaining as ghost after death
   firstAttackUsed?: boolean; // shadowblade: first attack bonus consumed
   skipNextMove?: boolean; // icegolem: alternate-turn movement
+  isClone?: boolean; // spawned by cloner; clones cannot spawn more clones
+  cloneTimer?: number; // cloner spawn cooldown countdown
+  phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
+  isPhantom?: boolean; // doppelganger phantom flag
+  doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
