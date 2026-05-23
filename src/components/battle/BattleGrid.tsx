@@ -457,18 +457,19 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         })}
       </div>
 
-      {/* Shield bond connections during placement */}
-      {(isPlacing || phase === 'place_enemy') && (() => {
-        const bonds: { tankRow: number; tankCol: number; unitRow: number; unitCol: number }[] = [];
-        const tanks = grid.flat().filter(c => c.unit && !c.unit.dead && c.unit.type === 'tank' && c.unit.team === 'player');
+      {/* Shield bond connections – visible during placement AND combat */}
+      {(isPlacing || phase === 'place_enemy' || phase === 'battle') && (() => {
+        const bonds: { tankRow: number; tankCol: number; unitRow: number; unitCol: number; team: 'player' | 'enemy' }[] = [];
+        const tanks = grid.flat().filter(c => c.unit && !c.unit.dead && c.unit.type === 'tank');
         for (const tankCell of tanks) {
+          const tank = tankCell.unit!;
           for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }, { row: -1, col: -1 }, { row: -1, col: 1 }, { row: 1, col: -1 }, { row: 1, col: 1 }]) {
             const r = tankCell.row + offset.row;
             const c = tankCell.col + offset.col;
             if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
               const neighbor = grid[r][c];
-              if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === 'player' && neighbor.unit.id !== tankCell.unit!.id) {
-                bonds.push({ tankRow: tankCell.row, tankCol: tankCell.col, unitRow: r, unitCol: c });
+              if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === tank.team && neighbor.unit.id !== tank.id) {
+                bonds.push({ tankRow: tankCell.row, tankCol: tankCell.col, unitRow: r, unitCol: c, team: tank.team });
               }
             }
           }
