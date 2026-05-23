@@ -1,6 +1,7 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { UnitType, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, ColorGroup } from '@/lib/battleGame';
 import { UnitInfoModal } from './UnitInfoModal';
+
 
 const COLOR_BORDER: Record<ColorGroup, string> = {
   red: 'border-unit-red',
