@@ -1386,3 +1386,101 @@ export function shouldSkipMove(unit: Unit): boolean {
   return false;
 }
 
+/** Spawn a phantom duplicate next to each unspawned doppelganger.
+ *  Phantom is invulnerable for 5 ticks, then disappears. */
+export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs: string[]): Unit[] {
+  const spawned: Unit[] = [];
+  const originals = allUnits.filter(u =>
+    u.type === 'doppelganger' && !u.isPhantom && !u.doppelSpawned && u.hp > 0 && !u.dead
+  );
+  for (const orig of originals) {
+    const offsets = [
+      { r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 },
+      { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
+    ];
+    for (const o of offsets) {
+      const r = orig.row + o.r, c = orig.col + o.c;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const cell = grid[r][c];
+      if (cell.unit || cell.terrain === 'water') continue;
+      const phantom: Unit = {
+        ...orig,
+        id: crypto.randomUUID(),
+        row: r, col: c,
+        isPhantom: true,
+        phantom: 5,
+        doppelSpawned: true,
+        cooldown: 0,
+        bondedToTankId: undefined,
+        movedWithTank: false,
+        slotIndex: undefined,
+      };
+      grid[r][c].unit = phantom;
+      spawned.push(phantom);
+      orig.doppelSpawned = true;
+      logs.push(`👥 Doppelgänger spawnt Phantom (5 Ticks unverwundbar)`);
+      break;
+    }
+    orig.doppelSpawned = true;
+  }
+  allUnits.push(...spawned);
+  return spawned;
+}
+
+/** Tick down phantom invulnerability timers. Phantom vanishes when timer hits 0. */
+export function tickPhantomTimers(allUnits: Unit[], grid: Cell[][], logs: string[]): void {
+  for (const u of allUnits) {
+    if (!u.isPhantom || u.phantom === undefined || u.dead) continue;
+    u.phantom -= 1;
+    if (u.phantom <= 0) {
+      u.hp = 0;
+      (u as any).dead = true;
+      if (grid[u.row]?.[u.col]?.unit?.id === u.id) {
+        grid[u.row][u.col].unit = null;
+      }
+      logs.push(`👥 Phantom verblasst`);
+    }
+  }
+}
+
+/** Chaindancer chain attack: jumps DIAGONALLY through up to 2 additional enemies
+ *  (3 enemies total counting the primary). Each chain hop deals 70% of original damage. */
+export function applyChainAttack(
+  attacker: Unit, primaryTarget: Unit, primaryDmg: number,
+  grid: Cell[][], logs: string[]
+): { row: number; col: number }[] {
+  const chainCells: { row: number; col: number }[] = [
+    { row: primaryTarget.row, col: primaryTarget.col }
+  ];
+  const visited = new Set<string>([primaryTarget.id]);
+  let current = primaryTarget;
+  const hopDmg = Math.round(primaryDmg * 0.7);
+  const diag = [
+    { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
+    { r: -2, c: -2 }, { r: -2, c: 2 }, { r: 2, c: -2 }, { r: 2, c: 2 },
+  ];
+  for (let hop = 0; hop < 2; hop++) {
+    let next: Unit | null = null;
+    let bestDist = Infinity;
+    for (const o of diag) {
+      const r = current.row + o.r, c = current.col + o.c;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const cu = grid[r][c].unit;
+      if (!cu || cu.team === attacker.team || cu.hp <= 0 || cu.dead) continue;
+      if (visited.has(cu.id)) continue;
+      if (cu.isPhantom && (cu.phantom ?? 0) > 0) continue;
+      const d = Math.abs(o.r) + Math.abs(o.c);
+      if (d < bestDist) { bestDist = d; next = cu; }
+    }
+    if (!next) break;
+    next.hp = Math.max(0, next.hp - hopDmg);
+    if (next.hp <= 0) (next as any).dead = true;
+    visited.add(next.id);
+    chainCells.push({ row: next.row, col: next.col });
+    logs.push(`🪢 Kettentänzer → ${UNIT_DEFS[next.type].emoji} ${hopDmg} (Kette)`);
+    current = next;
+  }
+  return chainCells;
+}
+
+
