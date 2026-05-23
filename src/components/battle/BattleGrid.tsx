@@ -31,6 +31,7 @@ interface Projectile { id: string; fromRow: number; fromCol: number; toRow: numb
 interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
+interface ChainEffect { id: string; cells: { row: number; col: number }[]; color: 'lightning' | 'chaindancer' }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
