@@ -67,12 +67,6 @@ export function UnitPicker({
 
   // ─── Slot mode ───────────────────────────────────────────
   if (roster && roster.length === 9) {
-    // Drag state lives here so the ghost re-renders on pointer move
-    const dragStart = useRef<{ x: number; y: number; idx: number; type: UnitType } | null>(null);
-    const draggedSlotIdx = useRef<number | null>(null);
-    const lastHover = useRef<{ row: number; col: number } | null>(null);
-    const [dragGhost, setDragGhost] = useState<{ x: number; y: number; emoji: string } | null>(null);
-    const isDragging = useRef(false);
 
     const findCellAtPoint = (x: number, y: number): { row: number; col: number } | null => {
       const el = document.elementFromPoint(x, y) as HTMLElement | null;
