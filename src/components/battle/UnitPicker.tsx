@@ -62,15 +62,92 @@ export function UnitPicker({
 
   // ─── Slot mode ───────────────────────────────────────────
   if (roster && roster.length === 9) {
-    const handleSlotClick = (idx: number) => {
-      if (didLongPress.current) { didLongPress.current = false; return; }
-      if (bannedSlots.includes(idx) || placedSlots.includes(idx)) return;
-      onSelectSlot?.(idx);
+    // Drag state lives here so the ghost re-renders on pointer move
+    const dragStart = useRef<{ x: number; y: number; idx: number; type: UnitType } | null>(null);
+    const draggedSlotIdx = useRef<number | null>(null);
+    const lastHover = useRef<{ row: number; col: number } | null>(null);
+    const [dragGhost, setDragGhost] = useState<{ x: number; y: number; emoji: string } | null>(null);
+    const isDragging = useRef(false);
+
+    const findCellAtPoint = (x: number, y: number): { row: number; col: number } | null => {
+      const el = document.elementFromPoint(x, y) as HTMLElement | null;
+      if (!el) return null;
+      const cellEl = el.closest('[data-cell-row]') as HTMLElement | null;
+      if (!cellEl) return null;
+      const r = parseInt(cellEl.getAttribute('data-cell-row') || '', 10);
+      const c = parseInt(cellEl.getAttribute('data-cell-col') || '', 10);
+      if (Number.isNaN(r) || Number.isNaN(c)) return null;
+      return { row: r, col: c };
     };
+
+    const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>, idx: number, type: UnitType) => {
+      if (bannedSlots.includes(idx) || placedSlots.includes(idx)) return;
+      didLongPress.current = false;
+      isDragging.current = false;
+      dragStart.current = { x: e.clientX, y: e.clientY, idx, type };
+      draggedSlotIdx.current = idx;
+      // Select immediately so visual state matches
+      onSelectSlot?.(idx);
+      // Long press → info modal
+      longPressTimer.current = setTimeout(() => {
+        didLongPress.current = true;
+        setInfoUnit(type);
+        dragStart.current = null;
+      }, LONG_PRESS_MS);
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+    };
+
+    const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (!dragStart.current) return;
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      if (!isDragging.current && Math.hypot(dx, dy) > 8) {
+        isDragging.current = true;
+        cancelPress();
+      }
+      if (!isDragging.current) return;
+      setDragGhost({ x: e.clientX, y: e.clientY, emoji: UNIT_DEFS[dragStart.current.type].emoji });
+      const cell = findCellAtPoint(e.clientX, e.clientY);
+      if (cell) {
+        lastHover.current = cell;
+        onDragHover?.(cell.row, cell.col, dragStart.current.type);
+      } else {
+        lastHover.current = null;
+        onDragHover?.(null, null, null);
+      }
+    };
+
+    const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+      cancelPress();
+      const wasDragging = isDragging.current;
+      const startInfo = dragStart.current;
+      const slotIdx = draggedSlotIdx.current;
+      dragStart.current = null;
+      draggedSlotIdx.current = null;
+      isDragging.current = false;
+      setDragGhost(null);
+      onDragHover?.(null, null, null);
+      if (didLongPress.current) { didLongPress.current = false; return; }
+      if (wasDragging && startInfo && slotIdx !== null) {
+        const cell = findCellAtPoint(e.clientX, e.clientY);
+        if (cell) onDragDrop?.(cell.row, cell.col, slotIdx);
+      }
+      // Pure tap: slot is already selected from pointerdown — nothing else to do
+    };
+
+    const handlePointerCancel = () => {
+      cancelPress();
+      dragStart.current = null;
+      draggedSlotIdx.current = null;
+      isDragging.current = false;
+      setDragGhost(null);
+      onDragHover?.(null, null, null);
+    };
+
     return (
       <>
         <div className="space-y-2">
-          <p className="text-xs text-muted-foreground text-center">{placedCount}/{maxUnits} platziert · <span className="text-[10px] opacity-60">gedrückt halten = Info</span></p>
+          <p className="text-xs text-muted-foreground text-center">{placedCount}/{maxUnits} platziert · <span className="text-[10px] opacity-60">ziehen = platzieren · halten = Info</span></p>
           <div className="grid grid-cols-3 gap-2">
             {roster.map((type, idx) => {
               const def = UNIT_DEFS[type];
@@ -82,16 +159,13 @@ export function UnitPicker({
               return (
                 <button
                   key={idx}
-                  onClick={() => handleSlotClick(idx)}
-                  onTouchStart={() => startPress(type)}
-                  onTouchEnd={cancelPress}
-                  onTouchCancel={cancelPress}
-                  onMouseDown={() => startPress(type)}
-                  onMouseUp={cancelPress}
-                  onMouseLeave={cancelPress}
+                  onPointerDown={(e) => handlePointerDown(e, idx, type)}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerCancel}
                   onContextMenu={(e) => e.preventDefault()}
                   disabled={disabled}
-                  className={`p-2 rounded-xl border-2 transition-all text-center relative select-none ${
+                  className={`p-2 rounded-xl border-2 transition-all text-center relative select-none touch-none ${
                     disabled
                       ? `border-border bg-muted/30 opacity-40 cursor-not-allowed ${isBanned ? 'grayscale' : ''}`
                       : isSelected
@@ -117,10 +191,14 @@ export function UnitPicker({
             })}
           </div>
         </div>
+        {dragGhost && (
+          <div className="drag-ghost" style={{ left: dragGhost.x, top: dragGhost.y }}>{dragGhost.emoji}</div>
+        )}
         {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
       </>
     );
   }
+
 
   // ─── Legacy type-based mode (tutorial, multiplayer) ────────
   const types = unitTypes && unitTypes.length > 0 ? unitTypes : UNIT_TYPES;
