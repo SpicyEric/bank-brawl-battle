@@ -599,11 +599,16 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
 
+  // === LAMB TAUNT: any enemy lamb is ALWAYS the primary target (provokes everyone). ===
+  const enemyLamb = enemies.find(e => e.type === 'lamb');
+  if (enemyLamb && unit.type !== 'sniper' && unit.type !== 'healer') {
+    return enemyLamb;
+  }
   // === SNIPER: always shoots lowest-HP enemy on the entire field ===
   if (unit.type === 'sniper') {
     return [...enemies].sort((a, b) => a.hp - b.hp)[0];
   }
-  // === LAMB: taunts the strongest enemy ===
+  // === LAMB (own lamb): taunts the strongest enemy ===
   if (unit.type === 'lamb') {
     return [...enemies].sort((a, b) => b.attack * b.hp - a.attack * a.hp)[0];
   }
