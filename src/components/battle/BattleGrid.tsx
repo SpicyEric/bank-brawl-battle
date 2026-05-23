@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType, TERRAIN_DEFS } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { UnitGlyph } from '@/components/UnitGlyph';
+import { getAttackIcon, iconUrl } from '@/lib/unitIcons';
 
 interface BattleGridProps {
   grid: Cell[][];
@@ -26,7 +27,7 @@ interface BattleGridProps {
 interface UnitPos { row: number; col: number }
 interface DamagePopup { id: string; row: number; col: number; damage: number; isStrong: boolean; isWeak: boolean; isKill: boolean }
 interface HealPopup { id: string; row: number; col: number; healAmount: number }
-interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string; type?: 'arrow' | 'magic' | 'frost' | 'default' }
+interface Projectile { id: string; fromRow: number; fromCol: number; toRow: number; toCol: number; emoji: string; iconFile?: string | null; type?: 'arrow' | 'magic' | 'frost' | 'default' | 'custom' | 'heal' }
 interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
