@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType, TERRAIN_DEFS } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
+import { UnitGlyph } from '@/components/UnitGlyph';
 
 interface BattleGridProps {
   grid: Cell[][];
@@ -483,7 +484,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                           : 'drop-shadow(0 0 4px hsl(0, 72%, 55%)) drop-shadow(0 0 8px hsl(0, 72%, 55%))',
                     }}
                   >
-                    {def?.emoji}
+                    {unit.type && <UnitGlyph type={unit.type} className="inline-block w-5 h-5 sm:w-6 sm:h-6 align-middle" />}
                     {isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🧊</span>}
                     {isBurning && !isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🔥</span>}
                   </span>

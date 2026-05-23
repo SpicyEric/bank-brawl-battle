@@ -1,6 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
 import { UnitType, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, ColorGroup } from '@/lib/battleGame';
 import { UnitInfoModal } from './UnitInfoModal';
+import { UnitGlyph } from '@/components/UnitGlyph';
+import { getUnitIcon, iconUrl } from '@/lib/unitIcons';
 
 
 const COLOR_BORDER: Record<ColorGroup, string> = {
@@ -177,7 +179,7 @@ export function UnitPicker({
                       <span className="text-lg">{isPlaced ? '✓' : '💤'}</span>
                     </div>
                   )}
-                  <span className="text-xl block">{def.emoji}</span>
+                  <UnitGlyph type={type} className="block mx-auto w-6 h-6" />
                   <p className="text-[10px] font-semibold text-foreground mt-1">{def.label}</p>
                   <p className="text-[9px] text-muted-foreground">
                     {isBanned ? 'Ermüdet' : isPlaced ? 'Platziert' : <>❤️{def.hp} ⚔️{def.attack}</>}
@@ -243,7 +245,7 @@ export function UnitPicker({
                     <span className="text-lg">💤</span>
                   </div>
                 )}
-                <span className="text-xl block">{def.emoji}</span>
+                <UnitGlyph type={type} className="block mx-auto w-6 h-6" />
                 <p className="text-[10px] font-semibold text-foreground mt-1">{def.label}</p>
                 <p className="text-[9px] text-muted-foreground">
                   {isBanned ? 'Ermüdet' : <>❤️{def.hp} ⚔️{def.attack}</>}
