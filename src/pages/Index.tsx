@@ -54,6 +54,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
   const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
   const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ row: number; col: number; type: UnitType } | null>(null);
   const [phaseOverlay, setPhaseOverlay] = useState<string | null>(null);
   const [overlaySubtext, setOverlaySubtext] = useState<string | null>(null);
   const [nextRoundCountdown, setNextRoundCountdown] = useState<number | null>(null);
