@@ -484,11 +484,31 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                       }}
                     />
                   )}
+                  {/* Persistent web overlay – spiderqueen capture */}
+                  {isWebbed && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm"
+                      style={{
+                        background: 'repeating-linear-gradient(45deg, hsl(0 0% 90% / 0.35) 0 1px, transparent 1px 4px), repeating-linear-gradient(-45deg, hsl(0 0% 90% / 0.35) 0 1px, transparent 1px 4px)',
+                        boxShadow: 'inset 0 0 6px hsl(0 0% 100% / 0.3)',
+                      }}
+                    />
+                  )}
+                  {/* Phantom shimmer overlay – doppelganger invulnerable phantom */}
+                  {isPhantom && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm animate-pulse"
+                      style={{
+                        background: 'linear-gradient(135deg, hsl(280 80% 70% / 0.35), hsl(220 90% 70% / 0.25))',
+                        boxShadow: 'inset 0 0 10px hsl(270 90% 75% / 0.7), 0 0 8px hsl(280 80% 65% / 0.5)',
+                      }}
+                    />
+                  )}
                   <span
-                    className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''} ${unit.ghost && unit.ghost > 0 ? 'ghost-active' : ''}`}
+                    className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''} ${isPhantom ? 'opacity-70' : ''} ${unit.ghost && unit.ghost > 0 ? 'ghost-active' : ''}`}
                     style={{
                       filter: unit.ghost && unit.ghost > 0
                         ? undefined
+                        : isPhantom
+                        ? 'drop-shadow(0 0 6px hsl(280, 80%, 70%)) drop-shadow(0 0 10px hsl(280, 80%, 70%))'
                         : isFrozen
                         ? 'drop-shadow(0 0 5px hsl(210, 80%, 60%)) drop-shadow(0 0 10px hsl(210, 80%, 60%))'
                         : (flipped ? unit.team === 'enemy' : unit.team === 'player')
@@ -498,8 +518,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   >
                     {unit.type && <UnitGlyph type={unit.type} className="inline-block w-5 h-5 sm:w-6 sm:h-6 align-middle" />}
                     {isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🧊</span>}
-                    {isBurning && !isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🔥</span>}
+                    {isWebbed && !isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🕸️</span>}
+                    {isBurning && !isFrozen && !isWebbed && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🔥</span>}
+                    {isPhantom && <span className="absolute -top-0.5 -left-0.5 text-[8px]">👥</span>}
                   </span>
+
                   <div className="absolute bottom-0.5 left-0.5 right-0.5 h-[3px] rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
