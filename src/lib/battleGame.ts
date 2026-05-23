@@ -261,7 +261,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 75,
     attack: 10,
     cooldown: 2,
-    description: 'Heilt Verbündete im Umkreis (2 Felder). Greift nur an, wenn niemand mehr zu heilen ist.',
+    description: 'Heilt Verbündete im Umkreis von 2 Feldern (+28 HP). Greift nur an, wenn niemand mehr zu heilen ist.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ALL_ADJACENT,
