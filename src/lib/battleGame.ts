@@ -377,7 +377,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   spiderqueen: {
     label: 'Spinnenkönigin', emoji: '🕷️', hp: 70, attack: 15, cooldown: 2,
-    description: 'Bewegt sich in alle 8 Richtungen (bis 2 Felder). (geplant: verlangsamt Feinde mit Netzen.)',
+    description: 'Bewegt sich in alle 8 Richtungen (bis 2 Felder). 30% Chance, Ziel mit Netz einzufrieren.',
     movePattern: [
       ...ALL_ADJACENT,
       { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
