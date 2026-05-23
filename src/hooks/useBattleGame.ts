@@ -258,9 +258,12 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     }
 
     const pUnits = playerUnits.map(u => ({ ...u }));
-    
-    const aiPlacements = generateAIPlacement(pUnits, enemyMaxUnits, grid, difficulty, enemyBannedUnits);
-    const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
+
+    // If AI already placed first (enemy-starts round), reuse those units instead of regenerating
+    const enemies: Unit[] = enemyUnits.length > 0
+      ? enemyUnits.map(u => ({ ...u }))
+      : generateAIPlacement(pUnits, enemyMaxUnits, grid, difficulty, enemyBannedUnits)
+          .map(p => createUnit(p.type, 'enemy', p.row, p.col));
 
     // Set bonds for all units (player + enemy)
     const allUnits = [...pUnits, ...enemies];
@@ -278,7 +281,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     });
 
     setPhase('place_enemy');
-  }, [playerUnits, enemyBannedUnits]);
+  }, [playerUnits, enemyUnits, enemyBannedUnits, enemyMaxUnits, grid, difficulty]);
 
   // Keep confirmPlacementRef in sync for auto-confirm timer
   useEffect(() => { confirmPlacementRef.current = confirmPlacement; }, [confirmPlacement]);
