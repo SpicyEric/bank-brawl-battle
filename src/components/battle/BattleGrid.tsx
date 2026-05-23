@@ -31,6 +31,7 @@ interface Projectile { id: string; fromRow: number; fromCol: number; toRow: numb
 interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
+interface ChainEffect { id: string; cells: { row: number; col: number }[]; color: 'lightning' | 'chaindancer' }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
@@ -45,11 +46,13 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [healGlows, setHealGlows] = useState<HealGlow[]>([]);
   const [healPopups, setHealPopups] = useState<HealPopup[]>([]);
   const [freezeEffects, setFreezeEffects] = useState<FreezeEffect[]>([]);
+  const [chainEffects, setChainEffects] = useState<ChainEffect[]>([]);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
   const healCounter = useRef(0);
   const freezeCounter = useRef(0);
+  const chainCounter = useRef(0);
   const [warCryFlash, setWarCryFlash] = useState(false);
   const [focusFlashAnim, setFocusFlashAnim] = useState(false);
   const [sacrificeAnim, setSacrificeAnim] = useState(false);
@@ -380,6 +383,25 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         setTimeout(() => setFreezeEffects(prev => prev.filter(f => !newFreezes.find(nf => nf.id === f.id))), 675);
       }, PROJECTILE_FLIGHT_TIME);
     }
+
+    // --- Chain effects (lightning chains + chaindancer) ---
+    const newChains: ChainEffect[] = [];
+    for (const evt of events) {
+      if (!evt.chainCells || evt.chainCells.length < 2) continue;
+      chainCounter.current += 1;
+      newChains.push({
+        id: `chain-${chainCounter.current}`,
+        cells: evt.chainCells,
+        color: evt.type === 'chain' ? 'chaindancer' : 'lightning',
+      });
+    }
+    if (newChains.length > 0) {
+      const delay = newChains[0].color === 'lightning' ? PROJECTILE_FLIGHT_TIME : 0;
+      setTimeout(() => {
+        setChainEffects(prev => [...prev, ...newChains]);
+        setTimeout(() => setChainEffects(prev => prev.filter(c => !newChains.find(nc => nc.id === c.id))), 900);
+      }, delay);
+    }
   };
 
   const cellSize = 100 / GRID_SIZE;
@@ -403,6 +425,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isShaking = shakeCells.has(`${cell.row}-${cell.col}`);
           const isDead = unit?.dead;
           const isFrozen = unit ? (unit.frozen ?? 0) > 0 : false;
+          const isWebbed = unit ? (unit.webbed ?? 0) > 0 : false;
+          const isPhantom = unit ? !!unit.isPhantom && (unit.phantom ?? 0) > 0 : false;
           const isBurning = unit ? !!(unit.burning && unit.burning.length > 0 && !unit.dead) : false;
           const isInactive = unit && !isDead && unit.activationTurn !== undefined && unit.activationTurn > 0 && phase === 'place_player';
           const cellKey = `${cell.row}-${cell.col}`;
@@ -482,11 +506,31 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                       }}
                     />
                   )}
+                  {/* Persistent web overlay – spiderqueen capture */}
+                  {isWebbed && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm"
+                      style={{
+                        background: 'repeating-linear-gradient(45deg, hsl(0 0% 90% / 0.35) 0 1px, transparent 1px 4px), repeating-linear-gradient(-45deg, hsl(0 0% 90% / 0.35) 0 1px, transparent 1px 4px)',
+                        boxShadow: 'inset 0 0 6px hsl(0 0% 100% / 0.3)',
+                      }}
+                    />
+                  )}
+                  {/* Phantom shimmer overlay – doppelganger invulnerable phantom */}
+                  {isPhantom && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm animate-pulse"
+                      style={{
+                        background: 'linear-gradient(135deg, hsl(280 80% 70% / 0.35), hsl(220 90% 70% / 0.25))',
+                        boxShadow: 'inset 0 0 10px hsl(270 90% 75% / 0.7), 0 0 8px hsl(280 80% 65% / 0.5)',
+                      }}
+                    />
+                  )}
                   <span
-                    className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''} ${unit.ghost && unit.ghost > 0 ? 'ghost-active' : ''}`}
+                    className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''} ${isPhantom ? 'opacity-70' : ''} ${unit.ghost && unit.ghost > 0 ? 'ghost-active' : ''}`}
                     style={{
                       filter: unit.ghost && unit.ghost > 0
                         ? undefined
+                        : isPhantom
+                        ? 'drop-shadow(0 0 6px hsl(280, 80%, 70%)) drop-shadow(0 0 10px hsl(280, 80%, 70%))'
                         : isFrozen
                         ? 'drop-shadow(0 0 5px hsl(210, 80%, 60%)) drop-shadow(0 0 10px hsl(210, 80%, 60%))'
                         : (flipped ? unit.team === 'enemy' : unit.team === 'player')
@@ -496,8 +540,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   >
                     {unit.type && <UnitGlyph type={unit.type} className="inline-block w-5 h-5 sm:w-6 sm:h-6 align-middle" />}
                     {isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🧊</span>}
-                    {isBurning && !isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🔥</span>}
+                    {isWebbed && !isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🕸️</span>}
+                    {isBurning && !isFrozen && !isWebbed && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🔥</span>}
+                    {isPhantom && <span className="absolute -top-0.5 -left-0.5 text-[8px]">👥</span>}
                   </span>
+
                   <div className="absolute bottom-0.5 left-0.5 right-0.5 h-[3px] rounded-full bg-muted overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all duration-300 ${
@@ -759,6 +806,44 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               <span className="text-lg freeze-emoji">🧊</span>
             </div>
           </div>
+        );
+      })}
+
+      {/* Chain effects: lightning bolts / chaindancer chain – flashing SVG between cells */}
+      {chainEffects.map(chain => {
+        const color = chain.color === 'lightning' ? 'hsl(55, 100%, 65%)' : 'hsl(280, 90%, 70%)';
+        const glow  = chain.color === 'lightning' ? 'hsl(55, 100%, 75%)' : 'hsl(290, 100%, 80%)';
+        const segments: { x1: number; y1: number; x2: number; y2: number }[] = [];
+        for (let i = 0; i < chain.cells.length - 1; i++) {
+          const a = chain.cells[i], b = chain.cells[i + 1];
+          segments.push({
+            x1: a.col * cellSize + cellSize / 2,
+            y1: visualRow(a.row) * cellSize + cellSize / 2,
+            x2: b.col * cellSize + cellSize / 2,
+            y2: visualRow(b.row) * cellSize + cellSize / 2,
+          });
+        }
+        return (
+          <svg key={chain.id} className="absolute inset-0 z-40 pointer-events-none w-full h-full chain-flash" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <filter id={`chain-glow-${chain.id}`} x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="0.6" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            {segments.map((s, i) => (
+              <g key={i} filter={`url(#chain-glow-${chain.id})`}>
+                <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={glow} strokeWidth="1.4" opacity="0.55" />
+                <line x1={s.x1} y1={s.y1} x2={s.x2} y2={s.y2} stroke={color} strokeWidth="0.7" strokeDasharray="2 1" />
+              </g>
+            ))}
+            {chain.cells.map((c, i) => (
+              <circle key={`c-${i}`} cx={c.col * cellSize + cellSize / 2} cy={visualRow(c.row) * cellSize + cellSize / 2} r="2.2" fill={glow} opacity="0.9" />
+            ))}
+          </svg>
         );
       })}
     </div>

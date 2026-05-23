@@ -7,6 +7,7 @@ import {
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
   applyPostAttackEffects, applyDeathEffects, processLavaTick, processGhostTick, shouldSkipMove,
+  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
@@ -288,6 +289,20 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
 
   // Start battle
   const startBattle = useCallback(() => {
+    // Spawn doppelganger phantoms at the start of the round
+    setGrid(prevGrid => {
+      const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
+      const allUnits: Unit[] = [];
+      for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
+      const logs: string[] = [];
+      const phantoms = spawnDoppelgangerPhantoms(allUnits, newGrid, logs);
+      if (phantoms.length > 0) {
+        setPlayerUnits(prev => [...prev, ...phantoms.filter(p => p.team === 'player')]);
+        setEnemyUnits(prev => [...prev, ...phantoms.filter(p => p.team === 'enemy')]);
+        if (logs.length > 0) setBattleLog(prev => [...logs, ...prev]);
+      }
+      return newGrid;
+    });
     setPhase('battle');
     setBattleLog([]);
     setTurnCount(0);
@@ -562,6 +577,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       processLavaTick(newGrid, logs);
       // === Banshee ghost timer tick-down ===
       processGhostTick(allUnits, newGrid, logs);
+      // === Doppelganger phantom timers ===
+      tickPhantomTimers(allUnits, newGrid, logs);
+
+
 
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
@@ -665,7 +684,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         }
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
+          // Phantoms (doppelganger phantom): completely invulnerable
+          if (target.isPhantom && (target.phantom ?? 0) > 0) {
+            unit.cooldown = unit.maxCooldown;
+            continue;
+          }
           let dmg = calcDamage(unit, target, newGrid);
+          // Frozen attacker: 50% damage penalty
+          if (isFrozenNow) dmg = Math.round(dmg * 0.5);
           // Apply morale modifier + shield wall
           if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
           else {
@@ -715,7 +741,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           // Judge: +8 ATK for each fallen ally — recalculated below at end of tick.
 
           // Lightning: chain to adjacent enemies for 50% damage
+          let lightningChainCells: { row: number; col: number }[] | undefined;
           if (unit.type === 'lightning') {
+            lightningChainCells = [{ row: target.row, col: target.col }];
             const chainDmg = Math.round(dmg * 0.5);
             for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
               if (dr === 0 && dc === 0) continue;
@@ -723,12 +751,21 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
               if (ar < 0 || ar >= GRID_SIZE || ac < 0 || ac >= GRID_SIZE) continue;
               const cu = newGrid[ar][ac].unit;
               if (cu && cu.hp > 0 && !cu.dead && cu.team !== unit.team && cu.id !== target.id) {
+                if (cu.isPhantom && (cu.phantom ?? 0) > 0) continue;
                 cu.hp = Math.max(0, cu.hp - chainDmg);
                 if (cu.hp <= 0) (cu as any).dead = true;
+                lightningChainCells.push({ row: ar, col: ac });
                 logs.push(`⚡ Blitz → ${UNIT_DEFS[cu.type].emoji} ${chainDmg} (Kettenblitz)`);
               }
             }
           }
+
+          // Chaindancer: chain attack through up to 2 additional diagonal enemies (70% dmg)
+          let chaindancerCells: { row: number; col: number }[] | undefined;
+          if (unit.type === 'chaindancer') {
+            chaindancerCells = applyChainAttack(unit, target, dmg, newGrid, logs);
+          }
+
 
           const def = UNIT_DEFS[unit.type];
           const tDef = UNIT_DEFS[target.type];
@@ -800,7 +837,28 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             isAoe: unit.type === 'dragon',
             aoeCells: aoeCells,
             isFrozen: didFreeze,
+            chainCells: lightningChainCells,
           });
+
+          // Emit a separate chain event for the chaindancer (visual chain through diagonal enemies)
+          if (chaindancerCells && chaindancerCells.length > 1) {
+            events.push({
+              type: 'chain',
+              attackerId: unit.id,
+              attackerRow: unit.row,
+              attackerCol: unit.col,
+              attackerEmoji: '🪢',
+              attackerType: unit.type,
+              targetId: target.id,
+              targetRow: target.row,
+              targetCol: target.col,
+              damage: 0,
+              isStrong: false, isWeak: false,
+              isRanged: false,
+              chainCells: chaindancerCells,
+            });
+          }
+
 
           // Emit freeze event for ice animation
           if (didFreeze) {
