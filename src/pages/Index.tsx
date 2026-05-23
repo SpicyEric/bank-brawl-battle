@@ -209,6 +209,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
           opponentMoraleActive={game.opponentMoraleActive || game.aiMoraleActive}
           focusFireActive={game.focusFireActive}
           sacrificeFlash={game.sacrificeUsed}
+          dragPreview={dragPreview}
         />
 
         {phaseOverlay && (
