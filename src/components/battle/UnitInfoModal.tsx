@@ -31,10 +31,12 @@ export function UnitInfoModal({ unitType, onClose, hideColorInfo }: UnitInfoModa
           <div>
             <div className="flex items-center gap-2">
               <h2 className="font-bold text-foreground text-lg">{def.label}</h2>
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                backgroundColor: `hsl(var(--unit-${colorGroup}) / 0.2)`,
-                color: `hsl(var(--unit-${colorGroup}))`,
-              }}>{COLOR_LABEL[colorGroup]}</span>
+              {!hideColorInfo && (
+                <span className="text-xs px-2 py-0.5 rounded-full" style={{
+                  backgroundColor: `hsl(var(--unit-${colorGroup}) / 0.2)`,
+                  color: `hsl(var(--unit-${colorGroup}))`,
+                }}>{COLOR_LABEL[colorGroup]}</span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground">{def.description}</p>
           </div>
