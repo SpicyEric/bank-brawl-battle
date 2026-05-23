@@ -254,6 +254,33 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
               onSelectSlot={game.setSelectedSlot}
               bannedSlots={game.playerBannedSlots}
               placedSlots={game.placedSlots}
+              onDragHover={(row, col, type) => {
+                if (row === null || col === null || !type) { setDragPreview(null); return; }
+                // Only show preview on valid placement zones
+                const isPlayerRow = roster
+                  ? (flipped ? row < 3 : [5, 6, 7].includes(row))
+                  : [5, 6, 7].includes(row);
+                const targetCell = game.grid[row]?.[col];
+                if (!isPlayerRow || !targetCell || targetCell.unit || targetCell.terrain === 'water') {
+                  setDragPreview(null);
+                  return;
+                }
+                setDragPreview({ row, col, type });
+              }}
+              onDragDrop={(row, col, slotIdx) => {
+                setDragPreview(null);
+                game.setSelectedSlot(slotIdx);
+                // Defer to next tick so selectedSlot is in state when placeUnit reads it
+                setTimeout(() => {
+                  const cell = game.grid[row]?.[col];
+                  if (!cell || cell.unit || cell.terrain === 'water') return;
+                  if (!roster) return;
+                  const type = roster[slotIdx];
+                  game.placeUnit(row, col);
+                  sfxPlace();
+                  setLastPlaced({ row, col, type });
+                }, 0);
+              }}
             />
             <button
               onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
