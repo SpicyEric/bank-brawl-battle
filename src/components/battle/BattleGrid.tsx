@@ -479,18 +479,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const y1 = visualRow(b.tankRow) * cellSize + cellSize / 2;
           const x2 = b.unitCol * cellSize + cellSize / 2;
           const y2 = visualRow(b.unitRow) * cellSize + cellSize / 2;
+          const isOwnTeam = flipped ? b.team === 'enemy' : b.team === 'player';
+          const color = isOwnTeam ? 'hsl(152, 60%, 48%)' : 'hsl(0, 72%, 55%)';
           return (
             <svg key={`bond-${i}`} className="absolute inset-0 z-20 pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
               <line
                 x1={x1} y1={y1} x2={x2} y2={y2}
-                stroke="hsl(152, 60%, 48%)"
+                stroke={color}
                 strokeWidth="0.6"
                 strokeDasharray="1.5,1"
                 opacity="0.7"
               >
                 <animate attributeName="stroke-dashoffset" from="0" to="-5" dur="1.5s" repeatCount="indefinite" />
               </line>
-              <circle cx={(x1 + x2) / 2} cy={(y1 + y2) / 2} r="1.2" fill="hsl(152, 60%, 48%)" opacity="0.8">
+              <circle cx={(x1 + x2) / 2} cy={(y1 + y2) / 2} r="1.2" fill={color} opacity="0.8">
                 <animate attributeName="opacity" values="0.4;0.9;0.4" dur="1.5s" repeatCount="indefinite" />
               </circle>
             </svg>
