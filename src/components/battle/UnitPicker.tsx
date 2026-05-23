@@ -53,7 +53,7 @@ export function UnitPicker({
   const draggedSlotIdx = useRef<number | null>(null);
   const lastHover = useRef<{ row: number; col: number } | null>(null);
   const isDragging = useRef(false);
-  const [dragGhost, setDragGhost] = useState<{ x: number; y: number; emoji: string } | null>(null);
+  const [dragGhost, setDragGhost] = useState<{ x: number; y: number; emoji: string; type: UnitType } | null>(null);
 
   const startPress = useCallback((type: UnitType) => {
     didLongPress.current = false;
@@ -107,7 +107,7 @@ export function UnitPicker({
         cancelPress();
       }
       if (!isDragging.current) return;
-      setDragGhost({ x: e.clientX, y: e.clientY, emoji: UNIT_DEFS[dragStart.current.type].emoji });
+      setDragGhost({ x: e.clientX, y: e.clientY, emoji: UNIT_DEFS[dragStart.current.type].emoji, type: dragStart.current.type });
       const cell = findCellAtPoint(e.clientX, e.clientY);
       if (cell) {
         lastHover.current = cell;
@@ -193,7 +193,7 @@ export function UnitPicker({
           </div>
         </div>
         {dragGhost && (
-          <div className="drag-ghost" style={{ left: dragGhost.x, top: dragGhost.y }}>{dragGhost.emoji}</div>
+          <div className="drag-ghost" style={{ left: dragGhost.x, top: dragGhost.y }}>{getUnitIcon(dragGhost.type) ? <img src={iconUrl(getUnitIcon(dragGhost.type)!)} alt="" className="w-8 h-8" style={{ imageRendering: 'pixelated' }} /> : dragGhost.emoji}</div>
         )}
         {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
       </>
