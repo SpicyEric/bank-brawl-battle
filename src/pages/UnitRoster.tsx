@@ -85,7 +85,6 @@ export default function UnitRoster() {
         <div className="space-y-1.5">
           {rows.map(({ color, indices }) => (
             <div key={color} className="flex items-center gap-1.5">
-              <span className="text-[9px] font-bold w-9 shrink-0 uppercase" style={{ color: `hsl(var(--unit-${color}))` }}>{COLOR_LABEL[color]}</span>
               <div className="grid grid-cols-3 gap-1.5 flex-1">
                 {indices.map(i => {
                   const t = slots[i];
@@ -98,10 +97,9 @@ export default function UnitRoster() {
                       className={`aspect-square rounded-lg border-2 flex flex-col items-center justify-center transition-all relative ${
                         t ? `${COLOR_RING[color]} active:scale-[0.95]`
                           : canDrop ? `border-primary bg-primary/10 ring-1 ring-primary animate-pulse`
-                          : 'border-dashed border-border bg-muted/20'
+                          : `${COLOR_EMPTY[color]} border-dashed`
                       }`}
                     >
-                      <div className={`absolute top-0.5 left-0.5 w-1.5 h-1.5 rounded-full ${COLOR_DOT[color]}`} />
                       {def ? (
                         <>
                           <span className="text-2xl">{def.emoji}</span>
@@ -121,8 +119,8 @@ export default function UnitRoster() {
 
       {/* Bottom: scrollable picker of all units (color-neutral) */}
       <div className="flex-1 overflow-y-auto px-3 pb-3">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1.5">
-          Tippe Einheit → wählen · gedrückt halten = Info
+        <p className="text-[10px] text-muted-foreground text-center mb-1.5 opacity-60">
+          Gedrückt halten = Info
         </p>
         <div className="grid grid-cols-3 gap-1.5">
           {UNIT_TYPES.map(t => {
