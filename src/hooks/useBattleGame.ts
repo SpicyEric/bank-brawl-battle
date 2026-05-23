@@ -660,10 +660,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           }
           target.hp = Math.max(0, target.hp - dmg);
           unit.cooldown = unit.maxCooldown;
-          // Warrior: track last attacked for lock-on behavior
-          if (unit.type === 'warrior') unit.lastAttackedId = target.id;
-          // Rider: track last attacked for target-switching
-          if (unit.type === 'rider') unit.lastAttackedId = target.id;
+          // Track last attacked target (used by targeting logic: lock-on for warrior/stormrunner/archer, switch for rider/assassin/frost/mage)
+          unit.lastAttackedId = target.id;
 
           // Frost: 50% chance to freeze the target for 1 turn
           let didFreeze = false;
