@@ -762,7 +762,8 @@ function terrainScore(pos: Position, grid: Cell[][]): number {
 function _selectBestMove(unit: Unit, target: Unit, possibleMoves: Position[], grid: Cell[][], allUnits: Unit[] | undefined, isRangedKiter: boolean): Position {
   // If can already attack, consider kiting or staying
   if (canAttack(unit, target)) {
-    if (isRangedKiter && (unit.stuckTurns || 0) < 3) {
+    // Ranged kiters: always try to maximize distance while still being able to attack.
+    if (isRangedKiter) {
       const kiteMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
       if (kiteMoves.length > 0) {
         kiteMoves.sort((a, b) => {
