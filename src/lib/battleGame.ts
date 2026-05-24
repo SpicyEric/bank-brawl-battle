@@ -319,7 +319,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   arsonist: {
     label: 'Brandstifter', emoji: '🔥', hp: 65, attack: 4, cooldown: 2,
-    description: 'Geringer Sofortschaden, zündet aber an: 6 Schaden pro Runde für 4 Runden. Stapelbar.',
+    description: 'Geringer Sofortschaden, zündet aber an: 6 Schaden pro Runde für 4 Runden. Stapelbar. Hinterlässt zudem eine Brandspur (3 Ticks), die nur Feinden Schaden zufügt.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
