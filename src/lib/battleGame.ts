@@ -1396,19 +1396,22 @@ export function leaveArsonistTrail(grid: Cell[][], unit: Unit): void {
   cell.lavaOwnerTeam = unit.team;
 }
 
-/** Tick down banshee ghost timers; mark dead when ghost expires. */
-export function processGhostTick(units: Unit[], grid: Cell[][], logs: string[]): void {
-  for (const u of units) {
-    if (u.ghost !== undefined && u.ghost > 0) {
-      u.ghost -= 1;
-      if (u.ghost <= 0) {
-        u.hp = 0;
-        (u as any).dead = true;
-        if (grid[u.row]?.[u.col]?.unit?.id === u.id) {
-          grid[u.row][u.col].unit = u;
-        }
-        logs.push(`👻 Geist verblasst`);
-      }
+/** Tick down banshee revival timers; revive at full HP when timer hits 0. */
+export function processGhostTick(_units: Unit[], grid: Cell[][], logs: string[]): void {
+  // Scan the grid directly: dead banshees aren't in the allUnits list.
+  for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+    const u = grid[r]?.[c]?.unit;
+    if (!u || u.type !== 'banshee') continue;
+    if (u.reviveIn === undefined || u.reviveIn <= 0) continue;
+    u.reviveIn -= 1;
+    if (u.reviveIn <= 0) {
+      u.reviveIn = undefined;
+      u.hp = u.maxHp;
+      (u as any).dead = false;
+      u.bansheeRevived = true;
+      u.ghost = 999; // persistent purple glow
+      u.cooldown = 0;
+      logs.push(`👻 Banshee erwacht erneut!`);
     }
   }
 }
