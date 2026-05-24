@@ -580,6 +580,17 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         }
       }
 
+      // === Bleed DoT processing (Vampir bite) ===
+      for (const u of allUnits) {
+        if (!u.bleeding || u.bleeding.length === 0 || u.hp <= 0 || u.dead) continue;
+        const tick = u.bleeding.shift()!;
+        if (tick > 0) {
+          u.hp = Math.max(0, u.hp - tick);
+          logs.push(`🩸 ${UNIT_DEFS[u.type].emoji} blutet: -${tick} ❤️${u.hp <= 0 ? ' ☠️' : ''}`);
+          if (u.hp <= 0) (u as any).dead = true;
+        }
+        if (u.bleeding.length === 0) u.bleeding = undefined;
+
       // === Lava field DoT (Vulkanit) ===
       processLavaTick(newGrid, logs);
       // === Banshee ghost timer tick-down ===
