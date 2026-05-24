@@ -855,6 +855,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           unit.stuckTurns = 0;
           const kitePos = moveToward(unit, target, newGrid, allUnits);
           if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
+            leaveArsonistTrail(newGrid, unit);
             newGrid[unit.row][unit.col].unit = null;
             unit.row = kitePos.row; unit.col = kitePos.col;
             newGrid[unit.row][unit.col].unit = unit;
