@@ -372,7 +372,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   cloner: {
     label: 'Kloner', emoji: '🧬', hp: 90, attack: 12, cooldown: 2,
-    description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt alle 3 Ticks einen Klon, der auf Feinde zustürmt.',
+    description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt alle 6 Ticks einen Klon (max. 3 Klone insgesamt), der auf Feinde zustürmt.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
