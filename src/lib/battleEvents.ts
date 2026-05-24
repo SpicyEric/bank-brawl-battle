@@ -26,4 +26,8 @@ export interface BattleEvent {
   innerCells?: { row: number; col: number }[];
   /** Rider-horn: outer ring cells (flash one tick later). */
   outerCells?: { row: number; col: number }[];
+  /** Dragon fire-spin: the (up to 3) cells lit on fire this tick along one beam. */
+  spinCells?: { row: number; col: number }[];
+  /** Dragon fire-spin: beam direction index (0..7) for this tick. */
+  spinDirIdx?: number;
 }
