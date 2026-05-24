@@ -580,6 +580,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       processGhostTick(allUnits, newGrid, logs);
       // === Doppelganger phantom timers ===
       tickPhantomTimers(allUnits, newGrid, logs);
+      // === Cloner: spawn clones every 3 ticks ===
+      tickClonerSpawns(allUnits, newGrid, logs);
 
 
 
