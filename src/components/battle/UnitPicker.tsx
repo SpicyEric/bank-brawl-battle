@@ -261,7 +261,7 @@ export function UnitPicker({
         </div>
       </div>
 
-      {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
+      {infoUnit && <UnitInfoModal unitType={infoUnit.type} colorOverride={infoUnit.color} onClose={() => setInfoUnit(null)} />}
     </>
   );
 }
