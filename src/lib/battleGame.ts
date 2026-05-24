@@ -26,7 +26,8 @@ export interface Unit {
   color?: 'red' | 'blue' | 'green'; // per-instance color (assigned from roster slot for player units)
   slotIndex?: number; // for player units: index in the chosen roster (0..8)
   dead?: boolean;
-  frozen?: number; // turns remaining frozen (can't move, attacks at 50% dmg)
+  frozen?: number; // turns remaining frozen (can't move, attacks at reduced dmg)
+  frozenDmgMul?: number; // damage multiplier while frozen (default 0.5; frost nova sets 0.3)
   webbed?: number; // turns remaining webbed (spiderqueen) – same as frozen, distinct visual
   stuckTurns?: number; // turns without attacking – used for anti-stalemate
   activationTurn?: number; // turn number when this unit becomes active (staggered rows)
