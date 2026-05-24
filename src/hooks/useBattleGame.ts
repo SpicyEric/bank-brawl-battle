@@ -6,7 +6,7 @@ import {
   GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
-  applyPostAttackEffects, applyDeathEffects, processLavaTick, processGhostTick, shouldSkipMove,
+  applyPostAttackEffects, applyDeathEffects, applyMirrorReflect, processLavaTick, processGhostTick, shouldSkipMove,
   spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
 } from '@/lib/battleGame';
