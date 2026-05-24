@@ -448,14 +448,13 @@ export const BASE_UNITS = 5;
 export const MAX_UNITS = 20; // absolute cap (limited by available rows: 3×8=24 cells)
 
 // Comeback mechanic: behind by 2+ → +1, behind by 4+ → +2
-// Round escalation: round 1 = 1 unit, round 2 = 2, ... until BASE_UNITS reached.
+// Round escalation: round N allows N units (up to MAX_UNITS), plus comeback bonus.
 export function getMaxUnits(myScore: number, opponentScore: number, roundNumber: number = 999): number {
   const deficit = opponentScore - myScore;
   let bonus = 0;
   if (deficit >= 4) bonus = 2;
   else if (deficit >= 2) bonus = 1;
-  const cap = Math.min(BASE_UNITS + bonus, MAX_UNITS);
-  return Math.min(roundNumber, cap);
+  return Math.min(roundNumber + bonus, MAX_UNITS);
 }
 export const GRID_SIZE = 8;
 export const PLAYER_ROWS = [5, 6, 7];
