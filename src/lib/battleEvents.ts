@@ -1,6 +1,6 @@
 // Battle events emitted during combat for animations
 export interface BattleEvent {
-  type: 'hit' | 'kill' | 'heal' | 'freeze' | 'web' | 'chain' | 'spawn' | 'impulse' | 'teleport' | 'frostNova' | 'riderHorn' | 'volleyMiss' | 'dragonSpin';
+  type: 'hit' | 'kill' | 'heal' | 'freeze' | 'web' | 'chain' | 'spawn' | 'impulse' | 'teleport' | 'frostNova' | 'riderHorn' | 'volleyMiss' | 'dragonSpin' | 'mirrorExplode';
   attackerId: string;
   attackerRow: number;
   attackerCol: number;
