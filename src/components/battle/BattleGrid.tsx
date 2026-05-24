@@ -329,6 +329,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         const rangedPopups: DamagePopup[] = [];
         const rangedDragonFires: DragonFire[] = [];
         for (const evt of rangedDamageEvents) {
+          if (evt.type === 'volleyMiss') continue; // visual-only arrow, no popup/shake
           const key = `${evt.targetRow}-${evt.targetCol}`;
           rangedShake.add(key);
           popupCounter.current += 1;
