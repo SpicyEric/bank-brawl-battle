@@ -736,7 +736,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           // Phantoms (doppelganger phantom): completely invulnerable
           if (target.isPhantom && (target.phantom ?? 0) > 0) {
-            unit.cooldown = unit.maxCooldown;
+            unit.cooldown = effectiveCooldown(unit, newGrid);
             continue;
           }
           let dmg = calcDamage(unit, target, newGrid);
@@ -750,13 +750,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
           }
           target.hp = Math.max(0, target.hp - dmg);
-          unit.cooldown = unit.maxCooldown;
+          // Cooldown reset honors terrain bonuses (ranger=1 on forest, mountaineer=2 on hill)
+          unit.cooldown = effectiveCooldown(unit, newGrid);
           // Track last attacked target (used by targeting logic: lock-on for warrior/stormrunner/archer, switch for rider/assassin/frost/mage)
           unit.lastAttackedId = target.id;
 
-          // Frost: 50% chance to freeze target for 3 ticks at 50% damage
+          // Frost: 50% chance to freeze target for 3 ticks at 50% damage (skip immune)
           let didFreeze = false;
-          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
+          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(target, newGrid)) {
             target.frozen = 3;
             target.frozenDmgMul = 0.5;
             didFreeze = true;
@@ -784,10 +785,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             }
           }
 
-          // Arsonist: apply burning DoT stack (5 dmg / turn, 4 turns)
-          if (unit.type === 'arsonist' && target.hp > 0) {
+          // Arsonist: apply burning DoT stack (5 dmg / turn, 4 turns) – skip fire-immune
+          if (unit.type === 'arsonist' && target.hp > 0 && !isImmuneToFire(target, newGrid)) {
             target.burning = [...(target.burning || []), { dmg: 5, turns: 4 }];
           }
+
 
           // Judge: +8 ATK for each fallen ally — recalculated below at end of tick.
 
