@@ -4,7 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
-  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
+  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, effectiveCooldown, tickTerrainHeals,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
@@ -773,6 +773,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       tickClonerSpawns(allUnits, newGrid, logs);
       // Mage impulse: every 7 ticks push enemies in 7x7 outward
       tickMageImpulse(allUnits, newGrid, events, logs);
+      tickMagnetPull(allUnits, newGrid, events, logs);
       // Frost Nova: every 7 ticks freeze enemies in 3x3 for 5 ticks at 30% dmg
       tickFrostNova(allUnits, newGrid, events, logs);
       // Rider horn: every 9 ticks, +50% dmg buff to allies in 5x5 for 2 ticks
