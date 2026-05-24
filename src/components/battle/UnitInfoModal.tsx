@@ -12,11 +12,13 @@ interface UnitInfoModalProps {
   onClose: () => void;
   /** Hide color affiliation (badge + strong/weak section) – used in roster where units are color-neutral */
   hideColorInfo?: boolean;
+  /** Override color (when inspecting a placed unit whose slot color differs from the type default) */
+  colorOverride?: ColorGroup;
 }
 
-export function UnitInfoModal({ unitType, onClose, hideColorInfo }: UnitInfoModalProps) {
+export function UnitInfoModal({ unitType, onClose, hideColorInfo, colorOverride }: UnitInfoModalProps) {
   const def = UNIT_DEFS[unitType];
-  const colorGroup = UNIT_COLOR_GROUPS[unitType];
+  const colorGroup = colorOverride ?? UNIT_COLOR_GROUPS[unitType];
   const beats = COLOR_BEATS[colorGroup];
   const losesTo = (Object.entries(COLOR_BEATS) as [ColorGroup, ColorGroup][]).find(([, v]) => v === colorGroup)?.[0] as ColorGroup;
   const moveGrid = getPatternDisplay(def.movePattern, 7);
