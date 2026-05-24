@@ -696,6 +696,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             if (unit.type === 'tank') {
               moveTankFormation(unit, kitePos, newGrid, allUnits);
             }
+            leaveArsonistTrail(newGrid, unit);
             newGrid[unit.row][unit.col].unit = null;
             unit.row = kitePos.row;
             unit.col = kitePos.col;
