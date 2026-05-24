@@ -229,7 +229,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 75,
     attack: 14,
     cooldown: 2,
-    description: 'Friert Gegner 3 Runden ein (50% Schadenseinbruch, keine Bewegung). Greift orthogonal bis 2 Felder an.',
+    description: 'Friert Gegner 3 Ticks ein (50% Schaden, keine Bewegung). Alle 7 Ticks: Frost-Nova im 3×3 friert Feinde 5 Ticks (nur 30% Schaden). Greift orthogonal bis 2 Felder an.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
