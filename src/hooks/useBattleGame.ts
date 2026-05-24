@@ -734,10 +734,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           // Track last attacked target (used by targeting logic: lock-on for warrior/stormrunner/archer, switch for rider/assassin/frost/mage)
           unit.lastAttackedId = target.id;
 
-          // Frost: 50% chance to freeze the target for 1 turn
+          // Frost: 50% chance to freeze target for 3 ticks at 50% damage
           let didFreeze = false;
           if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
-            target.frozen = 1;
+            target.frozen = 3;
+            target.frozenDmgMul = 0.5;
             didFreeze = true;
           }
 
