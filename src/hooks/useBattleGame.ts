@@ -562,6 +562,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       // === Burn DoT processing (Brandstifter / Arsonist) ===
       for (const u of allUnits) {
         if (!u.burning || u.burning.length === 0 || u.hp <= 0) continue;
+        // Mountaineer on hill is immune to fire damage
+        if (isImmuneToFire(u, newGrid)) {
+          u.burning = [];
+          continue;
+        }
         let totalBurn = 0;
         u.burning = u.burning.filter(b => {
           totalBurn += b.dmg;
