@@ -26,7 +26,8 @@ export interface Unit {
   color?: 'red' | 'blue' | 'green'; // per-instance color (assigned from roster slot for player units)
   slotIndex?: number; // for player units: index in the chosen roster (0..8)
   dead?: boolean;
-  frozen?: number; // turns remaining frozen (can't move, attacks at 50% dmg)
+  frozen?: number; // turns remaining frozen (can't move, attacks at reduced dmg)
+  frozenDmgMul?: number; // damage multiplier while frozen (default 0.5; frost nova sets 0.3)
   webbed?: number; // turns remaining webbed (spiderqueen) – same as frozen, distinct visual
   stuckTurns?: number; // turns without attacking – used for anti-stalemate
   activationTurn?: number; // turn number when this unit becomes active (staggered rows)
@@ -51,6 +52,7 @@ export interface Unit {
   clonesSpawnedTotal?: number; // lifetime total clones this cloner has spawned (max 3)
   parentClonerId?: string; // for clones: id of the cloner that spawned them
   impulseTimer?: number; // mage shockwave cooldown countdown
+  frostNovaTimer?: number; // frost mage 3x3 nova cooldown countdown
   phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
   isPhantom?: boolean; // doppelganger phantom flag
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
@@ -227,7 +229,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 75,
     attack: 14,
     cooldown: 2,
-    description: 'Friert Gegner 3 Runden ein (50% Schadenseinbruch, keine Bewegung). Greift orthogonal bis 2 Felder an.',
+    description: 'Friert Gegner 3 Ticks ein (50% Schaden, keine Bewegung). Alle 7 Ticks: Frost-Nova im 3×3 friert Feinde 5 Ticks (nur 30% Schaden). Greift orthogonal bis 2 Felder an.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
@@ -1576,6 +1578,56 @@ export function tickMageImpulse(
       pushedIds,
     });
     logs.push(`🔮 ${m.team === 'player' ? '👤' : '💀'} Magier-Impuls!`);
+  }
+}
+
+/** Frost Nova: every 7 ticks each frost mage freezes ALL enemies in 3×3 around itself
+ *  for 5 ticks at 30% damage. Pure crowd control, no damage. */
+export function tickFrostNova(
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  logs: string[],
+): void {
+  const frosts = allUnits.filter(u => u.type === 'frost' && u.hp > 0 && !u.dead);
+  for (const f of frosts) {
+    if (f.frostNovaTimer === undefined || f.frostNovaTimer <= 0) f.frostNovaTimer = 7;
+    f.frostNovaTimer -= 1;
+    if (f.frostNovaTimer > 0) continue;
+    f.frostNovaTimer = 7;
+
+    const aoeCells: { row: number; col: number }[] = [];
+    let frozenCount = 0;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const r = f.row + dr, c = f.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      aoeCells.push({ row: r, col: c });
+      if (dr === 0 && dc === 0) continue;
+      const u = grid[r][c].unit;
+      if (!u || u.hp <= 0 || u.dead) continue;
+      if (u.team === f.team) continue;
+      u.frozen = 5;
+      u.frozenDmgMul = 0.3;
+      frozenCount += 1;
+    }
+
+    events.push({
+      type: 'frostNova',
+      attackerId: f.id,
+      attackerRow: f.row,
+      attackerCol: f.col,
+      attackerEmoji: '❄️',
+      attackerType: 'frost',
+      targetId: f.id,
+      targetRow: f.row,
+      targetCol: f.col,
+      damage: 0,
+      isStrong: false,
+      isWeak: false,
+      isRanged: false,
+      aoeCells,
+    });
+    logs.push(`❄️ ${f.team === 'player' ? '👤' : '💀'} Frost-Nova! (${frozenCount} eingefroren)`);
   }
 }
 

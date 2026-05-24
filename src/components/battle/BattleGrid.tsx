@@ -33,6 +33,7 @@ interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
 interface ChainEffect { id: string; cells: { row: number; col: number }[]; color: 'lightning' | 'chaindancer' }
 interface ImpulseEffect { id: string; row: number; col: number }
+interface FrostNovaEffect { id: string; row: number; col: number }
 interface TeleportEffect { id: string; row: number; col: number; kind: 'out' | 'in' }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview }: BattleGridProps) {
@@ -54,6 +55,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const impulseCounter = useRef(0);
   const [teleportEffects, setTeleportEffects] = useState<TeleportEffect[]>([]);
   const teleportCounter = useRef(0);
+  const [frostNovaEffects, setFrostNovaEffects] = useState<FrostNovaEffect[]>([]);
+  const frostNovaCounter = useRef(0);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
@@ -226,7 +229,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     for (const evt of events) {
       // Impulse / teleport / spawn are visual-only and must not produce
       // projectiles, damage popups or AOE fire overlays.
-      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn') continue;
+      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn' || evt.type === 'frostNova') continue;
       if (evt.type === 'heal') healEvents.push(evt);
       else if (evt.type === 'freeze') freezeEvents.push(evt);
       else if (evt.isRanged) rangedDamageEvents.push(evt);
@@ -429,6 +432,18 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     if (impulsePushedIdsBatch.length > 0) {
       setImpulsePushedIds(new Set(impulsePushedIdsBatch));
       setTimeout(() => setImpulsePushedIds(new Set()), 1700);
+    }
+
+    // --- Frost Nova (3x3 freeze burst) ---
+    const newNovas: FrostNovaEffect[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'frostNova') continue;
+      frostNovaCounter.current += 1;
+      newNovas.push({ id: `nova-${frostNovaCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+    }
+    if (newNovas.length > 0) {
+      setFrostNovaEffects(prev => [...prev, ...newNovas]);
+      setTimeout(() => setFrostNovaEffects(prev => prev.filter(n => !newNovas.find(nn => nn.id === n.id))), 1100);
     }
 
     // --- Shadowblade teleport puffs ---
@@ -929,6 +944,43 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           <div className="absolute inset-0 flex items-center justify-center text-2xl teleport-puff-emoji">💨</div>
         </div>
       ))}
+
+      {/* Frost Nova: expanding cyan burst centered on frost mage, spans 3x3 */}
+      {frostNovaEffects.map(nv => {
+        const cx = nv.col * cellSize + cellSize / 2;
+        const cy = visualRow(nv.row) * cellSize + cellSize / 2;
+        return (
+          <svg key={nv.id} className="absolute inset-0 z-[5] pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <radialGradient id={`nova-grad-${nv.id}`}>
+                <stop offset="0%" stopColor="hsl(190, 100%, 92%)" stopOpacity="0.0" />
+                <stop offset="55%" stopColor="hsl(195, 100%, 75%)" stopOpacity="0.55" />
+                <stop offset="100%" stopColor="hsl(210, 100%, 65%)" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <circle cx={cx} cy={cy} r={cellSize * 1.6} fill={`url(#nova-grad-${nv.id})`} className="frost-nova-fill" />
+            <circle cx={cx} cy={cy} r={cellSize * 1.6} fill="none" stroke="hsl(195, 100%, 85%)" strokeWidth="1.0" className="frost-nova-ring" />
+            <circle cx={cx} cy={cy} r={cellSize * 1.6} fill="none" stroke="hsl(210, 100%, 95%)" strokeWidth="0.5" className="frost-nova-ring-inner" />
+            {/* Snowflake glyphs at the 8 surrounding cells */}
+            {[-1, 0, 1].map(dr => [-1, 0, 1].map(dc => {
+              if (dr === 0 && dc === 0) return null;
+              const sx = (nv.col + dc) * cellSize + cellSize / 2;
+              const sy = visualRow(nv.row + dr) * cellSize + cellSize / 2;
+              return (
+                <text
+                  key={`${dr}-${dc}`}
+                  x={sx}
+                  y={sy}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={cellSize * 0.55}
+                  className="frost-nova-flake"
+                >❄</text>
+              );
+            }))}
+          </svg>
+        );
+      })}
     </div>
   );
 }

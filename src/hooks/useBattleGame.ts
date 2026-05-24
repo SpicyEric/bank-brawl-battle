@@ -7,7 +7,7 @@ import {
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
   applyPostAttackEffects, applyDeathEffects, processLavaTick, processGhostTick, shouldSkipMove,
-  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, handleShadowbladeTick, leaveArsonistTrail,
+  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, tickFrostNova, handleShadowbladeTick, leaveArsonistTrail,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
@@ -584,6 +584,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       tickClonerSpawns(allUnits, newGrid, logs);
       // === Mage impulse: every 7 ticks push enemies in 7x7 outward ===
       tickMageImpulse(allUnits, newGrid, events, logs);
+      // === Frost Nova: every 7 ticks freeze enemies in 3x3 for 5 ticks at 30% dmg ===
+      tickFrostNova(allUnits, newGrid, events, logs);
 
 
 
@@ -595,9 +597,13 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           unit.webbed -= 1;
           continue;
         }
-        // Frozen: skip movement, but still allowed to attack at 50% dmg (handled below)
+        // Frozen: skip movement, attack at reduced dmg (50% default, 30% from frost nova)
         const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
-        if (isFrozenNow) unit.frozen = (unit.frozen || 0) - 1;
+        const frozenDmgMul = unit.frozenDmgMul ?? 0.5;
+        if (isFrozenNow) {
+          unit.frozen = (unit.frozen || 0) - 1;
+          if ((unit.frozen || 0) <= 0) unit.frozenDmgMul = undefined;
+        }
 
         unit.cooldown = Math.max(0, unit.cooldown - 1);
 
@@ -675,7 +681,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         if (!canAttack(unit, target)) {
           // Track stuck turns for anti-stalemate
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const skipMove = shouldSkipMove(unit);
+          const skipMove = isFrozenNow || shouldSkipMove(unit);
           const newPos = skipMove ? { row: unit.row, col: unit.col } : moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             // If tank, move bonded units first
@@ -689,20 +695,23 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             newGrid[unit.row][unit.col].unit = unit;
           }
         } else {
-          // Can attack → reset stuck counter, but ranged kiters still reposition
+          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen)
           unit.stuckTurns = 0;
-          const kitePos = moveToward(unit, target, newGrid, allUnits);
-          if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
-            if (unit.type === 'tank') {
-              moveTankFormation(unit, kitePos, newGrid, allUnits);
+          if (!isFrozenNow) {
+            const kitePos = moveToward(unit, target, newGrid, allUnits);
+            if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
+              if (unit.type === 'tank') {
+                moveTankFormation(unit, kitePos, newGrid, allUnits);
+              }
+              leaveArsonistTrail(newGrid, unit);
+              newGrid[unit.row][unit.col].unit = null;
+              unit.row = kitePos.row;
+              unit.col = kitePos.col;
+              newGrid[unit.row][unit.col].unit = unit;
             }
-            leaveArsonistTrail(newGrid, unit);
-            newGrid[unit.row][unit.col].unit = null;
-            unit.row = kitePos.row;
-            unit.col = kitePos.col;
-            newGrid[unit.row][unit.col].unit = unit;
           }
         }
+
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           // Phantoms (doppelganger phantom): completely invulnerable
@@ -712,7 +721,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           }
           let dmg = calcDamage(unit, target, newGrid);
           // Frozen attacker: 50% damage penalty
-          if (isFrozenNow) dmg = Math.round(dmg * 0.5);
+          if (isFrozenNow) dmg = Math.round(dmg * frozenDmgMul);
           // Apply morale modifier + shield wall
           if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
           else {
@@ -725,10 +734,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           // Track last attacked target (used by targeting logic: lock-on for warrior/stormrunner/archer, switch for rider/assassin/frost/mage)
           unit.lastAttackedId = target.id;
 
-          // Frost: 50% chance to freeze the target for 1 turn
+          // Frost: 50% chance to freeze target for 3 ticks at 50% damage
           let didFreeze = false;
           if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
-            target.frozen = 1;
+            target.frozen = 3;
+            target.frozenDmgMul = 0.5;
             didFreeze = true;
           }
 

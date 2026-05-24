@@ -4,7 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
-  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
+  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
@@ -18,7 +18,7 @@ interface MultiplayerConfig {
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken };
+  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken };
 }
 
 function serializeGrid(grid: Cell[][]) {
@@ -772,6 +772,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       tickClonerSpawns(allUnits, newGrid, logs);
       // Mage impulse: every 7 ticks push enemies in 7x7 outward
       tickMageImpulse(allUnits, newGrid, events, logs);
+      // Frost Nova: every 7 ticks freeze enemies in 3x3 for 5 ticks at 30% dmg
+      tickFrostNova(allUnits, newGrid, events, logs);
       const currentTurn = turnCount;
       const acting = allUnits.filter(u => {
         if (u.hp <= 0) return false;
@@ -781,7 +783,13 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
-        if (unit.frozen && unit.frozen > 0) { unit.frozen -= 1; continue; }
+        // Frozen: skip movement, attack at reduced dmg (50% default, 30% from frost nova)
+        const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
+        const frozenDmgMul = unit.frozenDmgMul ?? 0.5;
+        if (isFrozenNow) {
+          unit.frozen = (unit.frozen || 0) - 1;
+          if ((unit.frozen || 0) <= 0) unit.frozenDmgMul = undefined;
+        }
         unit.cooldown = Math.max(0, unit.cooldown - 1);
 
         // Shadowblade: custom teleport-strike behavior (every 5 ticks)
@@ -842,7 +850,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
         if (!canAttack(unit, target)) {
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const skipMove = shouldSkipMove(unit);
+          const skipMove = isFrozenNow || shouldSkipMove(unit);
           const newPos = skipMove ? { row: unit.row, col: unit.col } : moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             leaveArsonistTrail(newGrid, unit);
@@ -851,19 +859,23 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             newGrid[unit.row][unit.col].unit = unit;
           }
         } else {
-          // Can attack → reset stuck counter, but ranged kiters still reposition
+          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen)
           unit.stuckTurns = 0;
-          const kitePos = moveToward(unit, target, newGrid, allUnits);
-          if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
-            leaveArsonistTrail(newGrid, unit);
-            newGrid[unit.row][unit.col].unit = null;
-            unit.row = kitePos.row; unit.col = kitePos.col;
-            newGrid[unit.row][unit.col].unit = unit;
+          if (!isFrozenNow) {
+            const kitePos = moveToward(unit, target, newGrid, allUnits);
+            if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
+              leaveArsonistTrail(newGrid, unit);
+              newGrid[unit.row][unit.col].unit = null;
+              unit.row = kitePos.row; unit.col = kitePos.col;
+              newGrid[unit.row][unit.col].unit = unit;
+            }
           }
         }
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           let dmg = calcDamage(unit, target, newGrid);
+          // Frozen attacker: reduced damage
+          if (isFrozenNow) dmg = Math.round(dmg * frozenDmgMul);
           // Apply morale damage modifier + shield wall
           if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
           else {
@@ -877,10 +889,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           // Rider: track last attacked for target-switching
           if (unit.type === 'rider') unit.lastAttackedId = target.id;
 
-          // Frost: 50% chance to freeze the target for 1 turn
+          // Frost: 50% chance to freeze the target for 3 ticks at 50% damage
           let didFreeze = false;
           if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
-            target.frozen = 1;
+            target.frozen = 3;
+            target.frozenDmgMul = 0.5;
             didFreeze = true;
           }
 
