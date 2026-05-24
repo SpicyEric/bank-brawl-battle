@@ -430,7 +430,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     for (const evt of events) {
       if (evt.type !== 'impulse') continue;
       impulseCounter.current += 1;
-      newImpulses.push({ id: `impulse-${impulseCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+      newImpulses.push({ id: `impulse-${impulseCounter.current}`, row: evt.attackerRow, col: evt.attackerCol, kind: evt.attackerType === 'magnetiker' ? 'pull' : 'push' });
       if (evt.pushedIds) impulsePushedIdsBatch.push(...evt.pushedIds);
     }
     if (newImpulses.length > 0) {
