@@ -411,14 +411,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
 
     // --- Mage impulse (shockwave) ---
     const newImpulses: ImpulseEffect[] = [];
+    const impulsePushedIdsBatch: string[] = [];
     for (const evt of events) {
       if (evt.type !== 'impulse') continue;
       impulseCounter.current += 1;
       newImpulses.push({ id: `impulse-${impulseCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+      if (evt.pushedIds) impulsePushedIdsBatch.push(...evt.pushedIds);
     }
     if (newImpulses.length > 0) {
       setImpulseEffects(prev => [...prev, ...newImpulses]);
       setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 900);
+    }
+    if (impulsePushedIdsBatch.length > 0) {
+      setImpulsePushedIds(new Set(impulsePushedIdsBatch));
+      setTimeout(() => setImpulsePushedIds(new Set()), 950);
     }
 
     // --- Shadowblade teleport puffs ---
