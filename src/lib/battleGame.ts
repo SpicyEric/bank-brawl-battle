@@ -621,8 +621,8 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
 
-  // === LAMB TAUNT: any enemy lamb is ALWAYS the primary target (provokes everyone). ===
-  const enemyLamb = enemies.find(e => e.type === 'lamb');
+  // === LAMB TAUNT: enemy lamb provokes all units within a 7x7 area (Chebyshev ≤ 3). ===
+  const enemyLamb = enemies.find(e => e.type === 'lamb' && distance(unit, e) <= 3);
   if (enemyLamb && unit.type !== 'sniper' && unit.type !== 'healer') {
     return enemyLamb;
   }
