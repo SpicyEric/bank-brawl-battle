@@ -2288,59 +2288,65 @@ export function handleShadowbladeTick(
 
 
 
-/** Spawn a phantom duplicate next to each unspawned doppelganger.
- *  Phantom is invulnerable for 5 ticks, then disappears. */
+/** Spawn a phantom duplicate for each unspawned doppelganger.
+ *  Phantom spawns at a random cell in the opponent's 3 placement rows.
+ *  Phantom: 20 HP, 5 dmg, cooldown 2, invulnerable for 5 ticks. After 5 ticks
+ *  it becomes vulnerable but stays alive (with 20 HP max). Original doppelganger
+ *  remains idle (no move, no attack) until the phantom dies. */
 export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs: string[]): Unit[] {
   const spawned: Unit[] = [];
   const originals = allUnits.filter(u =>
     u.type === 'doppelganger' && !u.isPhantom && !u.doppelSpawned && u.hp > 0 && !u.dead
   );
   for (const orig of originals) {
-    const offsets = [
-      { r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 },
-      { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
-    ];
-    for (const o of offsets) {
-      const r = orig.row + o.r, c = orig.col + o.c;
-      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
-      const cell = grid[r][c];
-      if (cell.unit || cell.terrain === 'water') continue;
-      const phantom: Unit = {
-        ...orig,
-        id: crypto.randomUUID(),
-        row: r, col: c,
-        isPhantom: true,
-        phantom: 5,
-        doppelSpawned: true,
-        cooldown: 0,
-        bondedToTankId: undefined,
-        movedWithTank: false,
-        slotIndex: undefined,
-      };
-      grid[r][c].unit = phantom;
-      spawned.push(phantom);
-      orig.doppelSpawned = true;
-      logs.push(`👥 Doppelgänger spawnt Phantom (5 Ticks unverwundbar)`);
-      break;
-    }
     orig.doppelSpawned = true;
+    // Opponent's 3 placement rows (player → rows 0..2, enemy → rows 5..7)
+    const enemyRows = orig.team === 'player' ? [0, 1, 2] : [5, 6, 7];
+    const candidates: { r: number; c: number }[] = [];
+    for (const r of enemyRows) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        const cell = grid[r][c];
+        if (!cell.unit && cell.terrain !== 'water') candidates.push({ r, c });
+      }
+    }
+    if (candidates.length === 0) continue;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    const phantom: Unit = {
+      ...orig,
+      id: crypto.randomUUID(),
+      row: pick.r, col: pick.c,
+      hp: 20, maxHp: 20,
+      attack: 5,
+      cooldown: 0, maxCooldown: 2,
+      isPhantom: true,
+      phantom: 5,
+      doppelSpawned: true,
+      bondedToTankId: undefined,
+      movedWithTank: false,
+      slotIndex: undefined,
+      activationTurn: 0,
+      startRow: pick.r,
+      stuckTurns: 0,
+      lastAttackedId: undefined,
+      phantomId: undefined,
+    };
+    grid[pick.r][pick.c].unit = phantom;
+    spawned.push(phantom);
+    orig.phantomId = phantom.id;
+    logs.push(`👥 Doppelgänger spawnt Phantom (20 HP, 5 Ticks unverwundbar)`);
   }
   allUnits.push(...spawned);
   return spawned;
 }
 
-/** Tick down phantom invulnerability timers. Phantom vanishes when timer hits 0. */
+/** Tick down phantom invulnerability timers. Phantom stays alive after invuln ends
+ *  (with its 20 HP); enemies can damage it normally from that point on. */
 export function tickPhantomTimers(allUnits: Unit[], grid: Cell[][], logs: string[]): void {
   for (const u of allUnits) {
     if (!u.isPhantom || u.phantom === undefined || u.dead) continue;
-    u.phantom -= 1;
-    if (u.phantom <= 0) {
-      u.hp = 0;
-      (u as any).dead = true;
-      if (grid[u.row]?.[u.col]?.unit?.id === u.id) {
-        grid[u.row][u.col].unit = null;
-      }
-      logs.push(`👥 Phantom verblasst`);
+    if (u.phantom > 0) {
+      u.phantom -= 1;
+      if (u.phantom === 0) logs.push(`👥 Phantom verliert seine Unverwundbarkeit`);
     }
   }
 }
