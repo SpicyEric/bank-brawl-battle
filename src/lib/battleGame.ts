@@ -682,8 +682,8 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     if (locked) return locked;
   }
 
-  // === FROST / MAGE: switch target after every attack ===
-  if ((unit.type === 'frost' || unit.type === 'mage') &&
+  // === FROST / MAGE / VAMPIRE: switch target after every attack (nearest other enemy) ===
+  if ((unit.type === 'frost' || unit.type === 'mage' || unit.type === 'vampire') &&
       unit.lastAttackedId && enemies.length > 1) {
     const others = enemies.filter(e => e.id !== unit.lastAttackedId);
     if (others.length > 0) {
