@@ -35,6 +35,7 @@ interface ChainEffect { id: string; cells: { row: number; col: number }[]; color
 interface ImpulseEffect { id: string; row: number; col: number }
 interface FrostNovaEffect { id: string; row: number; col: number }
 interface RiderHornFlash { id: string; row: number; col: number; kind: 'inner' | 'outer' }
+interface DragonSpinFlame { id: string; row: number; col: number; delayMs: number }
 interface TeleportEffect { id: string; row: number; col: number; kind: 'out' | 'in' }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview }: BattleGridProps) {
