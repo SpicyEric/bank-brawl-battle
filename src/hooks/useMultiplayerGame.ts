@@ -768,8 +768,10 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       const logs: string[] = [];
       const events: BattleEvent[] = [];
-      // Cloner: spawn clones every 3 ticks
+      // Cloner: spawn clones every 6 ticks (max 3 lifetime)
       tickClonerSpawns(allUnits, newGrid, logs);
+      // Mage impulse: every 7 ticks push enemies in 7x7 outward
+      tickMageImpulse(allUnits, newGrid, events, logs);
       const currentTurn = turnCount;
       const acting = allUnits.filter(u => {
         if (u.hp <= 0) return false;
