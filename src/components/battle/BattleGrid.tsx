@@ -434,6 +434,18 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       setTimeout(() => setImpulsePushedIds(new Set()), 1700);
     }
 
+    // --- Frost Nova (3x3 freeze burst) ---
+    const newNovas: FrostNovaEffect[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'frostNova') continue;
+      frostNovaCounter.current += 1;
+      newNovas.push({ id: `nova-${frostNovaCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+    }
+    if (newNovas.length > 0) {
+      setFrostNovaEffects(prev => [...prev, ...newNovas]);
+      setTimeout(() => setFrostNovaEffects(prev => prev.filter(n => !newNovas.find(nn => nn.id === n.id))), 1100);
+    }
+
     // --- Shadowblade teleport puffs ---
     const newTeleports: TeleportEffect[] = [];
     for (const evt of events) {
