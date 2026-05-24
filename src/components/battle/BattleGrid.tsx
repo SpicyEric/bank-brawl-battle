@@ -55,6 +55,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [impulseEffects, setImpulseEffects] = useState<ImpulseEffect[]>([]);
   const [impulsePushedIds, setImpulsePushedIds] = useState<Set<string>>(new Set());
   const impulseCounter = useRef(0);
+  const [mirrorExplosions, setMirrorExplosions] = useState<{ id: string; row: number; col: number }[]>([]);
+  const mirrorExplosionCounter = useRef(0);
   const [teleportEffects, setTeleportEffects] = useState<TeleportEffect[]>([]);
   const teleportCounter = useRef(0);
   const [frostNovaEffects, setFrostNovaEffects] = useState<FrostNovaEffect[]>([]);
