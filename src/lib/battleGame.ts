@@ -148,7 +148,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 105,
     attack: 23,
     cooldown: 2,
-    description: 'Nahkämpfer. Beißt sich an einem Ziel fest bis es besiegt ist. Bewegt sich orthogonal (1 Feld).',
+    description: 'Nahkämpfer. Beißt sich an einem Ziel fest bis es besiegt ist. Bewegt sich orthogonal (1 Feld). Besonderheit: profitiert extrem vom Farbsystem – +50% Schaden gegen farblich schwächere Gegner (statt +30%) und nur −10% Schaden gegen farblich stärkere (statt −30%).',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: ['tank', 'mage', 'healer'],
@@ -340,7 +340,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   arsonist: {
     label: 'Brandstifter', emoji: '🔥', hp: 65, attack: 4, cooldown: 2,
-    description: 'Geringer Sofortschaden, zündet aber an: 6 Schaden pro Runde für 4 Runden. Stapelbar. Hinterlässt zudem eine Brandspur (3 Ticks), die nur Feinden Schaden zufügt.',
+    description: 'Geringer Sofortschaden, zündet aber an: 5 Schaden pro Tick für 4 Ticks. Stapelbar. Hinterlässt zudem eine Brandspur (3 Ticks), die nur Feinden Schaden zufügt.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
