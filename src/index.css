@@ -596,6 +596,36 @@
   animation: mage-impulse-fill-anim 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+/* Magnetiker pull: ring/fill shrink INWARD toward the magnetiker cell */
+@keyframes magnet-impulse-ring-anim {
+  0%   { transform: scale(1.0); opacity: 0; stroke-width: 0.3; transform-origin: center; transform-box: fill-box; }
+  20%  { opacity: 1; stroke-width: 0.9; }
+  60%  { opacity: 0.95; stroke-width: 1.2; }
+  100% { transform: scale(0.12); opacity: 0; stroke-width: 1.6; }
+}
+.magnet-impulse-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: magnet-impulse-ring-anim 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  filter: drop-shadow(0 0 4px hsl(180 100% 70%)) drop-shadow(0 0 8px hsl(200 100% 65%));
+}
+.magnet-impulse-ring-inner {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: magnet-impulse-ring-anim 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.08s forwards;
+  filter: drop-shadow(0 0 6px hsl(200 100% 90%));
+}
+@keyframes magnet-impulse-fill-anim {
+  0%   { transform: scale(1.0); opacity: 0; transform-box: fill-box; transform-origin: center; }
+  25%  { opacity: 0.9; }
+  100% { transform: scale(0.1); opacity: 0; }
+}
+.magnet-impulse-fill {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: magnet-impulse-fill-anim 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
 /* Shadowblade teleport puff */
 @keyframes teleport-out-bg-anim {
   0%   { background: radial-gradient(circle, hsl(280 90% 60% / 0.0) 0%, transparent 70%); transform: scale(0.4); opacity: 0; }
