@@ -1930,6 +1930,7 @@ function fireDragonBeam(
   grid: Cell[][],
   events: BattleEvent[],
   logs: string[],
+  beamOrder: number = 0,
 ): void {
   const { dr, dc } = DRAGON_SPIN_DIRS[dirIdx];
   const cells: { row: number; col: number }[] = [];
