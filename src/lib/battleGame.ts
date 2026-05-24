@@ -1868,6 +1868,8 @@ export function tickArcherVolley(
     logs.push(`🏹 ${a.team === 'player' ? '👤' : '💀'} Pfeilsalve! (${hitCount}/8 getroffen)`);
   }
 }
+
+/** Shadowblade per-tick behavior:
  *  - keeps maximum distance from enemies via diagonal jumps,
  *  - every 5 ticks teleports adjacent to chosen enemy and attacks,
  *  - next tick teleports back to its previous home position. */
