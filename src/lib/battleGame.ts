@@ -1529,6 +1529,7 @@ export function tickMageImpulse(
         grid[t.row][t.col].unit = null;
         t.row = cur.r; t.col = cur.c;
         grid[cur.r][cur.c].unit = t;
+        pushedIds.push(t.id);
       }
     }
 
@@ -1555,6 +1556,7 @@ export function tickMageImpulse(
       isWeak: false,
       isRanged: true,
       aoeCells: ringCells,
+      pushedIds,
     });
     logs.push(`🔮 ${m.team === 'player' ? '👤' : '💀'} Magier-Impuls!`);
   }
