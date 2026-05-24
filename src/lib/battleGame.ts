@@ -1710,6 +1710,7 @@ export function tickFrostNova(
       const u = grid[r][c].unit;
       if (!u || u.hp <= 0 || u.dead) continue;
       if (u.team === f.team) continue;
+      if (isImmuneToFreeze(u, grid)) continue;
       u.frozen = 5;
       u.frozenDmgMul = 0.3;
       frozenCount += 1;
