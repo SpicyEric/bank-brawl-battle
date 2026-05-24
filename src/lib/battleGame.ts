@@ -355,7 +355,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   mirror: {
     label: 'Spiegelkämpfer', emoji: '🪞', hp: 75, attack: 14, cooldown: 2,
-    description: 'Reflektiert 30% des erlittenen Schadens. Explodiert beim Tod für 20 Schaden im Umkreis.',
+    description: 'Reflektiert 30% des erlittenen Schadens (auch bei Ketten-/Splash-Treffern). Explodiert beim Tod für 30 Schaden im 3×3-Umkreis.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
