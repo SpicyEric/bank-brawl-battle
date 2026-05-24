@@ -305,7 +305,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   shadowblade: {
     label: 'Schattenklinge', emoji: '🥷', hp: 60, attack: 20, cooldown: 2,
-    description: 'Backstab-Bonus alle 3 Ticks: nächster Angriff +60% Schaden. Schneller Diagonal-Springer.',
+    description: 'Hält max. Abstand. Alle 5 Ticks: teleportiert sich neben einen Gegner, schlägt zu und teleportiert zurück.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
