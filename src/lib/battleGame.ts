@@ -747,7 +747,7 @@ function bfsFirstStep(unit: Unit, target: Unit, grid: Cell[][]): Position | null
     if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
     const cell = grid[nr][nc];
     if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) continue;
-    if (!canFly && cell.terrain === 'water') continue;
+    if (!canFly && !canSwim && cell.terrain === 'water') continue;
     if (!canFly && cell.unit?.dead) continue;
     const key = `${nr},${nc}`;
     if (visited.has(key)) continue;
