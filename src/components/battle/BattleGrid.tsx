@@ -424,11 +424,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
     if (newImpulses.length > 0) {
       setImpulseEffects(prev => [...prev, ...newImpulses]);
-      setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 900);
+      setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 1500);
     }
     if (impulsePushedIdsBatch.length > 0) {
       setImpulsePushedIds(new Set(impulsePushedIdsBatch));
-      setTimeout(() => setImpulsePushedIds(new Set()), 950);
+      setTimeout(() => setImpulsePushedIds(new Set()), 1700);
     }
 
     // --- Shadowblade teleport puffs ---
