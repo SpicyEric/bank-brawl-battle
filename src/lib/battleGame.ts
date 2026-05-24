@@ -598,12 +598,13 @@ export function getMoveCells(unit: Unit, grid: Cell[][]): Position[] {
   const def = UNIT_DEFS[unit.type];
   const canFly = unit.type === 'dragon';
   const canJump = unit.type === 'rider'; // rider jumps over obstacles like a chess knight
+  const canSwim = unit.type === 'waterwalker';
   return def.movePattern
     .map(p => ({ row: unit.row + p.row, col: unit.col + p.col }))
     .filter(p =>
       p.row >= 0 && p.row < GRID_SIZE && p.col >= 0 && p.col < GRID_SIZE &&
       (!grid[p.row][p.col].unit || grid[p.row][p.col].unit!.id === unit.id) &&
-      (canFly || canJump || grid[p.row][p.col].terrain !== 'water') &&
+      (canFly || canJump || canSwim || grid[p.row][p.col].terrain !== 'water') &&
       (canFly || canJump || !grid[p.row][p.col].unit?.dead)
     );
 }
