@@ -874,6 +874,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           let dmg = calcDamage(unit, target, newGrid);
+          // Frozen attacker: reduced damage
+          if (isFrozenNow) dmg = Math.round(dmg * frozenDmgMul);
           // Apply morale damage modifier + shield wall
           if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
           else {
@@ -887,10 +889,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           // Rider: track last attacked for target-switching
           if (unit.type === 'rider') unit.lastAttackedId = target.id;
 
-          // Frost: 50% chance to freeze the target for 1 turn
+          // Frost: 50% chance to freeze the target for 3 ticks at 50% damage
           let didFreeze = false;
           if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
-            target.frozen = 1;
+            target.frozen = 3;
+            target.frozenDmgMul = 0.5;
             didFreeze = true;
           }
 
