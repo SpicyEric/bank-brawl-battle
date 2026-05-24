@@ -505,7 +505,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
       </div>
 
       {inspectUnit && (
-        <UnitInfoModal unitType={inspectUnit} onClose={() => setInspectUnit(null)} />
+        <UnitInfoModal unitType={inspectUnit.type} colorOverride={inspectUnit.color} onClose={() => setInspectUnit(null)} />
       )}
       {/* Opponent disconnect overlay */}
       {game.opponentLeft && (
