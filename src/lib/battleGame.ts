@@ -53,6 +53,8 @@ export interface Unit {
   parentClonerId?: string; // for clones: id of the cloner that spawned them
   impulseTimer?: number; // mage shockwave cooldown countdown
   frostNovaTimer?: number; // frost mage 3x3 nova cooldown countdown
+  hornTimer?: number; // rider horn ability cooldown countdown (9 ticks)
+  hornBuff?: number; // ticks remaining of +50% damage from rider horn
   phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
   isPhantom?: boolean; // doppelganger phantom flag
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
