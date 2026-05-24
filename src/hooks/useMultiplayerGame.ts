@@ -4,7 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
-  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
+  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, effectiveCooldown, tickTerrainHeals,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
