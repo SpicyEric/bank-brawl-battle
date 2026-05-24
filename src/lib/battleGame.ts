@@ -1015,7 +1015,11 @@ function hasAdjacentFriendlyTank(defender: Unit, grid: Cell[][]): boolean {
 // Calculate damage with counter system + terrain bonuses + shield aura
 export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): number {
   
-  const baseAtk = attacker.attack + (attacker.judgeBonus || 0);
+  let baseAtk = attacker.attack + (attacker.judgeBonus || 0);
+  // Assassin: +4 damage against enemies below 50% HP
+  if (attacker.type === 'assassin' && defender.hp < defender.maxHp * 0.5) {
+    baseAtk += 4;
+  }
   let dmg = baseAtk * (0.95 + Math.random() * 0.1);
 
   const aColor = getUnitColor(attacker);
