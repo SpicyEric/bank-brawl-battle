@@ -792,6 +792,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
+        // Dragon mid fire-spin: skip movement/attack entirely.
+        if (unit.type === 'dragon' && (unit.spinTicksLeft ?? 0) > 0) continue;
         // Frozen: skip movement, attack at reduced dmg (50% default, 30% from frost nova)
         const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
         const frozenDmgMul = unit.frozenDmgMul ?? 0.5;
