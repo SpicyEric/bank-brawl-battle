@@ -1581,6 +1581,56 @@ export function tickMageImpulse(
   }
 }
 
+/** Frost Nova: every 7 ticks each frost mage freezes ALL enemies in 3×3 around itself
+ *  for 5 ticks at 30% damage. Pure crowd control, no damage. */
+export function tickFrostNova(
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  logs: string[],
+): void {
+  const frosts = allUnits.filter(u => u.type === 'frost' && u.hp > 0 && !u.dead);
+  for (const f of frosts) {
+    if (f.frostNovaTimer === undefined || f.frostNovaTimer <= 0) f.frostNovaTimer = 7;
+    f.frostNovaTimer -= 1;
+    if (f.frostNovaTimer > 0) continue;
+    f.frostNovaTimer = 7;
+
+    const aoeCells: { row: number; col: number }[] = [];
+    let frozenCount = 0;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const r = f.row + dr, c = f.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      aoeCells.push({ row: r, col: c });
+      if (dr === 0 && dc === 0) continue;
+      const u = grid[r][c].unit;
+      if (!u || u.hp <= 0 || u.dead) continue;
+      if (u.team === f.team) continue;
+      u.frozen = 5;
+      u.frozenDmgMul = 0.3;
+      frozenCount += 1;
+    }
+
+    events.push({
+      type: 'frostNova',
+      attackerId: f.id,
+      attackerRow: f.row,
+      attackerCol: f.col,
+      attackerEmoji: '❄️',
+      attackerType: 'frost',
+      targetId: f.id,
+      targetRow: f.row,
+      targetCol: f.col,
+      damage: 0,
+      isStrong: false,
+      isWeak: false,
+      isRanged: false,
+      aoeCells,
+    });
+    logs.push(`❄️ ${f.team === 'player' ? '👤' : '💀'} Frost-Nova! (${frozenCount} eingefroren)`);
+  }
+}
+
 /** Shadowblade per-tick behavior:
  *  - keeps maximum distance from enemies via diagonal jumps,
  *  - every 5 ticks teleports adjacent to chosen enemy and attacks,
