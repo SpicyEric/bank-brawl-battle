@@ -51,6 +51,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [chainEffects, setChainEffects] = useState<ChainEffect[]>([]);
   const [impulseEffects, setImpulseEffects] = useState<ImpulseEffect[]>([]);
   const impulseCounter = useRef(0);
+  const [teleportEffects, setTeleportEffects] = useState<TeleportEffect[]>([]);
+  const teleportCounter = useRef(0);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
