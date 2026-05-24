@@ -538,7 +538,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                           : 'drop-shadow(0 0 4px hsl(0, 72%, 55%)) drop-shadow(0 0 8px hsl(0, 72%, 55%))',
                     }}
                   >
-                    {unit.type && <UnitGlyph type={unit.type} className="inline-block w-5 h-5 sm:w-6 sm:h-6 align-middle" />}
+                    {unit.type && <UnitGlyph type={unit.type} isClone={unit.isClone} className="inline-block w-5 h-5 sm:w-6 sm:h-6 align-middle" />}
                     {isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🧊</span>}
                     {isWebbed && !isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🕸️</span>}
                     {isBurning && !isFrozen && !isWebbed && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🔥</span>}

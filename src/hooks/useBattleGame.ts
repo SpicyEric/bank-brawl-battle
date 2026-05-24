@@ -928,10 +928,27 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       }
 
       const alive = allUnits.filter(u => u.hp > 0);
-      const pAlive = alive.filter(u => u.team === 'player');
-      const eAlive = alive.filter(u => u.team === 'enemy');
-      setPlayerUnits(pAlive);
-      setEnemyUnits(eAlive);
+      const pAliveAll = alive.filter(u => u.team === 'player');
+      const eAliveAll = alive.filter(u => u.team === 'enemy');
+      // Clones don't count for win evaluation
+      const pAlive = pAliveAll.filter(u => !u.isClone);
+      const eAlive = eAliveAll.filter(u => !u.isClone);
+
+      const roundEnding = eAlive.length === 0 || pAlive.length === 0;
+      if (roundEnding) {
+        // Instantly despawn all clones from the board
+        for (let r = 0; r < GRID_SIZE; r++) {
+          for (let c = 0; c < GRID_SIZE; c++) {
+            const cu = newGrid[r][c].unit;
+            if (cu?.isClone) newGrid[r][c].unit = undefined;
+          }
+        }
+        setPlayerUnits(pAlive);
+        setEnemyUnits(eAlive);
+      } else {
+        setPlayerUnits(pAliveAll);
+        setEnemyUnits(eAliveAll);
+      }
 
       if (eAlive.length === 0) {
         const newPS = playerScoreRef.current + 1;
@@ -992,8 +1009,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     if (battleRef.current) clearInterval(battleRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
 
-    const pAlive = playerUnits.filter(u => u.hp > 0 && !u.dead);
-    const eAlive = enemyUnits.filter(u => u.hp > 0 && !u.dead);
+    const pAlive = playerUnits.filter(u => u.hp > 0 && !u.dead && !u.isClone);
+    const eAlive = enemyUnits.filter(u => u.hp > 0 && !u.dead && !u.isClone);
 
     if (pAlive.length > eAlive.length) {
       const newPS = playerScoreRef.current + 1;
