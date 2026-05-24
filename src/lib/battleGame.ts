@@ -1412,8 +1412,8 @@ export function shouldSkipMove(unit: Unit): boolean {
   return false;
 }
 
-/** Cloner spawns a clone every 5 ticks in an adjacent empty cell.
- *  Clones (isClone=true) behave as normal aggressive units, cannot spawn further clones. */
+/** Cloner spawns a clone every 6 ticks in an adjacent empty cell.
+ *  Max 3 living clones per cloner. Clones have 5 HP and 3 attack. */
 export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[]): Unit[] {
   const spawned: Unit[] = [];
   const cloners = allUnits.filter(u => u.type === 'cloner' && !u.isClone && u.hp > 0 && !u.dead);
@@ -1422,9 +1422,14 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
     { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
   ];
   for (const c of cloners) {
-    if (c.cloneTimer === undefined || c.cloneTimer <= 0) c.cloneTimer = 5;
+    if (c.cloneTimer === undefined || c.cloneTimer <= 0) c.cloneTimer = 6;
     c.cloneTimer -= 1;
     if (c.cloneTimer > 0) continue;
+    const aliveClones = allUnits.filter(u => u.isClone && u.parentClonerId === c.id && u.hp > 0 && !u.dead).length;
+    if (aliveClones >= 3) {
+      c.cloneTimer = 6;
+      continue;
+    }
     for (const o of offsets) {
       const r = c.row + o.r, col = c.col + o.c;
       if (r < 0 || r >= GRID_SIZE || col < 0 || col >= GRID_SIZE) continue;
@@ -1434,10 +1439,11 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
         ...c,
         id: crypto.randomUUID(),
         row: r, col,
-        hp: 10,
-        maxHp: 10,
-        attack: 6,
+        hp: 5,
+        maxHp: 5,
+        attack: 3,
         isClone: true,
+        parentClonerId: c.id,
         cloneTimer: undefined,
         skipNextMove: false,
         cooldown: 0,
@@ -1454,7 +1460,7 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
       logs.push(`🧬 Kloner spawnt einen Klon!`);
       break;
     }
-    c.cloneTimer = 5;
+    c.cloneTimer = 6;
   }
   allUnits.push(...spawned);
   return spawned;
