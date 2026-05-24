@@ -630,6 +630,11 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   if (unit.type === 'sniper') {
     return [...enemies].sort((a, b) => a.hp - b.hp)[0];
   }
+  // === ASSASSIN: ALWAYS hunts the globally lowest-HP enemy. Re-evaluates every tick.
+  //     Tiebreaker: nearest. No lock-on, no column bias, no tank-aggro detour. ===
+  if (unit.type === 'assassin') {
+    return [...enemies].sort((a, b) => a.hp - b.hp || distance(unit, a) - distance(unit, b))[0];
+  }
   // === LAMB (own lamb): taunts the strongest enemy ===
   if (unit.type === 'lamb') {
     return [...enemies].sort((a, b) => b.attack * b.hp - a.attack * a.hp)[0];
@@ -669,19 +674,11 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     if (locked) return locked;
   }
 
-  // === ASSASSIN / FROST / MAGE: switch target after every attack ===
-  if ((unit.type === 'assassin' || unit.type === 'frost' || unit.type === 'mage') &&
+  // === FROST / MAGE: switch target after every attack ===
+  if ((unit.type === 'frost' || unit.type === 'mage') &&
       unit.lastAttackedId && enemies.length > 1) {
     const others = enemies.filter(e => e.id !== unit.lastAttackedId);
     if (others.length > 0) {
-      // Assassin: prefer wounded among other targets; frost/mage: nearest
-      if (unit.type === 'assassin') {
-        const wounded = others.filter(e => e.hp < e.maxHp * 0.7);
-        if (wounded.length > 0) {
-          wounded.sort((a, b) => a.hp - b.hp);
-          return wounded[0];
-        }
-      }
       others.sort((a, b) => distance(unit, a) - distance(unit, b));
       return others[0];
     }
