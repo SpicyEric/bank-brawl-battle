@@ -32,7 +32,7 @@ interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
 interface ChainEffect { id: string; cells: { row: number; col: number }[]; color: 'lightning' | 'chaindancer' }
-interface ImpulseEffect { id: string; row: number; col: number }
+interface ImpulseEffect { id: string; row: number; col: number; kind: 'push' | 'pull' }
 interface FrostNovaEffect { id: string; row: number; col: number }
 interface RiderHornFlash { id: string; row: number; col: number; kind: 'inner' | 'outer' }
 interface DragonSpinFlame { id: string; row: number; col: number; delayMs: number }
