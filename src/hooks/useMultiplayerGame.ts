@@ -5,6 +5,7 @@ import {
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
+  handleTerrainSeeker, isImmuneToFreeze, effectiveCooldown, tickTerrainHeals,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
@@ -774,6 +775,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       tickMageImpulse(allUnits, newGrid, events, logs);
       // Frost Nova: every 7 ticks freeze enemies in 3x3 for 5 ticks at 30% dmg
       tickFrostNova(allUnits, newGrid, events, logs);
+      // Terrain regen: waterwalker heals on water
+      tickTerrainHeals(allUnits, newGrid, logs);
       const currentTurn = turnCount;
       const acting = allUnits.filter(u => {
         if (u.hp <= 0) return false;
@@ -791,6 +794,15 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           if ((unit.frozen || 0) <= 0) unit.frozenDmgMul = undefined;
         }
         unit.cooldown = Math.max(0, unit.cooldown - 1);
+
+        // === Terrain seekers (ranger / mountaineer / waterwalker) ===
+        let seekerHolds = false;
+        if (!isFrozenNow) {
+          const seek = handleTerrainSeeker(unit, newGrid, allUnits);
+          if (seek === 'moved' || seek === 'wait') continue;
+          if (seek === 'on_terrain') seekerHolds = true;
+        }
+
 
         // Shadowblade: custom teleport-strike behavior (every 5 ticks)
         if (unit.type === 'shadowblade') {
@@ -850,7 +862,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
         if (!canAttack(unit, target)) {
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const skipMove = isFrozenNow || shouldSkipMove(unit);
+          const skipMove = isFrozenNow || seekerHolds || shouldSkipMove(unit);
           const newPos = skipMove ? { row: unit.row, col: unit.col } : moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             leaveArsonistTrail(newGrid, unit);
@@ -859,9 +871,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             newGrid[unit.row][unit.col].unit = unit;
           }
         } else {
-          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen)
+          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen / seeker holding)
           unit.stuckTurns = 0;
-          if (!isFrozenNow) {
+          if (!isFrozenNow && !seekerHolds) {
             const kitePos = moveToward(unit, target, newGrid, allUnits);
             if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
               leaveArsonistTrail(newGrid, unit);
@@ -871,6 +883,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             }
           }
         }
+
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           let dmg = calcDamage(unit, target, newGrid);
@@ -883,15 +896,15 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
           }
           target.hp = Math.max(0, target.hp - dmg);
-          unit.cooldown = unit.maxCooldown;
+          unit.cooldown = effectiveCooldown(unit, newGrid);
           // Warrior: track last attacked for lock-on behavior
           if (unit.type === 'warrior') unit.lastAttackedId = target.id;
           // Rider: track last attacked for target-switching
           if (unit.type === 'rider') unit.lastAttackedId = target.id;
 
-          // Frost: 50% chance to freeze the target for 3 ticks at 50% damage
+          // Frost: 50% chance to freeze the target for 3 ticks at 50% damage (skip immune)
           let didFreeze = false;
-          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
+          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(target, newGrid)) {
             target.frozen = 3;
             target.frozenDmgMul = 0.5;
             didFreeze = true;

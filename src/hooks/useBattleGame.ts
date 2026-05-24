@@ -8,6 +8,7 @@ import {
   getActivationTurn,
   applyPostAttackEffects, applyDeathEffects, processLavaTick, processGhostTick, shouldSkipMove,
   spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, tickFrostNova, handleShadowbladeTick, leaveArsonistTrail,
+  handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
@@ -561,6 +562,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       // === Burn DoT processing (Brandstifter / Arsonist) ===
       for (const u of allUnits) {
         if (!u.burning || u.burning.length === 0 || u.hp <= 0) continue;
+        // Mountaineer on hill is immune to fire damage
+        if (isImmuneToFire(u, newGrid)) {
+          u.burning = [];
+          continue;
+        }
         let totalBurn = 0;
         u.burning = u.burning.filter(b => {
           totalBurn += b.dmg;
@@ -586,6 +592,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       tickMageImpulse(allUnits, newGrid, events, logs);
       // === Frost Nova: every 7 ticks freeze enemies in 3x3 for 5 ticks at 30% dmg ===
       tickFrostNova(allUnits, newGrid, events, logs);
+      // === Terrain regen: waterwalker heals on water ===
+      tickTerrainHeals(allUnits, newGrid, logs);
 
 
 
@@ -606,6 +614,17 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         }
 
         unit.cooldown = Math.max(0, unit.cooldown - 1);
+
+        // === Terrain seekers (ranger / mountaineer / waterwalker) ===
+        // Single-minded: head to nearest matching tile, defend it, don't chase.
+        let seekerHolds = false;
+        if (!isFrozenNow) {
+          const seek = handleTerrainSeeker(unit, newGrid, allUnits);
+          if (seek === 'moved' || seek === 'wait') continue; // travelling or holding → no attack
+          if (seek === 'on_terrain') seekerHolds = true; // attack from here, never step off
+        }
+
+
 
         // Shadowblade: custom teleport-strike behavior (every 5 ticks)
         if (unit.type === 'shadowblade' && !isFrozenNow) {
@@ -681,7 +700,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         if (!canAttack(unit, target)) {
           // Track stuck turns for anti-stalemate
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const skipMove = isFrozenNow || shouldSkipMove(unit);
+          const skipMove = isFrozenNow || seekerHolds || shouldSkipMove(unit);
           const newPos = skipMove ? { row: unit.row, col: unit.col } : moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             // If tank, move bonded units first
@@ -695,9 +714,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             newGrid[unit.row][unit.col].unit = unit;
           }
         } else {
-          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen)
+          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen / seeker holding)
           unit.stuckTurns = 0;
-          if (!isFrozenNow) {
+          if (!isFrozenNow && !seekerHolds) {
             const kitePos = moveToward(unit, target, newGrid, allUnits);
             if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
               if (unit.type === 'tank') {
@@ -713,10 +732,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         }
 
 
+
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           // Phantoms (doppelganger phantom): completely invulnerable
           if (target.isPhantom && (target.phantom ?? 0) > 0) {
-            unit.cooldown = unit.maxCooldown;
+            unit.cooldown = effectiveCooldown(unit, newGrid);
             continue;
           }
           let dmg = calcDamage(unit, target, newGrid);
@@ -730,13 +750,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
           }
           target.hp = Math.max(0, target.hp - dmg);
-          unit.cooldown = unit.maxCooldown;
+          // Cooldown reset honors terrain bonuses (ranger=1 on forest, mountaineer=2 on hill)
+          unit.cooldown = effectiveCooldown(unit, newGrid);
           // Track last attacked target (used by targeting logic: lock-on for warrior/stormrunner/archer, switch for rider/assassin/frost/mage)
           unit.lastAttackedId = target.id;
 
-          // Frost: 50% chance to freeze target for 3 ticks at 50% damage
+          // Frost: 50% chance to freeze target for 3 ticks at 50% damage (skip immune)
           let didFreeze = false;
-          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
+          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(target, newGrid)) {
             target.frozen = 3;
             target.frozenDmgMul = 0.5;
             didFreeze = true;
@@ -764,10 +785,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             }
           }
 
-          // Arsonist: apply burning DoT stack (5 dmg / turn, 4 turns)
-          if (unit.type === 'arsonist' && target.hp > 0) {
+          // Arsonist: apply burning DoT stack (5 dmg / turn, 4 turns) – skip fire-immune
+          if (unit.type === 'arsonist' && target.hp > 0 && !isImmuneToFire(target, newGrid)) {
             target.burning = [...(target.burning || []), { dmg: 5, turns: 4 }];
           }
+
 
           // Judge: +8 ATK for each fallen ally — recalculated below at end of tick.
 

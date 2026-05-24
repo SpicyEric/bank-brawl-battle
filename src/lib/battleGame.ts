@@ -368,14 +368,14 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   ranger: {
     label: 'Waldläufer', emoji: '🪵', hp: 70, attack: 14, cooldown: 2,
-    description: 'Sucht aktiv Wälder auf und verteidigt sie (+100% Schaden im Wald). Bewegt sich in alle 8 Richtungen.',
+    description: 'Strebt zwanghaft ins nächste Waldfeld und verteidigt es. Auf Wald: 19 ATK, Cooldown 1. Ohne Waldfeld kämpft er normal.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   mountaineer: {
     label: 'Bergkrieger', emoji: '🪨', hp: 130, attack: 21, cooldown: 3,
-    description: 'Auf Hügeln: immun gegen Fernkampf-Schaden.',
+    description: 'Strebt zwanghaft auf den nächsten Hügel und belagert ihn. Auf Hügel: Cooldown 2, immun gegen Einfrieren und Feuerschaden. Ohne Hügel kämpft er normal.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
@@ -407,7 +407,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   waterwalker: {
     label: 'Wasserwandler', emoji: '🌊', hp: 85, attack: 19, cooldown: 2,
-    description: 'Strebt aktiv ins Wasser. Auf Wasser: -30% erlittener Schaden, bleibt stehen und verteidigt seinen Tümpel.',
+    description: 'Strebt zwanghaft in den nächsten Tümpel. Auf Wasser: -30% erlittener Schaden, regeneriert +3 HP pro Tick. Ohne Wasserfeld kämpft er normal.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
@@ -598,12 +598,13 @@ export function getMoveCells(unit: Unit, grid: Cell[][]): Position[] {
   const def = UNIT_DEFS[unit.type];
   const canFly = unit.type === 'dragon';
   const canJump = unit.type === 'rider'; // rider jumps over obstacles like a chess knight
+  const canSwim = unit.type === 'waterwalker';
   return def.movePattern
     .map(p => ({ row: unit.row + p.row, col: unit.col + p.col }))
     .filter(p =>
       p.row >= 0 && p.row < GRID_SIZE && p.col >= 0 && p.col < GRID_SIZE &&
       (!grid[p.row][p.col].unit || grid[p.row][p.col].unit!.id === unit.id) &&
-      (canFly || canJump || grid[p.row][p.col].terrain !== 'water') &&
+      (canFly || canJump || canSwim || grid[p.row][p.col].terrain !== 'water') &&
       (canFly || canJump || !grid[p.row][p.col].unit?.dead)
     );
 }
@@ -732,6 +733,7 @@ function couldAttackFrom(pos: Position, unitType: UnitType, target: Position): b
 // BFS to find shortest path to any cell from which unit can attack target
 function bfsFirstStep(unit: Unit, target: Unit, grid: Cell[][]): Position | null {
   const canFly = unit.type === 'dragon';
+  const canSwim = unit.type === 'waterwalker';
   const start = `${unit.row},${unit.col}`;
   const visited = new Set<string>([start]);
   // Queue: [row, col, firstStepRow, firstStepCol]
@@ -745,7 +747,7 @@ function bfsFirstStep(unit: Unit, target: Unit, grid: Cell[][]): Position | null
     if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
     const cell = grid[nr][nc];
     if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) continue;
-    if (!canFly && cell.terrain === 'water') continue;
+    if (!canFly && !canSwim && cell.terrain === 'water') continue;
     if (!canFly && cell.unit?.dead) continue;
     const key = `${nr},${nc}`;
     if (visited.has(key)) continue;
@@ -771,7 +773,7 @@ function bfsFirstStep(unit: Unit, target: Unit, grid: Cell[][]): Position | null
       if (visited.has(key)) continue;
       const cell = grid[nr][nc];
       if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) continue;
-      if (!canFly && cell.terrain === 'water') continue;
+      if (!canFly && !canSwim && cell.terrain === 'water') continue;
       if (!canFly && cell.unit?.dead) continue;
       visited.add(key);
       queue.push([nr, nc, fr, fc]);
@@ -1031,14 +1033,11 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // Forest bonus: defender in forest takes -20% damage
   if (defenderTerrain === 'forest') dmg *= 0.8;
 
-  // Ranger: +100% damage when standing in forest
-  if (attacker.type === 'ranger' && attackerTerrain === 'forest') dmg *= 2.0;
+  // Ranger: on a forest tile, effective ATK is 19 (base 14) → scale damage accordingly
+  if (attacker.type === 'ranger' && attackerTerrain === 'forest') dmg *= (19 / 14);
 
   // Waterwalker: -30% incoming damage on water
   if (defender.type === 'waterwalker' && defenderTerrain === 'water') dmg *= 0.7;
-
-  // Mountaineer: immune to ranged damage while on a hill
-  if (defender.type === 'mountaineer' && defenderTerrain === 'hill' && isRanged) dmg = 0;
 
   // Shield aura: defender adjacent to friendly tank takes -20% damage
   if (grid && hasAdjacentFriendlyTank(defender, grid)) dmg *= 0.8;
@@ -1283,7 +1282,7 @@ export function applyPostAttackEffects(
   // Icegolem: 25% chance to freeze melee attacker for 1 turn
   if (target.type === 'icegolem' && attacker.hp > 0 && Math.random() < 0.25) {
     const dist = Math.abs(attacker.row - target.row) + Math.abs(attacker.col - target.col);
-    if (dist <= 2) {
+    if (dist <= 2 && !isImmuneToFreeze(attacker, grid)) {
       attacker.frozen = Math.max(attacker.frozen || 0, 1);
       logs.push(`🧊 Eisgolem friert ${UNIT_DEFS[attacker.type].emoji} ein`);
     }
@@ -1375,7 +1374,7 @@ export function processLavaTick(grid: Cell[][], logs: string[]): void {
     const cell = grid[r][c];
     if (!cell.lavaTicks) continue;
     const u = cell.unit;
-    if (u && u.hp > 0 && !u.dead && u.team !== cell.lavaOwnerTeam) {
+    if (u && u.hp > 0 && !u.dead && u.team !== cell.lavaOwnerTeam && !isImmuneToFire(u, grid)) {
       u.hp = Math.max(0, u.hp - 8);
       logs.push(`🌋 Lava → ${UNIT_DEFS[u.type].emoji} 8${u.hp <= 0 ? ' ☠️' : ''}`);
       if (u.hp <= 0) (u as any).dead = true;
@@ -1396,6 +1395,111 @@ export function leaveArsonistTrail(grid: Cell[][], unit: Unit): void {
   if (!cell || cell.terrain === 'water') return;
   cell.lavaTicks = 3;
   cell.lavaOwnerTeam = unit.team;
+}
+
+// ============= TERRAIN SEEKERS (ranger / mountaineer / waterwalker) =============
+
+/** Returns the terrain a unit zealously seeks, or null if none. */
+export function getSeekTerrain(type: UnitType): TerrainType | null {
+  if (type === 'ranger') return 'forest';
+  if (type === 'mountaineer') return 'hill';
+  if (type === 'waterwalker') return 'water';
+  return null;
+}
+
+/** Mountaineer on hill is immune to freezing. */
+export function isImmuneToFreeze(unit: Unit, grid: Cell[][]): boolean {
+  return unit.type === 'mountaineer' && grid[unit.row]?.[unit.col]?.terrain === 'hill';
+}
+
+/** Mountaineer on hill is immune to fire / lava / burning DoT. */
+export function isImmuneToFire(unit: Unit, grid: Cell[][]): boolean {
+  return unit.type === 'mountaineer' && grid[unit.row]?.[unit.col]?.terrain === 'hill';
+}
+
+/** Effective cooldown considering terrain bonuses (ranger forest=1, mountaineer hill=2). */
+export function effectiveCooldown(unit: Unit, grid: Cell[][]): number {
+  const t = grid[unit.row]?.[unit.col]?.terrain;
+  if (unit.type === 'ranger' && t === 'forest') return 1;
+  if (unit.type === 'mountaineer' && t === 'hill') return 2;
+  return unit.maxCooldown;
+}
+
+export type SeekerResult = 'normal' | 'on_terrain' | 'moved' | 'wait';
+
+/** Move a terrain-seeker one step toward the nearest free matching terrain tile.
+ *  Returns:
+ *   - 'normal'      → no seek behavior (no terrain of that type exists, or unit is not a seeker)
+ *   - 'on_terrain'  → already on a matching tile, hand off to normal attack logic (no chasing)
+ *   - 'moved'       → moved this tick; do NOT attack (single-minded travel)
+ *   - 'wait'        → all matching tiles occupied or no path; hold position, no attack
+ */
+export function handleTerrainSeeker(unit: Unit, grid: Cell[][], _allUnits: Unit[]): SeekerResult {
+  const terrain = getSeekTerrain(unit.type);
+  if (!terrain) return 'normal';
+
+  // Collect all matching tiles
+  const tiles: { row: number; col: number; occupiedByOther: boolean }[] = [];
+  for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+    if (grid[r][c].terrain !== terrain) continue;
+    const occ = grid[r][c].unit;
+    tiles.push({ row: r, col: c, occupiedByOther: !!occ && occ.id !== unit.id && !occ.dead });
+  }
+  if (tiles.length === 0) return 'normal';
+
+  // Already standing on matching terrain → defend in place
+  if (grid[unit.row][unit.col].terrain === terrain) return 'on_terrain';
+
+  // Pick nearest free tile
+  const free = tiles.filter(t => !t.occupiedByOther);
+  if (free.length === 0) return 'wait';
+  free.sort((a, b) => distance(unit, a) - distance(unit, b));
+  const goal = free[0];
+
+  const possibleMoves = getMoveCells(unit, grid);
+  if (possibleMoves.length === 0) return 'wait';
+
+  // Prefer a direct move that lands ON the goal tile
+  const direct = possibleMoves.find(p => p.row === goal.row && p.col === goal.col);
+  let newPos: Position | null = direct ?? null;
+
+  if (!newPos) {
+    // Use BFS toward goal (fake target Unit-shape: only row/col matter)
+    const fakeTarget = { row: goal.row, col: goal.col, id: '__seek__', team: unit.team } as Unit;
+    const step = bfsFirstStep(unit, fakeTarget, grid);
+    if (step) {
+      const valid = possibleMoves.find(p => p.row === step.row && p.col === step.col);
+      if (valid) newPos = valid;
+    }
+    if (!newPos) {
+      // Fallback greedy: move that minimizes distance to goal
+      const sorted = [...possibleMoves].sort((a, b) => distance(a, goal) - distance(b, goal));
+      newPos = sorted[0];
+    }
+  }
+
+  if (!newPos || (newPos.row === unit.row && newPos.col === unit.col)) return 'wait';
+
+  // Commit the move on the grid
+  grid[unit.row][unit.col].unit = null;
+  unit.row = newPos.row;
+  unit.col = newPos.col;
+  grid[unit.row][unit.col].unit = unit;
+  return 'moved';
+}
+
+/** Waterwalker: regenerate +3 HP per tick while standing on water. */
+export function tickTerrainHeals(allUnits: Unit[], grid: Cell[][], logs: string[]): void {
+  for (const u of allUnits) {
+    if (u.hp <= 0 || (u as any).dead) continue;
+    if (u.type === 'waterwalker' && grid[u.row]?.[u.col]?.terrain === 'water' && u.hp < u.maxHp) {
+      const heal = Math.min(3, u.maxHp - u.hp);
+      if (heal > 0) {
+        u.hp += heal;
+        logs.push(`🌊 Wasserwandler regeneriert +${heal} ❤️`);
+      }
+    }
+  }
 }
 
 /** Tick down banshee revival timers; revive at full HP when timer hits 0. */
@@ -1606,6 +1710,7 @@ export function tickFrostNova(
       const u = grid[r][c].unit;
       if (!u || u.hp <= 0 || u.dead) continue;
       if (u.team === f.team) continue;
+      if (isImmuneToFreeze(u, grid)) continue;
       u.frozen = 5;
       u.frozenDmgMul = 0.3;
       frozenCount += 1;
