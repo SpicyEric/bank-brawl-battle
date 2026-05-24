@@ -1122,7 +1122,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       setPhase('place_player');
     } else {
       const terrainGrid = generateTerrain(createEmptyGrid());
-      const aiMax = getMaxUnits(enemyScore, playerScore);
+      const aiMax = getMaxUnits(enemyScore, playerScore, roundNumber + 1);
       const aiPlacements = generateAIPlacement([], aiMax, terrainGrid, difficulty, enemyBannedUnits);
       const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
       for (const e of enemies) terrainGrid[e.row][e.col].unit = e;
