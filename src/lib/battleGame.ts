@@ -397,7 +397,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   magnetiker: {
     label: 'Magnetiker', emoji: '🧲', hp: 80, attack: 12, cooldown: 2,
-    description: 'Zieht nach jedem Angriff alle Feinde im Umkreis 2 ein Feld näher.',
+    description: 'Alle 4 Ticks: zieht alle Feinde im 7×7-Umkreis maximal nah an sich heran (bis auf 1 Feld).',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
