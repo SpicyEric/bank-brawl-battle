@@ -46,7 +46,7 @@ export function UnitPicker({
   roster, selectedSlot = null, onSelectSlot, bannedSlots = [], placedSlots = [],
   onDragHover, onDragDrop,
 }: UnitPickerProps) {
-  const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
+  const [infoUnit, setInfoUnit] = useState<{ type: UnitType; color?: ColorGroup } | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
   const dragStart = useRef<{ x: number; y: number; idx: number; type: UnitType } | null>(null);
