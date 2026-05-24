@@ -55,6 +55,7 @@ export interface Unit {
   frostNovaTimer?: number; // frost mage 3x3 nova cooldown countdown
   hornTimer?: number; // rider horn ability cooldown countdown (9 ticks)
   hornBuff?: number; // ticks remaining of +50% damage from rider horn
+  volleyTimer?: number; // archer 8-direction volley cooldown countdown (4 ticks)
   phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
   isPhantom?: boolean; // doppelganger phantom flag
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
