@@ -484,12 +484,17 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     for (const evt of events) {
       if (evt.type !== 'dragonSpin') continue;
       const cells = evt.spinCells || [];
+      const beamOrder = evt.spinBeamOrder ?? 0;
+      // Whip-swing pacing: beams sweep fast within a tick, cells inside a beam
+      // ignite outward almost instantly.
+      const BEAM_GAP = 70; // ms between consecutive beams
+      const CELL_GAP = 30; // ms between cells along a beam
       cells.forEach((c, i) => {
         dragonSpinCounter.current += 1;
         newSpinFlames.push({
           id: `dspin-${dragonSpinCounter.current}`,
           row: c.row, col: c.col,
-          delayMs: i * 110,
+          delayMs: beamOrder * BEAM_GAP + i * CELL_GAP,
         });
       });
     }
