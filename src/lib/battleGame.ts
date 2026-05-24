@@ -1509,6 +1509,9 @@ export function tickMageImpulse(
       return db - da;
     });
 
+    const pushedIds: string[] = [];
+
+
     for (const t of targets) {
       const sr = Math.sign(t.row - m.row);
       const sc = Math.sign(t.col - m.col);
