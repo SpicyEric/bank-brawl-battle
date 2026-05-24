@@ -40,7 +40,9 @@ export interface Unit {
   skipNextMove?: boolean; // icegolem: alternate-turn movement
   isClone?: boolean; // spawned by cloner; clones cannot spawn more clones
   cloneTimer?: number; // cloner spawn cooldown countdown
+  clonesSpawnedTotal?: number; // lifetime total clones this cloner has spawned (max 3)
   parentClonerId?: string; // for clones: id of the cloner that spawned them
+  impulseTimer?: number; // mage shockwave cooldown countdown
   phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
   isPhantom?: boolean; // doppelganger phantom flag
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
