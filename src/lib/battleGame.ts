@@ -1304,10 +1304,10 @@ export function applyPostAttackEffects(
     }
   }
 
-  // Spiderqueen: 35% chance to web target for 3 turns (separate field, distinct visual)
-  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.35) {
-    target.webbed = Math.max(target.webbed || 0, 3);
-    logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} 3 Runden gefangen`);
+  // Spiderqueen: 25% chance to web target for 5 ticks (no move, no attack at all)
+  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.25) {
+    target.webbed = Math.max(target.webbed || 0, 5);
+    logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} 5 Ticks gefangen`);
   }
 
   // Magnetiker pull is no longer per-attack — handled by tickMagnetPull every 4 ticks.
