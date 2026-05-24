@@ -963,11 +963,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           applyPostAttackEffects(unit, target, dmg, newGrid, logs);
 
           if (target.hp <= 0) {
-            const stillAlive = applyDeathEffects(target, allUnits, newGrid, logs);
+            const stillAlive = applyDeathEffects(target, allUnits, newGrid, logs, events);
             if (!stillAlive) (target as any).dead = true;
           }
           if (unit.hp <= 0) {
-            const stillAlive = applyDeathEffects(unit, allUnits, newGrid, logs);
+            const stillAlive = applyDeathEffects(unit, allUnits, newGrid, logs, events);
             if (!stillAlive) (unit as any).dead = true;
           }
         }
