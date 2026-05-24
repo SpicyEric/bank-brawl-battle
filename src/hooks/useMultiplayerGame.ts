@@ -394,7 +394,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     if (phase !== 'place_player' || !isMyTurnToPlace || !selectedUnit) return;
     if (playerBannedUnits.includes(selectedUnit)) return; // Fatigue ban
     if (!myRows.includes(row)) return;
-    if (playerUnits.length >= BASE_UNITS) return;
+    if (playerUnits.length >= Math.min(roundNumber, BASE_UNITS)) return;
     if (grid[row][col].unit) return;
     if (grid[row][col].terrain === 'water') return;
 
