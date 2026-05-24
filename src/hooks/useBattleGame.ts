@@ -615,6 +615,15 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
 
         unit.cooldown = Math.max(0, unit.cooldown - 1);
 
+        // === Terrain seekers (ranger / mountaineer / waterwalker) ===
+        // Single-minded: head to nearest matching tile, defend it, don't chase.
+        if (!isFrozenNow) {
+          const seek = handleTerrainSeeker(unit, newGrid, allUnits);
+          if (seek === 'moved' || seek === 'wait') continue; // travelling or holding → no attack
+          // 'on_terrain' or 'normal' → fall through to normal logic below
+        }
+
+
         // Shadowblade: custom teleport-strike behavior (every 5 ticks)
         if (unit.type === 'shadowblade' && !isFrozenNow) {
           handleShadowbladeTick(unit, allUnits, newGrid, events, logs, (atk, tgt, dmg) => {
