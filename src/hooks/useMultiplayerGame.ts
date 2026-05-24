@@ -4,7 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
-  MULTI_PLACE_TIME_LIMIT,
+  MULTI_PLACE_TIME_LIMIT, getMaxUnits,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
@@ -394,7 +394,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     if (phase !== 'place_player' || !isMyTurnToPlace || !selectedUnit) return;
     if (playerBannedUnits.includes(selectedUnit)) return; // Fatigue ban
     if (!myRows.includes(row)) return;
-    if (playerUnits.length >= Math.min(roundNumber, BASE_UNITS)) return;
+    if (playerUnits.length >= getMaxUnits(playerScore, enemyScore, roundNumber)) return;
     if (grid[row][col].unit) return;
     if (grid[row][col].terrain === 'water') return;
 
@@ -1084,8 +1084,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     playerUnits, enemyUnits, turnCount, battleLog, battleEvents, battleTimer,
     playerScore, enemyScore, roundNumber,
     playerStarts: true,
-    playerMaxUnits: Math.min(roundNumber, BASE_UNITS),
-    enemyMaxUnits: Math.min(roundNumber, BASE_UNITS),
+    playerMaxUnits: getMaxUnits(playerScore, enemyScore, roundNumber),
+    enemyMaxUnits: getMaxUnits(playerScore, enemyScore, roundNumber),
     gameOver, gameWon, gameDraw: false,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
