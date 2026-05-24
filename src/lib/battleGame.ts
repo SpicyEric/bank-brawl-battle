@@ -1393,6 +1393,15 @@ export function processGhostTick(units: Unit[], grid: Cell[][], logs: string[]):
 
 /** Icegolem alternates movement; returns true if this unit should skip its move this tick. */
 export function shouldSkipMove(unit: Unit): boolean {
+  if (unit.type === 'cloner' && !unit.isClone) {
+    // Cloner moves every 2nd tick
+    if (unit.skipNextMove) {
+      unit.skipNextMove = false;
+      return true;
+    }
+    unit.skipNextMove = true;
+    return false;
+  }
   if (unit.type !== 'icegolem') return false;
   if (unit.skipNextMove) {
     unit.skipNextMove = false;
@@ -1400,6 +1409,52 @@ export function shouldSkipMove(unit: Unit): boolean {
   }
   unit.skipNextMove = true;
   return false;
+}
+
+/** Cloner spawns a clone every 3 ticks in an adjacent empty cell.
+ *  Clones (isClone=true) behave as normal aggressive units, cannot spawn further clones. */
+export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[]): Unit[] {
+  const spawned: Unit[] = [];
+  const cloners = allUnits.filter(u => u.type === 'cloner' && !u.isClone && u.hp > 0 && !u.dead);
+  const offsets = [
+    { r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 },
+    { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
+  ];
+  for (const c of cloners) {
+    if (c.cloneTimer === undefined || c.cloneTimer <= 0) c.cloneTimer = 3;
+    c.cloneTimer -= 1;
+    if (c.cloneTimer > 0) continue;
+    for (const o of offsets) {
+      const r = c.row + o.r, col = c.col + o.c;
+      if (r < 0 || r >= GRID_SIZE || col < 0 || col >= GRID_SIZE) continue;
+      const cell = grid[r][col];
+      if (cell.unit || cell.terrain === 'water') continue;
+      const clone: Unit = {
+        ...c,
+        id: crypto.randomUUID(),
+        row: r, col,
+        hp: c.maxHp,
+        isClone: true,
+        cloneTimer: undefined,
+        skipNextMove: false,
+        cooldown: 0,
+        bondedToTankId: undefined,
+        movedWithTank: false,
+        slotIndex: undefined,
+        activationTurn: 0,
+        startRow: r,
+        stuckTurns: 0,
+        lastAttackedId: undefined,
+      };
+      grid[r][col].unit = clone;
+      spawned.push(clone);
+      logs.push(`🧬 Kloner spawnt einen Klon!`);
+      break;
+    }
+    c.cloneTimer = 3;
+  }
+  allUnits.push(...spawned);
+  return spawned;
 }
 
 /** Spawn a phantom duplicate next to each unspawned doppelganger.
