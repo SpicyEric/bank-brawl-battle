@@ -37,7 +37,9 @@ export interface Unit {
   movedWithTank?: boolean; // set to true when unit already moved this tick via tank formation
   burning?: { dmg: number; turns: number }[]; // active burn DoT stacks (arsonist)
   judgeBonus?: number; // extra ATK accrued by judge from fallen allies
-  ghost?: number; // banshee: turns remaining as ghost after death
+  ghost?: number; // banshee: visual purple glow flag (>0 = glow active)
+  reviveIn?: number; // banshee: ticks until revival from first death
+  bansheeRevived?: boolean; // banshee: already used its one revival
   firstAttackUsed?: boolean; // shadowblade: first attack bonus consumed
   teleportTimer?: number; // shadowblade: ticks until next teleport-strike
   homeRow?: number; // shadowblade: row to return to after teleport-strike
@@ -284,7 +286,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // Mechanics marked "(geplant)" in the description are currently approximated via stats/patterns.
   banshee: {
     label: 'Banshee', emoji: '👻', hp: 70, attack: 16, cooldown: 2,
-    description: 'Diagonale Bewegung. Bleibt nach dem Tod 3 Runden als Geist aktiv (+10 ATK).',
+    description: 'Diagonale Bewegung. Stirbt einmalig nur scheinbar – steht nach 3 Runden mit voller HP wieder auf (zweiter Tod ist endgültig).',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -1329,14 +1331,15 @@ export function applyPostAttackEffects(
 /** Apply death-trigger effects: mirror explosion, lamb heal, banshee ghost.
  *  Returns true if the unit should NOT be marked dead yet (e.g. banshee turned ghost). */
 export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[][], logs: string[]): boolean {
-  // Banshee → ghost form (3 turns +10 ATK)
-  if (deadUnit.type === 'banshee' && deadUnit.ghost === undefined) {
-    deadUnit.ghost = 3;
-    deadUnit.hp = 1;
-    (deadUnit as any).dead = false;
-    deadUnit.attack += 10;
-    logs.push(`👻 Banshee erhebt sich als Geist (+10 ATK, 3 Runden)`);
-    return true; // not really dead
+  // Banshee → fake death: appears dead & blocks the cell for 3 ticks, then revives at full HP.
+  // Second death is permanent.
+  if (deadUnit.type === 'banshee' && !deadUnit.bansheeRevived && deadUnit.reviveIn === undefined) {
+    deadUnit.reviveIn = 3;
+    deadUnit.hp = 0;
+    (deadUnit as any).dead = true;
+    deadUnit.ghost = 0; // no glow while "dead"
+    logs.push(`💀 Banshee gefallen – erhebt sich in 3 Runden wieder`);
+    return false; // truly dead for now (cell stays blocked); caller leaves dead=true
   }
   // Mirror death explosion: 20 dmg to adjacent enemies
   if (deadUnit.type === 'mirror') {
@@ -1393,19 +1396,22 @@ export function leaveArsonistTrail(grid: Cell[][], unit: Unit): void {
   cell.lavaOwnerTeam = unit.team;
 }
 
-/** Tick down banshee ghost timers; mark dead when ghost expires. */
-export function processGhostTick(units: Unit[], grid: Cell[][], logs: string[]): void {
-  for (const u of units) {
-    if (u.ghost !== undefined && u.ghost > 0) {
-      u.ghost -= 1;
-      if (u.ghost <= 0) {
-        u.hp = 0;
-        (u as any).dead = true;
-        if (grid[u.row]?.[u.col]?.unit?.id === u.id) {
-          grid[u.row][u.col].unit = u;
-        }
-        logs.push(`👻 Geist verblasst`);
-      }
+/** Tick down banshee revival timers; revive at full HP when timer hits 0. */
+export function processGhostTick(_units: Unit[], grid: Cell[][], logs: string[]): void {
+  // Scan the grid directly: dead banshees aren't in the allUnits list.
+  for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+    const u = grid[r]?.[c]?.unit;
+    if (!u || u.type !== 'banshee') continue;
+    if (u.reviveIn === undefined || u.reviveIn <= 0) continue;
+    u.reviveIn -= 1;
+    if (u.reviveIn <= 0) {
+      u.reviveIn = undefined;
+      u.hp = u.maxHp;
+      (u as any).dead = false;
+      u.bansheeRevived = true;
+      u.ghost = 999; // persistent purple glow
+      u.cooldown = 0;
+      logs.push(`👻 Banshee erwacht erneut!`);
     }
   }
 }

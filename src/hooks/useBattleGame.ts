@@ -961,8 +961,16 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       }
 
       const alive = allUnits.filter(u => u.hp > 0);
-      const pAliveAll = alive.filter(u => u.team === 'player');
-      const eAliveAll = alive.filter(u => u.team === 'enemy');
+      // Banshees in mid-revival count as alive (they appear dead on the grid but will return).
+      const revivingBanshees: Unit[] = [];
+      for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+        const cu = newGrid[r]?.[c]?.unit;
+        if (cu && cu.type === 'banshee' && cu.reviveIn !== undefined && cu.reviveIn > 0) {
+          revivingBanshees.push(cu);
+        }
+      }
+      const pAliveAll = [...alive.filter(u => u.team === 'player'), ...revivingBanshees.filter(u => u.team === 'player')];
+      const eAliveAll = [...alive.filter(u => u.team === 'enemy'), ...revivingBanshees.filter(u => u.team === 'enemy')];
       // Clones don't count for win evaluation
       const pAlive = pAliveAll.filter(u => !u.isClone);
       const eAlive = eAliveAll.filter(u => !u.isClone);
