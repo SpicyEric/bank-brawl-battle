@@ -655,7 +655,15 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                       }}
                     />
                   )}
-                  {/* Phantom shimmer overlay – doppelganger invulnerable phantom */}
+                  {/* Persistent bleed overlay – vampire bite DoT */}
+                  {isBleeding && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm animate-pulse"
+                      style={{
+                        background: 'radial-gradient(circle at 50% 35%, hsl(0 85% 45% / 0.45), hsl(0 90% 30% / 0.20) 70%, transparent 100%)',
+                        boxShadow: 'inset 0 -6px 8px hsl(0 90% 35% / 0.55)',
+                      }}
+                    />
+                  )}
                   {isPhantom && (
                     <div className="absolute inset-0 z-0 pointer-events-none rounded-sm animate-pulse"
                       style={{
