@@ -596,6 +596,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       tickRiderHorn(allUnits, newGrid, events, logs);
       // === Archer volley: every 4 ticks, 8-direction infinite-range arrow salvo ===
       tickArcherVolley(allUnits, newGrid, events, logs);
+      // === Dragon fire-spin: every 10 ticks, dragon spins 8 ticks firing beams ===
+      tickDragonSpin(allUnits, newGrid, events, logs);
       // === Terrain regen: waterwalker heals on water ===
       tickTerrainHeals(allUnits, newGrid, logs);
 
