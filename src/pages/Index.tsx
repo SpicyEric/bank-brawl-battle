@@ -52,7 +52,7 @@ function SinglePlayerGame() {
 function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; roster?: UnitType[] }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('battle');
-  const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
+  const [inspectUnit, setInspectUnit] = useState<{ type: UnitType; color?: ColorGroup } | null>(null);
   const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
   const [dragPreview, setDragPreview] = useState<{ row: number; col: number; type: UnitType } | null>(null);
   const [phaseOverlay, setPhaseOverlay] = useState<string | null>(null);
