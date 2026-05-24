@@ -224,6 +224,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     const freezeEvents: BattleEvent[] = [];
 
     for (const evt of events) {
+      // Impulse / teleport / spawn are visual-only and must not produce
+      // projectiles, damage popups or AOE fire overlays.
+      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn') continue;
       if (evt.type === 'heal') healEvents.push(evt);
       else if (evt.type === 'freeze') freezeEvents.push(evt);
       else if (evt.isRanged) rangedDamageEvents.push(evt);
@@ -421,11 +424,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
     if (newImpulses.length > 0) {
       setImpulseEffects(prev => [...prev, ...newImpulses]);
-      setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 900);
+      setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 1500);
     }
     if (impulsePushedIdsBatch.length > 0) {
       setImpulsePushedIds(new Set(impulsePushedIdsBatch));
-      setTimeout(() => setImpulsePushedIds(new Set()), 950);
+      setTimeout(() => setImpulsePushedIds(new Set()), 1700);
     }
 
     // --- Shadowblade teleport puffs ---
@@ -527,7 +530,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     transition: offset
                       ? 'none'
                       : (impulsePushedIds.has(unit.id)
-                          ? 'transform 900ms cubic-bezier(0.18, 0.9, 0.32, 1)'
+                          ? 'transform 1500ms cubic-bezier(0.12, 0.85, 0.25, 1)'
                           : 'transform 580ms ease-out'),
                   }}
                 >
