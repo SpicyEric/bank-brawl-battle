@@ -1301,28 +1301,8 @@ export function applyPostAttackEffects(
     logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} 3 Runden gefangen`);
   }
 
-  // Magnetiker: pull adjacent enemies one step closer after attack
-  if (attacker.type === 'magnetiker') {
-    for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
-      if (dr === 0 && dc === 0) continue;
-      if (Math.abs(dr) <= 1 && Math.abs(dc) <= 1) continue; // only pull from >1
-      const r = attacker.row + dr, c = attacker.col + dc;
-      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
-      const cu = grid[r][c].unit;
-      if (!cu || cu.team === attacker.team || cu.hp <= 0 || cu.dead) continue;
-      const sr = Math.sign(attacker.row - r);
-      const sc = Math.sign(attacker.col - c);
-      const nr = r + sr, nc = c + sc;
-      if (nr === attacker.row && nc === attacker.col) continue;
-      if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
-      if (grid[nr][nc].unit) continue;
-      if (grid[nr][nc].terrain === 'water' && cu.type !== 'waterwalker') continue;
-      grid[r][c].unit = null;
-      cu.row = nr; cu.col = nc;
-      grid[nr][nc].unit = cu;
-    }
-    logs.push(`🧲 Magnetiker zieht Feinde heran`);
-  }
+  // Magnetiker pull is no longer per-attack — handled by tickMagnetPull every 4 ticks.
+
 
   // Vulkanit: spawn lava in a 5-tile PLUS pattern on the target (center + 4 orthogonal), 3 ticks
   if (attacker.type === 'vulkanit') {
