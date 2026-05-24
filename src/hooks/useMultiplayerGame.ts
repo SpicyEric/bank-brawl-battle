@@ -783,7 +783,13 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
-        if (unit.frozen && unit.frozen > 0) { unit.frozen -= 1; continue; }
+        // Frozen: skip movement, attack at reduced dmg (50% default, 30% from frost nova)
+        const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
+        const frozenDmgMul = unit.frozenDmgMul ?? 0.5;
+        if (isFrozenNow) {
+          unit.frozen = (unit.frozen || 0) - 1;
+          if ((unit.frozen || 0) <= 0) unit.frozenDmgMul = undefined;
+        }
         unit.cooldown = Math.max(0, unit.cooldown - 1);
 
         // Shadowblade: custom teleport-strike behavior (every 5 ticks)
