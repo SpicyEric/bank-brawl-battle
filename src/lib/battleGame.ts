@@ -56,6 +56,10 @@ export interface Unit {
   hornTimer?: number; // rider horn ability cooldown countdown (9 ticks)
   hornBuff?: number; // ticks remaining of +50% damage from rider horn
   volleyTimer?: number; // archer 8-direction volley cooldown countdown (4 ticks)
+  spinTimer?: number; // dragon fire-spin cooldown countdown (10 ticks)
+  spinTicksLeft?: number; // dragon: ticks remaining in active fire spin (8 = just started)
+  spinDirIdx?: number; // dragon: current beam direction (0..7)
+  spinClockwise?: boolean; // dragon: rotation direction this spin
   phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
   isPhantom?: boolean; // doppelganger phantom flag
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
