@@ -487,8 +487,8 @@ export const ROUND_TIME_LIMIT = 45; // seconds
 export const PLACE_TIME_LIMIT = 15; // seconds for placement phase (difficulty 2+)
 export const MULTI_PLACE_TIME_LIMIT = 20; // seconds for multiplayer placement phase
 
-export const COUNTER_MULTIPLIER = 1.4;
-export const WEAKNESS_MULTIPLIER = 0.6;
+export const COUNTER_MULTIPLIER = 1.3;
+export const WEAKNESS_MULTIPLIER = 0.7;
 
 export function createEmptyGrid(): Cell[][] {
   return Array.from({ length: GRID_SIZE }, (_, row) =>
