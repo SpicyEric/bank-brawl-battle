@@ -420,6 +420,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       setImpulseEffects(prev => [...prev, ...newImpulses]);
       setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 900);
     }
+
+    // --- Shadowblade teleport puffs ---
+    const newTeleports: TeleportEffect[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'teleport') continue;
+      teleportCounter.current += 1;
+      newTeleports.push({ id: `tp-out-${teleportCounter.current}`, row: evt.attackerRow, col: evt.attackerCol, kind: 'out' });
+      teleportCounter.current += 1;
+      newTeleports.push({ id: `tp-in-${teleportCounter.current}`, row: evt.targetRow, col: evt.targetCol, kind: 'in' });
+    }
+    if (newTeleports.length > 0) {
+      setTeleportEffects(prev => [...prev, ...newTeleports]);
+      setTimeout(() => setTeleportEffects(prev => prev.filter(t => !newTeleports.find(nt => nt.id === t.id))), 700);
+    }
   };
 
   const cellSize = 100 / GRID_SIZE;
