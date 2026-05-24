@@ -229,7 +229,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     for (const evt of events) {
       // Impulse / teleport / spawn are visual-only and must not produce
       // projectiles, damage popups or AOE fire overlays.
-      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn') continue;
+      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn' || evt.type === 'frostNova') continue;
       if (evt.type === 'heal') healEvents.push(evt);
       else if (evt.type === 'freeze') freezeEvents.push(evt);
       else if (evt.isRanged) rangedDamageEvents.push(evt);
