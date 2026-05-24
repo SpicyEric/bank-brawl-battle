@@ -48,6 +48,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [healPopups, setHealPopups] = useState<HealPopup[]>([]);
   const [freezeEffects, setFreezeEffects] = useState<FreezeEffect[]>([]);
   const [chainEffects, setChainEffects] = useState<ChainEffect[]>([]);
+  const [impulseEffects, setImpulseEffects] = useState<ImpulseEffect[]>([]);
+  const impulseCounter = useRef(0);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
