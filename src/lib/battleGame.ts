@@ -1374,7 +1374,7 @@ export function processLavaTick(grid: Cell[][], logs: string[]): void {
     const cell = grid[r][c];
     if (!cell.lavaTicks) continue;
     const u = cell.unit;
-    if (u && u.hp > 0 && !u.dead && u.team !== cell.lavaOwnerTeam) {
+    if (u && u.hp > 0 && !u.dead && u.team !== cell.lavaOwnerTeam && !isImmuneToFire(u, grid)) {
       u.hp = Math.max(0, u.hp - 8);
       logs.push(`🌋 Lava → ${UNIT_DEFS[u.type].emoji} 8${u.hp <= 0 ? ' ☠️' : ''}`);
       if (u.hp <= 0) (u as any).dead = true;
