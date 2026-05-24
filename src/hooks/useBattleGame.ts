@@ -6,7 +6,7 @@ import {
   GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
-  applyPostAttackEffects, applyDeathEffects, processLavaTick, processGhostTick, shouldSkipMove,
+  applyPostAttackEffects, applyDeathEffects, applyMirrorReflect, processLavaTick, processGhostTick, shouldSkipMove,
   spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
 } from '@/lib/battleGame';
@@ -835,6 +835,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
               hit.add(cu.id);
               lightningChainCells.push({ row: cu.row, col: cu.col });
               logs.push(`⚡ Blitz → ${UNIT_DEFS[cu.type].emoji} ${chainDmg} (Kettenblitz ${Math.round(mult * 100)}%)`);
+              // Mirror reflects chain-lightning hops too.
+              applyMirrorReflect(unit, cu, chainDmg, logs);
               current = { row: cu.row, col: cu.col };
             }
           }
@@ -961,11 +963,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           applyPostAttackEffects(unit, target, dmg, newGrid, logs);
 
           if (target.hp <= 0) {
-            const stillAlive = applyDeathEffects(target, allUnits, newGrid, logs);
+            const stillAlive = applyDeathEffects(target, allUnits, newGrid, logs, events);
             if (!stillAlive) (target as any).dead = true;
           }
           if (unit.hp <= 0) {
-            const stillAlive = applyDeathEffects(unit, allUnits, newGrid, logs);
+            const stillAlive = applyDeathEffects(unit, allUnits, newGrid, logs, events);
             if (!stillAlive) (unit as any).dead = true;
           }
         }

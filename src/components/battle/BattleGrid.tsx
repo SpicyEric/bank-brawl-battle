@@ -55,6 +55,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [impulseEffects, setImpulseEffects] = useState<ImpulseEffect[]>([]);
   const [impulsePushedIds, setImpulsePushedIds] = useState<Set<string>>(new Set());
   const impulseCounter = useRef(0);
+  const [mirrorExplosions, setMirrorExplosions] = useState<{ id: string; row: number; col: number }[]>([]);
+  const mirrorExplosionCounter = useRef(0);
   const [teleportEffects, setTeleportEffects] = useState<TeleportEffect[]>([]);
   const teleportCounter = useRef(0);
   const [frostNovaEffects, setFrostNovaEffects] = useState<FrostNovaEffect[]>([]);
@@ -235,7 +237,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     for (const evt of events) {
       // Impulse / teleport / spawn are visual-only and must not produce
       // projectiles, damage popups or AOE fire overlays.
-      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn' || evt.type === 'frostNova' || evt.type === 'riderHorn' || evt.type === 'dragonSpin') continue;
+      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn' || evt.type === 'frostNova' || evt.type === 'riderHorn' || evt.type === 'dragonSpin' || evt.type === 'mirrorExplode') continue;
       if (evt.type === 'volleyMiss') { rangedDamageEvents.push(evt); continue; }
       if (evt.type === 'heal') healEvents.push(evt);
       else if (evt.type === 'freeze') freezeEvents.push(evt);
@@ -440,6 +442,18 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     if (impulsePushedIdsBatch.length > 0) {
       setImpulsePushedIds(new Set(impulsePushedIdsBatch));
       setTimeout(() => setImpulsePushedIds(new Set()), 1700);
+    }
+
+    // --- Mirror death explosion (red 3x3 shockwave) ---
+    const newMirrorBlasts: { id: string; row: number; col: number }[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'mirrorExplode') continue;
+      mirrorExplosionCounter.current += 1;
+      newMirrorBlasts.push({ id: `mirror-x-${mirrorExplosionCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+    }
+    if (newMirrorBlasts.length > 0) {
+      setMirrorExplosions(prev => [...prev, ...newMirrorBlasts]);
+      setTimeout(() => setMirrorExplosions(prev => prev.filter(m => !newMirrorBlasts.find(nb => nb.id === m.id))), 1100);
     }
 
     // --- Frost Nova (3x3 freeze burst) ---
@@ -996,6 +1010,26 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             <circle cx={cx} cy={cy} r={cellSize * 3.5} fill={`url(#imp-grad-${imp.id})`} className={fillCls} />
             <circle cx={cx} cy={cy} r={cellSize * 3.5} fill="none" stroke={ringStroke} strokeWidth="0.8" className={ringCls} />
             <circle cx={cx} cy={cy} r={cellSize * 3.5} fill="none" stroke={ringStrokeInner} strokeWidth="0.4" className={ringInnerCls} />
+          </svg>
+        );
+      })}
+
+      {/* Mirror death explosion: red expanding shockwave covering 3x3 around the mirror cell */}
+      {mirrorExplosions.map(mx => {
+        const cx = mx.col * cellSize + cellSize / 2;
+        const cy = visualRow(mx.row) * cellSize + cellSize / 2;
+        return (
+          <svg key={mx.id} className="absolute inset-0 z-[6] pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <radialGradient id={`mx-grad-${mx.id}`}>
+                <stop offset="0%" stopColor="hsl(0, 100%, 90%)" stopOpacity="0.9" />
+                <stop offset="55%" stopColor="hsl(8, 100%, 60%)" stopOpacity="0.7" />
+                <stop offset="100%" stopColor="hsl(0, 100%, 45%)" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <circle cx={cx} cy={cy} r={cellSize * 1.5} fill={`url(#mx-grad-${mx.id})`} className="mirror-explode-fill" />
+            <circle cx={cx} cy={cy} r={cellSize * 1.5} fill="none" stroke="hsl(0, 100%, 70%)" strokeWidth="1.2" className="mirror-explode-ring" />
+            <circle cx={cx} cy={cy} r={cellSize * 1.5} fill="none" stroke="hsl(20, 100%, 80%)" strokeWidth="0.6" className="mirror-explode-ring-inner" />
           </svg>
         );
       })}
