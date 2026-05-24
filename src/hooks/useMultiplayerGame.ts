@@ -795,6 +795,15 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         }
         unit.cooldown = Math.max(0, unit.cooldown - 1);
 
+        // === Terrain seekers (ranger / mountaineer / waterwalker) ===
+        let seekerHolds = false;
+        if (!isFrozenNow) {
+          const seek = handleTerrainSeeker(unit, newGrid, allUnits);
+          if (seek === 'moved' || seek === 'wait') continue;
+          if (seek === 'on_terrain') seekerHolds = true;
+        }
+
+
         // Shadowblade: custom teleport-strike behavior (every 5 ticks)
         if (unit.type === 'shadowblade') {
           handleShadowbladeTick(unit, allUnits, newGrid, events, logs, (atk, tgt, dmg) => {
