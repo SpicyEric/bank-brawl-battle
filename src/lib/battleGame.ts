@@ -1326,7 +1326,7 @@ export function applyPostAttackEffects(
 
 /** Apply death-trigger effects: mirror explosion, lamb heal, banshee ghost.
  *  Returns true if the unit should NOT be marked dead yet (e.g. banshee turned ghost). */
-export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[][], logs: string[]): boolean {
+export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[][], logs: string[], events?: BattleEvent[]): boolean {
   // Banshee → fake death: appears dead & blocks the cell for 3 ticks, then revives at full HP.
   // Second death is permanent.
   if (deadUnit.type === 'banshee' && !deadUnit.bansheeRevived && deadUnit.reviveIn === undefined) {
@@ -1337,18 +1337,38 @@ export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[]
     logs.push(`💀 Banshee gefallen – erhebt sich in 3 Runden wieder`);
     return false; // truly dead for now (cell stays blocked); caller leaves dead=true
   }
-  // Mirror death explosion: 20 dmg to adjacent enemies
+  // Mirror death explosion: 30 dmg to all enemies in 3x3 around the mirror
   if (deadUnit.type === 'mirror') {
+    const blastCells: { row: number; col: number }[] = [];
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
       const r = deadUnit.row + dr, c = deadUnit.col + dc;
       if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      blastCells.push({ row: r, col: c });
+      if (dr === 0 && dc === 0) continue;
       const cu = grid[r][c].unit;
       if (cu && cu.team !== deadUnit.team && cu.hp > 0 && !cu.dead) {
-        cu.hp = Math.max(0, cu.hp - 20);
+        cu.hp = Math.max(0, cu.hp - 30);
         if (cu.hp <= 0) (cu as any).dead = true;
-        logs.push(`🪞 Spiegel-Explosion → ${UNIT_DEFS[cu.type].emoji} 20`);
+        logs.push(`🪞 Spiegel-Explosion → ${UNIT_DEFS[cu.type].emoji} 30${cu.hp <= 0 ? ' ☠️' : ''}`);
       }
+    }
+    if (events) {
+      events.push({
+        type: 'mirrorExplode',
+        attackerId: deadUnit.id,
+        attackerRow: deadUnit.row,
+        attackerCol: deadUnit.col,
+        attackerEmoji: '🪞',
+        attackerType: 'mirror',
+        targetId: deadUnit.id,
+        targetRow: deadUnit.row,
+        targetCol: deadUnit.col,
+        damage: 30,
+        isStrong: false,
+        isWeak: false,
+        isRanged: false,
+        aoeCells: blastCells,
+      });
     }
   }
   // Lamb: heal all allies +30% maxHp
@@ -1361,6 +1381,17 @@ export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[]
     if (allies.length > 0) logs.push(`🐑 Opferlamm heilt ${allies.length} Verbündete (+30%)`);
   }
   return false;
+}
+
+/** Reflect 30% of `dmg` from a mirror target back onto the attacker.
+ *  Use this for indirect hits (chain lightning, chaindancer hops, splash) where
+ *  `applyPostAttackEffects` does not run. */
+export function applyMirrorReflect(attacker: Unit, target: Unit, dmg: number, logs: string[]): void {
+  if (target.type !== 'mirror' || target.hp <= 0 || dmg <= 0) return;
+  const refl = Math.max(1, Math.round(dmg * 0.3));
+  attacker.hp = Math.max(0, attacker.hp - refl);
+  if (attacker.hp <= 0) (attacker as any).dead = true;
+  logs.push(`🪞 Reflektion → ${UNIT_DEFS[attacker.type].emoji} ${refl}`);
 }
 
 /** Tick down lava fields and damage enemies standing on them. */
