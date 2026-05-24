@@ -56,6 +56,10 @@ export interface Unit {
   hornTimer?: number; // rider horn ability cooldown countdown (9 ticks)
   hornBuff?: number; // ticks remaining of +50% damage from rider horn
   volleyTimer?: number; // archer 8-direction volley cooldown countdown (4 ticks)
+  spinTimer?: number; // dragon fire-spin cooldown countdown (10 ticks)
+  spinTicksLeft?: number; // dragon: ticks remaining in active fire spin (8 = just started)
+  spinDirIdx?: number; // dragon: current beam direction (0..7)
+  spinClockwise?: boolean; // dragon: rotation direction this spin
   phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
   isPhantom?: boolean; // doppelganger phantom flag
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
@@ -169,7 +173,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 95,
     attack: 24,
     cooldown: 3,
-    description: 'Fliegt über Hindernisse. Flächenangriff (3x3, 30% Splash). Ignoriert Blockaden.',
+    description: 'Fliegt über Hindernisse. Flächenangriff (3x3, 30% Splash). Alle 10 Ticks: bleibt stehen und dreht sich 8 Ticks lang im Kreis, speit pro Tick einen 3-Felder-Feuerstrahl in eine Richtung. Getroffene Gegner brennen 8 Ticks (5 Dmg/Tick).',
     movePattern: [
       ...ALL_ADJACENT,
       { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
@@ -1889,6 +1893,140 @@ export function tickArcherVolley(
     logs.push(`🏹 ${a.team === 'player' ? '👤' : '💀'} Pfeilsalve! (${hitCount}/8 getroffen)`);
   }
 }
+
+/** Dragon fire-spin: every 10 ticks, the dragon freezes in place and performs
+ *  an 8-tick rotation, spitting a 3-cell fire beam in one of 8 directions per
+ *  tick. Enemies hit are set on fire for 8 ticks (5 dmg/tick). The starting
+ *  direction targets the nearest enemy; rotation direction is random per spin. */
+const DRAGON_SPIN_DIRS: { dr: number; dc: number }[] = [
+  { dr: -1, dc:  0 }, // 0: up
+  { dr: -1, dc:  1 }, // 1: up-right
+  { dr:  0, dc:  1 }, // 2: right
+  { dr:  1, dc:  1 }, // 3: down-right
+  { dr:  1, dc:  0 }, // 4: down
+  { dr:  1, dc: -1 }, // 5: down-left
+  { dr:  0, dc: -1 }, // 6: left
+  { dr: -1, dc: -1 }, // 7: up-left
+];
+
+function dragonDirIdxToward(dr: number, dc: number): number {
+  // pick the DRAGON_SPIN_DIRS entry whose unit vector best matches (dr,dc)
+  const len = Math.hypot(dr, dc) || 1;
+  const ux = dr / len, uy = dc / len;
+  let best = 0, bestDot = -Infinity;
+  for (let i = 0; i < 8; i++) {
+    const d = DRAGON_SPIN_DIRS[i];
+    const dl = Math.hypot(d.dr, d.dc);
+    const dot = (d.dr / dl) * ux + (d.dc / dl) * uy;
+    if (dot > bestDot) { bestDot = dot; best = i; }
+  }
+  return best;
+}
+
+function fireDragonBeam(
+  dragon: Unit,
+  dirIdx: number,
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  logs: string[],
+): void {
+  const { dr, dc } = DRAGON_SPIN_DIRS[dirIdx];
+  const cells: { row: number; col: number }[] = [];
+  for (let step = 1; step <= 3; step++) {
+    const r = dragon.row + dr * step;
+    const c = dragon.col + dc * step;
+    if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) break;
+    cells.push({ row: r, col: c });
+  }
+  if (cells.length === 0) return;
+
+  let hits = 0;
+  for (const cell of cells) {
+    const u = grid[cell.row][cell.col].unit;
+    if (!u || u.hp <= 0 || u.dead) continue;
+    if (u.team === dragon.team) continue;
+    if (isImmuneToFire(u, grid)) continue;
+    u.burning = [...(u.burning || []), { dmg: 5, turns: 8 }];
+    hits += 1;
+  }
+
+  events.push({
+    type: 'dragonSpin',
+    attackerId: dragon.id,
+    attackerRow: dragon.row,
+    attackerCol: dragon.col,
+    attackerEmoji: '🔥',
+    attackerType: 'dragon',
+    targetId: dragon.id,
+    targetRow: cells[cells.length - 1].row,
+    targetCol: cells[cells.length - 1].col,
+    damage: 0,
+    isStrong: false,
+    isWeak: false,
+    isRanged: false,
+    spinCells: cells,
+    spinDirIdx: dirIdx,
+  });
+
+  if (hits > 0) {
+    logs.push(`🔥 ${dragon.team === 'player' ? '👤' : '💀'} Drachen-Feuerwirbel entzündet ${hits} Gegner!`);
+  }
+}
+
+export function tickDragonSpin(
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  logs: string[],
+): void {
+  const dragons = allUnits.filter(u => u.type === 'dragon' && u.hp > 0 && !u.dead);
+  for (const d of dragons) {
+    // Continuing an active spin: fire the next beam this tick.
+    if ((d.spinTicksLeft ?? 0) > 0) {
+      const idx = d.spinDirIdx ?? 0;
+      fireDragonBeam(d, idx, allUnits, grid, events, logs);
+      d.spinDirIdx = ((idx + (d.spinClockwise ? 1 : -1)) + 8) % 8;
+      d.spinTicksLeft = (d.spinTicksLeft ?? 0) - 1;
+      if ((d.spinTicksLeft ?? 0) <= 0) {
+        d.spinTicksLeft = undefined;
+        d.spinClockwise = undefined;
+        d.spinDirIdx = undefined;
+        d.spinTimer = 10;
+      }
+      continue;
+    }
+
+    // Not spinning: count down cooldown, then trigger.
+    if (d.spinTimer === undefined || d.spinTimer <= 0) d.spinTimer = 10;
+    d.spinTimer -= 1;
+    if (d.spinTimer > 0) continue;
+
+    // Pick start direction toward nearest enemy (fallback: random)
+    const enemies = allUnits.filter(u => u.team !== d.team && u.hp > 0 && !u.dead);
+    let startIdx = Math.floor(Math.random() * 8);
+    if (enemies.length > 0) {
+      let nearest = enemies[0];
+      let bestDist = Math.abs(nearest.row - d.row) + Math.abs(nearest.col - d.col);
+      for (const e of enemies) {
+        const dist = Math.abs(e.row - d.row) + Math.abs(e.col - d.col);
+        if (dist < bestDist) { bestDist = dist; nearest = e; }
+      }
+      startIdx = dragonDirIdxToward(nearest.row - d.row, nearest.col - d.col);
+    }
+    d.spinClockwise = Math.random() < 0.5;
+    d.spinDirIdx = startIdx;
+    d.spinTicksLeft = 8;
+    logs.push(`🐉 ${d.team === 'player' ? '👤' : '💀'} Drache beginnt Feuerwirbel!`);
+
+    // Fire the first beam immediately this tick.
+    fireDragonBeam(d, startIdx, allUnits, grid, events, logs);
+    d.spinDirIdx = ((startIdx + (d.spinClockwise ? 1 : -1)) + 8) % 8;
+    d.spinTicksLeft -= 1;
+  }
+}
+
+
 
 /** Shadowblade per-tick behavior:
  *  - keeps maximum distance from enemies via diagonal jumps,

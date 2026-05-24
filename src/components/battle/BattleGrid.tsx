@@ -35,6 +35,7 @@ interface ChainEffect { id: string; cells: { row: number; col: number }[]; color
 interface ImpulseEffect { id: string; row: number; col: number }
 interface FrostNovaEffect { id: string; row: number; col: number }
 interface RiderHornFlash { id: string; row: number; col: number; kind: 'inner' | 'outer' }
+interface DragonSpinFlame { id: string; row: number; col: number; delayMs: number }
 interface TeleportEffect { id: string; row: number; col: number; kind: 'out' | 'in' }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview }: BattleGridProps) {
@@ -60,6 +61,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const frostNovaCounter = useRef(0);
   const [hornFlashes, setHornFlashes] = useState<RiderHornFlash[]>([]);
   const hornCounter = useRef(0);
+  const [dragonSpinFlames, setDragonSpinFlames] = useState<DragonSpinFlame[]>([]);
+  const dragonSpinCounter = useRef(0);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
@@ -232,7 +235,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     for (const evt of events) {
       // Impulse / teleport / spawn are visual-only and must not produce
       // projectiles, damage popups or AOE fire overlays.
-      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn' || evt.type === 'frostNova' || evt.type === 'riderHorn') continue;
+      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn' || evt.type === 'frostNova' || evt.type === 'riderHorn' || evt.type === 'dragonSpin') continue;
       if (evt.type === 'volleyMiss') { rangedDamageEvents.push(evt); continue; }
       if (evt.type === 'heal') healEvents.push(evt);
       else if (evt.type === 'freeze') freezeEvents.push(evt);
@@ -474,6 +477,32 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     if (newNovas.length > 0) {
       setFrostNovaEffects(prev => [...prev, ...newNovas]);
       setTimeout(() => setFrostNovaEffects(prev => prev.filter(n => !newNovas.find(nn => nn.id === n.id))), 1100);
+    }
+
+    // --- Dragon fire-spin: per-tick 3-cell beam, cells ignite one after another ---
+    const newSpinFlames: DragonSpinFlame[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'dragonSpin') continue;
+      const cells = evt.spinCells || [];
+      cells.forEach((c, i) => {
+        dragonSpinCounter.current += 1;
+        newSpinFlames.push({
+          id: `dspin-${dragonSpinCounter.current}`,
+          row: c.row, col: c.col,
+          delayMs: i * 110,
+        });
+      });
+    }
+    if (newSpinFlames.length > 0) {
+      // Stagger spawn by delayMs, remove each after its animation.
+      for (const f of newSpinFlames) {
+        setTimeout(() => {
+          setDragonSpinFlames(prev => [...prev, f]);
+          setTimeout(() => {
+            setDragonSpinFlames(prev => prev.filter(x => x.id !== f.id));
+          }, 850);
+        }, f.delayMs);
+      }
     }
 
     // --- Shadowblade teleport puffs ---
@@ -1027,6 +1056,35 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             zIndex: 6,
           }}
         />
+      ))}
+
+      {/* Dragon fire-spin beam: per-cell sequential ignition */}
+      {dragonSpinFlames.map(f => (
+        <div
+          key={f.id}
+          className="dragon-fire-cell"
+          style={{
+            position: 'absolute',
+            left: `${f.col * cellSize}%`,
+            top: `${visualRow(f.row) * cellSize}%`,
+            width: `${cellSize}%`,
+            height: `${cellSize}%`,
+            pointerEvents: 'none',
+            zIndex: 7,
+          }}
+        >
+          <div
+            className="dragon-fire-emoji"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: `${cellSize * 0.55}cqw`,
+            }}
+          >🔥</div>
+        </div>
       ))}
     </div>
   );

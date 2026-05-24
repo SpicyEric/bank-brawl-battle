@@ -4,7 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
-  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
+  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, effectiveCooldown, tickTerrainHeals,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
@@ -19,7 +19,7 @@ interface MultiplayerConfig {
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken };
+  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning };
 }
 
 function serializeGrid(grid: Cell[][]) {
@@ -779,6 +779,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       tickRiderHorn(allUnits, newGrid, events, logs);
       // Archer volley: every 4 ticks, 8-direction infinite-range arrow salvo
       tickArcherVolley(allUnits, newGrid, events, logs);
+      // Dragon fire-spin: every 10 ticks, dragon spins 8 ticks firing beams
+      tickDragonSpin(allUnits, newGrid, events, logs);
       // Terrain regen: waterwalker heals on water
       tickTerrainHeals(allUnits, newGrid, logs);
       const currentTurn = turnCount;
@@ -790,6 +792,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
+        // Dragon mid fire-spin: skip movement/attack entirely.
+        if (unit.type === 'dragon' && (unit.spinTicksLeft ?? 0) > 0) continue;
         // Frozen: skip movement, attack at reduced dmg (50% default, 30% from frost nova)
         const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
         const frozenDmgMul = unit.frozenDmgMul ?? 0.5;

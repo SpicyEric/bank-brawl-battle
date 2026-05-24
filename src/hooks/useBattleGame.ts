@@ -7,7 +7,7 @@ import {
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
   applyPostAttackEffects, applyDeathEffects, processLavaTick, processGhostTick, shouldSkipMove,
-  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, handleShadowbladeTick, leaveArsonistTrail,
+  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, handleShadowbladeTick, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
@@ -596,6 +596,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       tickRiderHorn(allUnits, newGrid, events, logs);
       // === Archer volley: every 4 ticks, 8-direction infinite-range arrow salvo ===
       tickArcherVolley(allUnits, newGrid, events, logs);
+      // === Dragon fire-spin: every 10 ticks, dragon spins 8 ticks firing beams ===
+      tickDragonSpin(allUnits, newGrid, events, logs);
       // === Terrain regen: waterwalker heals on water ===
       tickTerrainHeals(allUnits, newGrid, logs);
 
@@ -603,6 +605,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
 
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
+
+        // Dragon mid fire-spin: skip movement/attack entirely.
+        if (unit.type === 'dragon' && (unit.spinTicksLeft ?? 0) > 0) continue;
 
         // Webbed: can't act at all (spiderqueen net)
         if (unit.webbed && unit.webbed > 0) {
