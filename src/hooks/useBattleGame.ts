@@ -781,24 +781,19 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           }
 
           // === NEW UNIT EFFECTS ===
-          // Vampire: lifesteal 30%, explode at overheal
+          // Vampire: lifesteal 30% (capped to maxHp, no overheal/explosion) + bleeding DoT (10/5/3/1)
           if (unit.type === 'vampire' && dmg > 0) {
             const heal = Math.round(dmg * 0.3);
-            unit.hp = Math.min(unit.maxHp + 30, unit.hp + heal); // allow brief overheal cap
-            if (unit.hp > unit.maxHp) {
-              // Explode for 25 splash to adjacent enemies, then revert to maxHp
-              for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-                if (dr === 0 && dc === 0) continue;
-                const ar = unit.row + dr, ac = unit.col + dc;
-                if (ar < 0 || ar >= GRID_SIZE || ac < 0 || ac >= GRID_SIZE) continue;
-                const cu = newGrid[ar][ac].unit;
-                if (cu && cu.hp > 0 && !cu.dead && cu.team !== unit.team) {
-                  cu.hp = Math.max(0, cu.hp - 25);
-                  if (cu.hp <= 0) (cu as any).dead = true;
-                }
-              }
-              logs.push(`🧛 ${unit.team === 'player' ? '👤' : '💀'} Vampir EXPLODIERT! (Splash 25)`);
-              unit.hp = unit.maxHp;
+            const before = unit.hp;
+            unit.hp = Math.min(unit.maxHp, unit.hp + heal);
+            const healed = unit.hp - before;
+            if (healed > 0) {
+              logs.push(`🧛 Vampir saugt ${healed} ❤️`);
+            }
+            // Apply / refresh bleeding DoT on the target
+            if (target.hp > 0) {
+              target.bleeding = [10, 5, 3, 1];
+              logs.push(`🩸 ${UNIT_DEFS[target.type].emoji} blutet!`);
             }
           }
 
