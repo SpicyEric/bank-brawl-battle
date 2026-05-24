@@ -1560,6 +1560,159 @@ export function tickMageImpulse(
   }
 }
 
+/** Shadowblade per-tick behavior:
+ *  - keeps maximum distance from enemies via diagonal jumps,
+ *  - every 5 ticks teleports adjacent to chosen enemy and attacks,
+ *  - next tick teleports back to its previous home position. */
+export function handleShadowbladeTick(
+  unit: Unit,
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  logs: string[],
+  dmgMod: (attacker: Unit, target: Unit, dmg: number) => number,
+): void {
+  if (unit.hp <= 0 || unit.dead) return;
+  unit.cooldown = Math.max(0, unit.cooldown - 1);
+
+  const enemies = allUnits.filter(e => e.team !== unit.team && e.hp > 0 && !e.dead && !(e.isPhantom && (e.phantom ?? 0) > 0));
+  if (enemies.length === 0) return;
+
+  const teleportFrom = { row: unit.row, col: unit.col };
+  const emitTeleport = (from: { row: number; col: number }, to: { row: number; col: number }) => {
+    events.push({
+      type: 'teleport',
+      attackerId: unit.id,
+      attackerRow: from.row, attackerCol: from.col,
+      attackerEmoji: '🥷', attackerType: 'shadowblade',
+      targetId: unit.id, targetRow: to.row, targetCol: to.col,
+      damage: 0, isStrong: false, isWeak: false, isRanged: false,
+    });
+  };
+
+  // --- Return phase ---
+  if (unit.pendingTeleportReturn) {
+    const hr = unit.homeRow, hc = unit.homeCol;
+    let dest: { row: number; col: number } | null = null;
+    if (hr !== undefined && hc !== undefined && hr >= 0 && hr < GRID_SIZE && hc >= 0 && hc < GRID_SIZE) {
+      const cell = grid[hr][hc];
+      if (!cell.unit && cell.terrain !== 'water') dest = { row: hr, col: hc };
+    }
+    if (!dest) {
+      // pick free cell that maximizes distance from enemies (any cell on board)
+      let best: { row: number; col: number; score: number } | null = null;
+      for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+        const cell = grid[r][c];
+        if (cell.unit || cell.terrain === 'water') continue;
+        let minD = Infinity;
+        for (const e of enemies) {
+          const d = Math.max(Math.abs(r - e.row), Math.abs(c - e.col));
+          if (d < minD) minD = d;
+        }
+        if (!best || minD > best.score) best = { row: r, col: c, score: minD };
+      }
+      if (best) dest = { row: best.row, col: best.col };
+    }
+    if (dest) {
+      grid[unit.row][unit.col].unit = null;
+      unit.row = dest.row; unit.col = dest.col;
+      grid[dest.row][dest.col].unit = unit;
+      emitTeleport(teleportFrom, dest);
+      logs.push(`🥷 Schattenklinge teleportiert zurück`);
+    }
+    unit.pendingTeleportReturn = false;
+    unit.homeRow = undefined;
+    unit.homeCol = undefined;
+    unit.teleportTimer = 5;
+    return;
+  }
+
+  // --- Strike phase (teleport in + attack) ---
+  if (unit.teleportTimer === undefined) unit.teleportTimer = 5;
+  if (unit.teleportTimer <= 0) {
+    // Pick target: lowest HP enemy first (finish off), tiebreak by closest
+    const ranked = [...enemies].sort((a, b) => {
+      if (a.hp !== b.hp) return a.hp - b.hp;
+      const da = Math.max(Math.abs(a.row - unit.row), Math.abs(a.col - unit.col));
+      const db = Math.max(Math.abs(b.row - unit.row), Math.abs(b.col - unit.col));
+      return da - db;
+    });
+    const offsets = [
+      { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
+      { r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 },
+    ];
+    for (const t of ranked) {
+      let dest: { row: number; col: number } | null = null;
+      for (const o of offsets) {
+        const r = t.row + o.r, c = t.col + o.c;
+        if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+        const cell = grid[r][c];
+        if (cell.unit || cell.terrain === 'water') continue;
+        dest = { row: r, col: c };
+        break;
+      }
+      if (!dest) continue;
+      // Teleport in
+      unit.homeRow = teleportFrom.row;
+      unit.homeCol = teleportFrom.col;
+      grid[unit.row][unit.col].unit = null;
+      unit.row = dest.row; unit.col = dest.col;
+      grid[dest.row][dest.col].unit = unit;
+      emitTeleport(teleportFrom, dest);
+      // Strike
+      let dmg = calcDamage(unit, t, grid);
+      dmg = dmgMod(unit, t, dmg);
+      t.hp = Math.max(0, t.hp - dmg);
+      unit.lastAttackedId = t.id;
+      const tDef = UNIT_DEFS[t.type];
+      logs.push(`🥷 ${unit.team === 'player' ? '👤' : '💀'} Schattenklinge → ${tDef.emoji} ${dmg}${t.hp <= 0 ? ' ☠️' : ''}`);
+      events.push({
+        type: t.hp <= 0 ? 'kill' : 'hit',
+        attackerId: unit.id,
+        attackerRow: unit.row, attackerCol: unit.col,
+        attackerEmoji: '🥷', attackerType: 'shadowblade',
+        targetId: t.id, targetRow: t.row, targetCol: t.col,
+        damage: dmg, isStrong: false, isWeak: false,
+        isRanged: false,
+      });
+      if (t.hp <= 0) (t as any).dead = true;
+      unit.pendingTeleportReturn = true;
+      unit.teleportTimer = 0; // stays 0 so next tick triggers return
+      return;
+    }
+    // No target reachable; try again next tick
+  } else {
+    unit.teleportTimer -= 1;
+  }
+
+  // --- Kiting movement: maximize distance from nearest enemy ---
+  const moveOffsets = [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }];
+  const currentMinDist = enemies.reduce((m, e) => {
+    const d = Math.max(Math.abs(unit.row - e.row), Math.abs(unit.col - e.col));
+    return Math.min(m, d);
+  }, Infinity);
+  let bestMove: { row: number; col: number; score: number } | null = null;
+  for (const o of moveOffsets) {
+    const r = unit.row + o.row, c = unit.col + o.col;
+    if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+    const cell = grid[r][c];
+    if (cell.unit || cell.terrain === 'water') continue;
+    let minD = Infinity;
+    for (const e of enemies) {
+      const d = Math.max(Math.abs(r - e.row), Math.abs(c - e.col));
+      if (d < minD) minD = d;
+    }
+    if (!bestMove || minD > bestMove.score) bestMove = { row: r, col: c, score: minD };
+  }
+  if (bestMove && bestMove.score > currentMinDist) {
+    grid[unit.row][unit.col].unit = null;
+    unit.row = bestMove.row; unit.col = bestMove.col;
+    grid[bestMove.row][bestMove.col].unit = unit;
+  }
+}
+
+
+
 
 /** Spawn a phantom duplicate next to each unspawned doppelganger.
  *  Phantom is invulnerable for 5 ticks, then disappears. */
