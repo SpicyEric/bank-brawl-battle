@@ -530,7 +530,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     transition: offset
                       ? 'none'
                       : (impulsePushedIds.has(unit.id)
-                          ? 'transform 900ms cubic-bezier(0.18, 0.9, 0.32, 1)'
+                          ? 'transform 1500ms cubic-bezier(0.12, 0.85, 0.25, 1)'
                           : 'transform 580ms ease-out'),
                   }}
                 >
