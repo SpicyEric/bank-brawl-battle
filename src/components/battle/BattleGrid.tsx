@@ -524,7 +524,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   className="absolute inset-0 flex flex-col items-center justify-center z-10"
                   style={{
                     ...slideStyle,
-                    transition: offset ? 'none' : 'transform 580ms ease-out',
+                    transition: offset
+                      ? 'none'
+                      : (impulsePushedIds.has(unit.id)
+                          ? 'transform 900ms cubic-bezier(0.18, 0.9, 0.32, 1)'
+                          : 'transform 580ms ease-out'),
                   }}
                 >
                   {/* Persistent freeze overlay – stays visible the entire time the unit is frozen */}
