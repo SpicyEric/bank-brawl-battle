@@ -733,6 +733,7 @@ function couldAttackFrom(pos: Position, unitType: UnitType, target: Position): b
 // BFS to find shortest path to any cell from which unit can attack target
 function bfsFirstStep(unit: Unit, target: Unit, grid: Cell[][]): Position | null {
   const canFly = unit.type === 'dragon';
+  const canSwim = unit.type === 'waterwalker';
   const start = `${unit.row},${unit.col}`;
   const visited = new Set<string>([start]);
   // Queue: [row, col, firstStepRow, firstStepCol]
