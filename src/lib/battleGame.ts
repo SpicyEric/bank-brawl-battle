@@ -1555,8 +1555,7 @@ export function tickMageImpulse(
       damage: 0,
       isStrong: false,
       isWeak: false,
-      isRanged: true,
-      aoeCells: ringCells,
+      isRanged: false,
       pushedIds,
     });
     logs.push(`🔮 ${m.team === 'player' ? '👤' : '💀'} Magier-Impuls!`);
