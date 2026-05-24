@@ -721,7 +721,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           }
           let dmg = calcDamage(unit, target, newGrid);
           // Frozen attacker: 50% damage penalty
-          if (isFrozenNow) dmg = Math.round(dmg * 0.5);
+          if (isFrozenNow) dmg = Math.round(dmg * frozenDmgMul);
           // Apply morale modifier + shield wall
           if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
           else {
