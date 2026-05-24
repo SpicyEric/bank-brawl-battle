@@ -1,3 +1,5 @@
+import type { BattleEvent } from './battleEvents';
+
 export type UnitType =
   | 'warrior' | 'rider' | 'archer' | 'assassin' | 'mage' | 'tank' | 'dragon' | 'healer' | 'frost'
   // New units (v2):
