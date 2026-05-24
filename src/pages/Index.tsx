@@ -206,7 +206,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
               return;
             }
             const unit = game.grid[row][col].unit;
-            if (unit) setInspectUnit(unit.type);
+            if (unit) setInspectUnit({ type: unit.type, color: unit.color as ColorGroup | undefined });
           }}
           lastPlaced={lastPlaced}
           battleEvents={game.battleEvents}
