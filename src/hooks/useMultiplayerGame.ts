@@ -896,15 +896,15 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
           }
           target.hp = Math.max(0, target.hp - dmg);
-          unit.cooldown = unit.maxCooldown;
+          unit.cooldown = effectiveCooldown(unit, newGrid);
           // Warrior: track last attacked for lock-on behavior
           if (unit.type === 'warrior') unit.lastAttackedId = target.id;
           // Rider: track last attacked for target-switching
           if (unit.type === 'rider') unit.lastAttackedId = target.id;
 
-          // Frost: 50% chance to freeze the target for 3 ticks at 50% damage
+          // Frost: 50% chance to freeze the target for 3 ticks at 50% damage (skip immune)
           let didFreeze = false;
-          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5) {
+          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(target, newGrid)) {
             target.frozen = 3;
             target.frozenDmgMul = 0.5;
             didFreeze = true;
