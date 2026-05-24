@@ -216,7 +216,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 65,
     attack: 18,
     cooldown: 2,
-    description: 'Bewegt sich in alle Richtungen (1 Feld). Greift orthogonal bis 3 Felder an.',
+    description: 'Bewegt sich in alle Richtungen (1 Feld). Greift orthogonal bis 3 Felder an. Alle 4 Ticks: 8-Pfeil-Salve in alle Richtungen (orthogonal + diagonal) mit unendlicher Reichweite – jeder Pfeil trifft den ersten Gegner auf seiner Linie.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
