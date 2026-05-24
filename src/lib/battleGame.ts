@@ -368,14 +368,14 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   ranger: {
     label: 'Waldläufer', emoji: '🪵', hp: 70, attack: 14, cooldown: 2,
-    description: 'Sucht aktiv Wälder auf und verteidigt sie (+100% Schaden im Wald). Bewegt sich in alle 8 Richtungen.',
+    description: 'Strebt zwanghaft ins nächste Waldfeld und verteidigt es. Auf Wald: 19 ATK, Cooldown 1. Ohne Waldfeld kämpft er normal.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   mountaineer: {
     label: 'Bergkrieger', emoji: '🪨', hp: 130, attack: 21, cooldown: 3,
-    description: 'Auf Hügeln: immun gegen Fernkampf-Schaden.',
+    description: 'Strebt zwanghaft auf den nächsten Hügel und belagert ihn. Auf Hügel: Cooldown 2, immun gegen Einfrieren und Feuerschaden. Ohne Hügel kämpft er normal.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
