@@ -186,7 +186,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const confirmPlacementRef = useRef<(() => void) | null>(null);
 
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore, roundNumber);
-  const enemyMaxUnits = getMaxUnits(enemyScore, playerScore, roundNumber);
+  // AI always gets the same cap as the player (symmetric round escalation)
+  const enemyMaxUnits = playerMaxUnits;
 
   // Slot mode: slots can be reused on the battlefield (mono comps allowed).
   // placedSlots is kept empty so the picker never disables a slot during placement.
@@ -1122,7 +1123,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       setPhase('place_player');
     } else {
       const terrainGrid = generateTerrain(createEmptyGrid());
-      const aiMax = getMaxUnits(enemyScore, playerScore, roundNumber + 1);
+      const aiMax = getMaxUnits(playerScore, enemyScore, roundNumber + 1);
       const aiPlacements = generateAIPlacement([], aiMax, terrainGrid, difficulty, enemyBannedUnits);
       const enemies: Unit[] = aiPlacements.map(p => createUnit(p.type, 'enemy', p.row, p.col));
       for (const e of enemies) terrainGrid[e.row][e.col].unit = e;
