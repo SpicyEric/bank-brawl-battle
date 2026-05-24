@@ -700,7 +700,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         if (!canAttack(unit, target)) {
           // Track stuck turns for anti-stalemate
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const skipMove = isFrozenNow || shouldSkipMove(unit);
+          const skipMove = isFrozenNow || seekerHolds || shouldSkipMove(unit);
           const newPos = skipMove ? { row: unit.row, col: unit.col } : moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             // If tank, move bonded units first
@@ -714,9 +714,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             newGrid[unit.row][unit.col].unit = unit;
           }
         } else {
-          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen)
+          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen / seeker holding)
           unit.stuckTurns = 0;
-          if (!isFrozenNow) {
+          if (!isFrozenNow && !seekerHolds) {
             const kitePos = moveToward(unit, target, newGrid, allUnits);
             if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
               if (unit.type === 'tank') {
@@ -730,6 +730,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             }
           }
         }
+
 
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
