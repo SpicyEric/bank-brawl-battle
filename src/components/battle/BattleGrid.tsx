@@ -50,6 +50,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [freezeEffects, setFreezeEffects] = useState<FreezeEffect[]>([]);
   const [chainEffects, setChainEffects] = useState<ChainEffect[]>([]);
   const [impulseEffects, setImpulseEffects] = useState<ImpulseEffect[]>([]);
+  const [impulsePushedIds, setImpulsePushedIds] = useState<Set<string>>(new Set());
   const impulseCounter = useRef(0);
   const [teleportEffects, setTeleportEffects] = useState<TeleportEffect[]>([]);
   const teleportCounter = useRef(0);
@@ -411,14 +412,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
 
     // --- Mage impulse (shockwave) ---
     const newImpulses: ImpulseEffect[] = [];
+    const impulsePushedIdsBatch: string[] = [];
     for (const evt of events) {
       if (evt.type !== 'impulse') continue;
       impulseCounter.current += 1;
       newImpulses.push({ id: `impulse-${impulseCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+      if (evt.pushedIds) impulsePushedIdsBatch.push(...evt.pushedIds);
     }
     if (newImpulses.length > 0) {
       setImpulseEffects(prev => [...prev, ...newImpulses]);
       setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 900);
+    }
+    if (impulsePushedIdsBatch.length > 0) {
+      setImpulsePushedIds(new Set(impulsePushedIdsBatch));
+      setTimeout(() => setImpulsePushedIds(new Set()), 950);
     }
 
     // --- Shadowblade teleport puffs ---
@@ -517,7 +524,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   className="absolute inset-0 flex flex-col items-center justify-center z-10"
                   style={{
                     ...slideStyle,
-                    transition: offset ? 'none' : 'transform 580ms ease-out',
+                    transition: offset
+                      ? 'none'
+                      : (impulsePushedIds.has(unit.id)
+                          ? 'transform 900ms cubic-bezier(0.18, 0.9, 0.32, 1)'
+                          : 'transform 580ms ease-out'),
                   }}
                 >
                   {/* Persistent freeze overlay – stays visible the entire time the unit is frozen */}
@@ -884,7 +895,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         const cx = imp.col * cellSize + cellSize / 2;
         const cy = visualRow(imp.row) * cellSize + cellSize / 2;
         return (
-          <svg key={imp.id} className="absolute inset-0 z-40 pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <svg key={imp.id} className="absolute inset-0 z-[5] pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             <defs>
               <radialGradient id={`imp-grad-${imp.id}`}>
                 <stop offset="0%" stopColor="hsl(270, 100%, 80%)" stopOpacity="0.0" />

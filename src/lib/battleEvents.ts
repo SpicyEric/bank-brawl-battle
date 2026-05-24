@@ -20,4 +20,6 @@ export interface BattleEvent {
   isFrozen?: boolean; // target got frozen by this attack
   /** Cells that get a lightning-chain flash (Blitzmagier). */
   chainCells?: { row: number; col: number }[];
+  /** Unit ids that were pushed by a mage impulse (used to apply a stronger slide animation). */
+  pushedIds?: string[];
 }
