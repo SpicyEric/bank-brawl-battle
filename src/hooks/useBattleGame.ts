@@ -7,7 +7,7 @@ import {
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
   applyPostAttackEffects, applyDeathEffects, processLavaTick, processGhostTick, shouldSkipMove,
-  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, handleShadowbladeTick,
+  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, handleShadowbladeTick, leaveArsonistTrail,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
@@ -682,6 +682,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             if (unit.type === 'tank') {
               moveTankFormation(unit, newPos, newGrid, allUnits);
             }
+            leaveArsonistTrail(newGrid, unit);
             newGrid[unit.row][unit.col].unit = null;
             unit.row = newPos.row;
             unit.col = newPos.col;
@@ -695,6 +696,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             if (unit.type === 'tank') {
               moveTankFormation(unit, kitePos, newGrid, allUnits);
             }
+            leaveArsonistTrail(newGrid, unit);
             newGrid[unit.row][unit.col].unit = null;
             unit.row = kitePos.row;
             unit.col = kitePos.col;

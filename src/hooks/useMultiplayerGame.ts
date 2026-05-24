@@ -4,7 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
-  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, handleShadowbladeTick, shouldSkipMove,
+  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
@@ -845,6 +845,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           const skipMove = shouldSkipMove(unit);
           const newPos = skipMove ? { row: unit.row, col: unit.col } : moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
+            leaveArsonistTrail(newGrid, unit);
             newGrid[unit.row][unit.col].unit = null;
             unit.row = newPos.row; unit.col = newPos.col;
             newGrid[unit.row][unit.col].unit = unit;
@@ -854,6 +855,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           unit.stuckTurns = 0;
           const kitePos = moveToward(unit, target, newGrid, allUnits);
           if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
+            leaveArsonistTrail(newGrid, unit);
             newGrid[unit.row][unit.col].unit = null;
             unit.row = kitePos.row; unit.col = kitePos.col;
             newGrid[unit.row][unit.col].unit = unit;

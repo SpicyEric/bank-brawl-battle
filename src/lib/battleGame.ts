@@ -319,7 +319,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   arsonist: {
     label: 'Brandstifter', emoji: '🔥', hp: 65, attack: 4, cooldown: 2,
-    description: 'Geringer Sofortschaden, zündet aber an: 6 Schaden pro Runde für 4 Runden. Stapelbar.',
+    description: 'Geringer Sofortschaden, zündet aber an: 6 Schaden pro Runde für 4 Runden. Stapelbar. Hinterlässt zudem eine Brandspur (3 Ticks), die nur Feinden Schaden zufügt.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
@@ -1381,6 +1381,16 @@ export function processLavaTick(grid: Cell[][], logs: string[]): void {
       cell.lavaOwnerTeam = undefined;
     }
   }
+}
+
+/** Arsonist: leave a 3-tick burning trail on the cell the unit is leaving.
+ *  Damages enemies only (lavaOwnerTeam = arsonist's team). Call BEFORE clearing the cell. */
+export function leaveArsonistTrail(grid: Cell[][], unit: Unit): void {
+  if (unit.type !== 'arsonist') return;
+  const cell = grid[unit.row]?.[unit.col];
+  if (!cell || cell.terrain === 'water') return;
+  cell.lavaTicks = 3;
+  cell.lavaOwnerTeam = unit.team;
 }
 
 /** Tick down banshee ghost timers; mark dead when ghost expires. */
