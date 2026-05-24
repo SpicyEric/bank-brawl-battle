@@ -1383,6 +1383,16 @@ export function processLavaTick(grid: Cell[][], logs: string[]): void {
   }
 }
 
+/** Arsonist: leave a 3-tick burning trail on the cell the unit is leaving.
+ *  Damages enemies only (lavaOwnerTeam = arsonist's team). Call BEFORE clearing the cell. */
+export function leaveArsonistTrail(grid: Cell[][], unit: Unit): void {
+  if (unit.type !== 'arsonist') return;
+  const cell = grid[unit.row]?.[unit.col];
+  if (!cell || cell.terrain === 'water') return;
+  cell.lavaTicks = 3;
+  cell.lavaOwnerTeam = unit.team;
+}
+
 /** Tick down banshee ghost timers; mark dead when ghost expires. */
 export function processGhostTick(units: Unit[], grid: Cell[][], logs: string[]): void {
   for (const u of units) {
