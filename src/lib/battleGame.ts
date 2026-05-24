@@ -61,9 +61,10 @@ export interface Unit {
   spinTicksLeft?: number; // dragon: ticks remaining in active fire spin (8 = just started)
   spinDirIdx?: number; // dragon: current beam direction (0..7)
   spinClockwise?: boolean; // dragon: rotation direction this spin
-  phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
-  isPhantom?: boolean; // doppelganger phantom flag
+  phantom?: number; // doppelganger phantom: ticks left of invulnerability (0 = vulnerable, still alive with 20 HP)
+  isPhantom?: boolean; // doppelganger phantom flag (kept true for life of phantom for visuals)
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
+  phantomId?: string; // link from original doppelganger → spawned phantom (original idles until phantom dies)
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -411,7 +412,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   spiderqueen: {
     label: 'Spinnenkönigin', emoji: '🕷️', hp: 70, attack: 15, cooldown: 2,
-    description: 'Bewegt sich in alle 8 Richtungen (bis 2 Felder). 35% Chance, Ziel im Netz zu fangen (3 Runden).',
+    description: 'Bewegt sich in alle 8 Richtungen (bis 2 Felder). 25% Chance, Ziel im Netz zu fangen (5 Ticks: kein Move, kein Angriff).',
     movePattern: [
       ...ALL_ADJACENT,
       { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
@@ -429,7 +430,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   doppelganger: {
     label: 'Doppelgänger', emoji: '👥', hp: 85, attack: 17, cooldown: 2,
-    description: 'Spawnt zu Beginn der Runde ein Phantom-Duplikat (5 Ticks unverwundbar). Gegner unterscheiden Original und Phantom nicht.',
+    description: 'Spawnt zu Rundenstart ein lila leuchtendes Phantom (20 HP, 5 Dmg, 5 Ticks unverwundbar) irgendwo in den 3 Gegnerlinien. Original bleibt still, bis das Phantom stirbt.',
     movePattern: DIAGONAL,
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -450,7 +451,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   chaindancer: {
-    label: 'Kettentänzer', emoji: '🪢', hp: 65, attack: 22, cooldown: 3,
+    label: 'Kettentänzer', emoji: '🪢', hp: 75, attack: 22, cooldown: 3,
     description: 'Kettenangriff: Schaden springt diagonal durch bis zu 3 Feinde (jeweils 70% Schaden). Diagonale Bewegung bis 2 Felder.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
@@ -1303,10 +1304,10 @@ export function applyPostAttackEffects(
     }
   }
 
-  // Spiderqueen: 35% chance to web target for 3 turns (separate field, distinct visual)
-  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.35) {
-    target.webbed = Math.max(target.webbed || 0, 3);
-    logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} 3 Runden gefangen`);
+  // Spiderqueen: 25% chance to web target for 5 ticks (no move, no attack at all)
+  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.25) {
+    target.webbed = Math.max(target.webbed || 0, 5);
+    logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} 5 Ticks gefangen`);
   }
 
   // Magnetiker pull is no longer per-attack — handled by tickMagnetPull every 4 ticks.
@@ -2287,59 +2288,65 @@ export function handleShadowbladeTick(
 
 
 
-/** Spawn a phantom duplicate next to each unspawned doppelganger.
- *  Phantom is invulnerable for 5 ticks, then disappears. */
+/** Spawn a phantom duplicate for each unspawned doppelganger.
+ *  Phantom spawns at a random cell in the opponent's 3 placement rows.
+ *  Phantom: 20 HP, 5 dmg, cooldown 2, invulnerable for 5 ticks. After 5 ticks
+ *  it becomes vulnerable but stays alive (with 20 HP max). Original doppelganger
+ *  remains idle (no move, no attack) until the phantom dies. */
 export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs: string[]): Unit[] {
   const spawned: Unit[] = [];
   const originals = allUnits.filter(u =>
     u.type === 'doppelganger' && !u.isPhantom && !u.doppelSpawned && u.hp > 0 && !u.dead
   );
   for (const orig of originals) {
-    const offsets = [
-      { r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 },
-      { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
-    ];
-    for (const o of offsets) {
-      const r = orig.row + o.r, c = orig.col + o.c;
-      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
-      const cell = grid[r][c];
-      if (cell.unit || cell.terrain === 'water') continue;
-      const phantom: Unit = {
-        ...orig,
-        id: crypto.randomUUID(),
-        row: r, col: c,
-        isPhantom: true,
-        phantom: 5,
-        doppelSpawned: true,
-        cooldown: 0,
-        bondedToTankId: undefined,
-        movedWithTank: false,
-        slotIndex: undefined,
-      };
-      grid[r][c].unit = phantom;
-      spawned.push(phantom);
-      orig.doppelSpawned = true;
-      logs.push(`👥 Doppelgänger spawnt Phantom (5 Ticks unverwundbar)`);
-      break;
-    }
     orig.doppelSpawned = true;
+    // Opponent's 3 placement rows (player → rows 0..2, enemy → rows 5..7)
+    const enemyRows = orig.team === 'player' ? [0, 1, 2] : [5, 6, 7];
+    const candidates: { r: number; c: number }[] = [];
+    for (const r of enemyRows) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        const cell = grid[r][c];
+        if (!cell.unit && cell.terrain !== 'water') candidates.push({ r, c });
+      }
+    }
+    if (candidates.length === 0) continue;
+    const pick = candidates[Math.floor(Math.random() * candidates.length)];
+    const phantom: Unit = {
+      ...orig,
+      id: crypto.randomUUID(),
+      row: pick.r, col: pick.c,
+      hp: 20, maxHp: 20,
+      attack: 5,
+      cooldown: 0, maxCooldown: 2,
+      isPhantom: true,
+      phantom: 5,
+      doppelSpawned: true,
+      bondedToTankId: undefined,
+      movedWithTank: false,
+      slotIndex: undefined,
+      activationTurn: 0,
+      startRow: pick.r,
+      stuckTurns: 0,
+      lastAttackedId: undefined,
+      phantomId: undefined,
+    };
+    grid[pick.r][pick.c].unit = phantom;
+    spawned.push(phantom);
+    orig.phantomId = phantom.id;
+    logs.push(`👥 Doppelgänger spawnt Phantom (20 HP, 5 Ticks unverwundbar)`);
   }
   allUnits.push(...spawned);
   return spawned;
 }
 
-/** Tick down phantom invulnerability timers. Phantom vanishes when timer hits 0. */
+/** Tick down phantom invulnerability timers. Phantom stays alive after invuln ends
+ *  (with its 20 HP); enemies can damage it normally from that point on. */
 export function tickPhantomTimers(allUnits: Unit[], grid: Cell[][], logs: string[]): void {
   for (const u of allUnits) {
     if (!u.isPhantom || u.phantom === undefined || u.dead) continue;
-    u.phantom -= 1;
-    if (u.phantom <= 0) {
-      u.hp = 0;
-      (u as any).dead = true;
-      if (grid[u.row]?.[u.col]?.unit?.id === u.id) {
-        grid[u.row][u.col].unit = null;
-      }
-      logs.push(`👥 Phantom verblasst`);
+    if (u.phantom > 0) {
+      u.phantom -= 1;
+      if (u.phantom === 0) logs.push(`👥 Phantom verliert seine Unverwundbarkeit`);
     }
   }
 }
