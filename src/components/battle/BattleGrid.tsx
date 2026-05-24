@@ -1009,6 +1009,23 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           </svg>
         );
       })}
+
+      {/* Rider horn: yellow square flash on each cell of the inner 3×3 then outer 5×5 ring */}
+      {hornFlashes.map(f => (
+        <div
+          key={f.id}
+          className={f.kind === 'inner' ? 'horn-flash-inner' : 'horn-flash-outer'}
+          style={{
+            position: 'absolute',
+            left: `${f.col * cellSize}%`,
+            top: `${visualRow(f.row) * cellSize}%`,
+            width: `${cellSize}%`,
+            height: `${cellSize}%`,
+            pointerEvents: 'none',
+            zIndex: 6,
+          }}
+        />
+      ))}
     </div>
   );
 }
