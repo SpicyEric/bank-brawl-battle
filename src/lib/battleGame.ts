@@ -286,7 +286,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // Mechanics marked "(geplant)" in the description are currently approximated via stats/patterns.
   banshee: {
     label: 'Banshee', emoji: '👻', hp: 70, attack: 16, cooldown: 2,
-    description: 'Diagonale Bewegung. Stirbt einmalig nur scheinbar – steht nach 3 Runden mit voller HP wieder auf (zweiter Tod ist endgültig).',
+    description: 'Diagonale Bewegung. Stirbt einmalig nur scheinbar – steht nach 3 Runden mit 40 HP und nur noch 10 ATK wieder auf (zweiter Tod ist endgültig).',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -1406,7 +1406,8 @@ export function processGhostTick(_units: Unit[], grid: Cell[][], logs: string[])
     u.reviveIn -= 1;
     if (u.reviveIn <= 0) {
       u.reviveIn = undefined;
-      u.hp = u.maxHp;
+      u.hp = 40;
+      u.attack = 10;
       (u as any).dead = false;
       u.bansheeRevived = true;
       u.ghost = 999; // persistent purple glow
