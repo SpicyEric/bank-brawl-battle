@@ -37,7 +37,9 @@ export interface Unit {
   movedWithTank?: boolean; // set to true when unit already moved this tick via tank formation
   burning?: { dmg: number; turns: number }[]; // active burn DoT stacks (arsonist)
   judgeBonus?: number; // extra ATK accrued by judge from fallen allies
-  ghost?: number; // banshee: turns remaining as ghost after death
+  ghost?: number; // banshee: visual purple glow flag (>0 = glow active)
+  reviveIn?: number; // banshee: ticks until revival from first death
+  bansheeRevived?: boolean; // banshee: already used its one revival
   firstAttackUsed?: boolean; // shadowblade: first attack bonus consumed
   teleportTimer?: number; // shadowblade: ticks until next teleport-strike
   homeRow?: number; // shadowblade: row to return to after teleport-strike
