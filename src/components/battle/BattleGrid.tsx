@@ -32,6 +32,7 @@ interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
 interface ChainEffect { id: string; cells: { row: number; col: number }[]; color: 'lightning' | 'chaindancer' }
+interface ImpulseEffect { id: string; row: number; col: number }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
@@ -47,6 +48,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [healPopups, setHealPopups] = useState<HealPopup[]>([]);
   const [freezeEffects, setFreezeEffects] = useState<FreezeEffect[]>([]);
   const [chainEffects, setChainEffects] = useState<ChainEffect[]>([]);
+  const [impulseEffects, setImpulseEffects] = useState<ImpulseEffect[]>([]);
+  const impulseCounter = useRef(0);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
@@ -401,6 +404,18 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         setChainEffects(prev => [...prev, ...newChains]);
         setTimeout(() => setChainEffects(prev => prev.filter(c => !newChains.find(nc => nc.id === c.id))), 900);
       }, delay);
+    }
+
+    // --- Mage impulse (shockwave) ---
+    const newImpulses: ImpulseEffect[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'impulse') continue;
+      impulseCounter.current += 1;
+      newImpulses.push({ id: `impulse-${impulseCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+    }
+    if (newImpulses.length > 0) {
+      setImpulseEffects(prev => [...prev, ...newImpulses]);
+      setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 900);
     }
   };
 
@@ -843,6 +858,26 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             {chain.cells.map((c, i) => (
               <circle key={`c-${i}`} cx={c.col * cellSize + cellSize / 2} cy={visualRow(c.row) * cellSize + cellSize / 2} r="2.2" fill={glow} opacity="0.9" />
             ))}
+          </svg>
+        );
+      })}
+
+      {/* Mage impulse: expanding shockwave ring centered on mage, spans 7x7 */}
+      {impulseEffects.map(imp => {
+        const cx = imp.col * cellSize + cellSize / 2;
+        const cy = visualRow(imp.row) * cellSize + cellSize / 2;
+        return (
+          <svg key={imp.id} className="absolute inset-0 z-40 pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <radialGradient id={`imp-grad-${imp.id}`}>
+                <stop offset="0%" stopColor="hsl(270, 100%, 80%)" stopOpacity="0.0" />
+                <stop offset="70%" stopColor="hsl(270, 100%, 75%)" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="hsl(280, 100%, 65%)" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill={`url(#imp-grad-${imp.id})`} className="mage-impulse-fill" />
+            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill="none" stroke="hsl(270, 100%, 80%)" strokeWidth="0.8" className="mage-impulse-ring" />
+            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill="none" stroke="hsl(290, 100%, 90%)" strokeWidth="0.4" className="mage-impulse-ring-inner" />
           </svg>
         );
       })}

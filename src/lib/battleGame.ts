@@ -1,3 +1,5 @@
+import type { BattleEvent } from './battleEvents';
+
 export type UnitType =
   | 'warrior' | 'rider' | 'archer' | 'assassin' | 'mage' | 'tank' | 'dragon' | 'healer' | 'frost'
   // New units (v2):
@@ -40,7 +42,9 @@ export interface Unit {
   skipNextMove?: boolean; // icegolem: alternate-turn movement
   isClone?: boolean; // spawned by cloner; clones cannot spawn more clones
   cloneTimer?: number; // cloner spawn cooldown countdown
+  clonesSpawnedTotal?: number; // lifetime total clones this cloner has spawned (max 3)
   parentClonerId?: string; // for clones: id of the cloner that spawned them
+  impulseTimer?: number; // mage shockwave cooldown countdown
   phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
   isPhantom?: boolean; // doppelganger phantom flag
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
@@ -244,7 +248,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 85,
     attack: 25,
     cooldown: 2,
-    description: 'Versteckt sich hinter Verbündeten. Greift diagonal 1-3 Felder an.',
+    description: 'Versteckt sich hinter Verbündeten. Greift diagonal 1-3 Felder an. Alle 7 Ticks: Impulswelle stößt alle Feinde im 7×7-Umkreis nach außen.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...DIAGONAL,
@@ -370,7 +374,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   cloner: {
     label: 'Kloner', emoji: '🧬', hp: 90, attack: 12, cooldown: 2,
-    description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt alle 3 Ticks einen Klon, der auf Feinde zustürmt.',
+    description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt alle 6 Ticks einen Klon (max. 3 Klone insgesamt), der auf Feinde zustürmt.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
@@ -1413,7 +1417,7 @@ export function shouldSkipMove(unit: Unit): boolean {
 }
 
 /** Cloner spawns a clone every 6 ticks in an adjacent empty cell.
- *  Max 3 living clones per cloner. Clones have 5 HP and 3 attack. */
+ *  Lifetime cap: max 3 clones per cloner ever (not just alive). Clones have 3 HP and 3 attack. */
 export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[]): Unit[] {
   const spawned: Unit[] = [];
   const cloners = allUnits.filter(u => u.type === 'cloner' && !u.isClone && u.hp > 0 && !u.dead);
@@ -1422,14 +1426,11 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
     { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
   ];
   for (const c of cloners) {
+    if ((c.clonesSpawnedTotal ?? 0) >= 3) continue; // lifetime limit reached
     if (c.cloneTimer === undefined || c.cloneTimer <= 0) c.cloneTimer = 6;
     c.cloneTimer -= 1;
     if (c.cloneTimer > 0) continue;
-    const aliveClones = allUnits.filter(u => u.isClone && u.parentClonerId === c.id && u.hp > 0 && !u.dead).length;
-    if (aliveClones >= 3) {
-      c.cloneTimer = 6;
-      continue;
-    }
+    let didSpawn = false;
     for (const o of offsets) {
       const r = c.row + o.r, col = c.col + o.c;
       if (r < 0 || r >= GRID_SIZE || col < 0 || col >= GRID_SIZE) continue;
@@ -1445,6 +1446,7 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
         isClone: true,
         parentClonerId: c.id,
         cloneTimer: undefined,
+        clonesSpawnedTotal: undefined,
         skipNextMove: false,
         cooldown: 0,
         bondedToTankId: undefined,
@@ -1457,14 +1459,103 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
       };
       grid[r][col].unit = clone;
       spawned.push(clone);
-      logs.push(`🧬 Kloner spawnt einen Klon!`);
+      c.clonesSpawnedTotal = (c.clonesSpawnedTotal ?? 0) + 1;
+      logs.push(`🧬 Kloner spawnt Klon (${c.clonesSpawnedTotal}/3)`);
+      didSpawn = true;
       break;
     }
     c.cloneTimer = 6;
+    if (!didSpawn) {
+      // couldn't place this tick (no free adjacent cell) — try again next tick without consuming a charge
+    }
   }
   allUnits.push(...spawned);
   return spawned;
 }
+
+/** Mage impulse: every 7 ticks each mage pushes ALL enemies within 7x7 (Chebyshev ≤3)
+ *  outward to land at distance > 3 (or until blocked / edge). Deals no damage. */
+export function tickMageImpulse(
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  logs: string[],
+): void {
+  const mages = allUnits.filter(u => u.type === 'mage' && u.hp > 0 && !u.dead);
+  for (const m of mages) {
+    if (m.impulseTimer === undefined || m.impulseTimer <= 0) m.impulseTimer = 7;
+    m.impulseTimer -= 1;
+    if (m.impulseTimer > 0) continue;
+    m.impulseTimer = 7;
+
+    // Collect enemies in 7x7 box (Chebyshev ≤3), sorted by distance descending so outer ones move first.
+    const targets: Unit[] = [];
+    for (let dr = -3; dr <= 3; dr++) for (let dc = -3; dc <= 3; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = m.row + dr, c = m.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const u = grid[r][c].unit;
+      if (!u || u.hp <= 0 || u.dead) continue;
+      if (u.team === m.team) continue;
+      targets.push(u);
+    }
+    targets.sort((a, b) => {
+      const da = Math.max(Math.abs(a.row - m.row), Math.abs(a.col - m.col));
+      const db = Math.max(Math.abs(b.row - m.row), Math.abs(b.col - m.col));
+      return db - da;
+    });
+
+    for (const t of targets) {
+      const sr = Math.sign(t.row - m.row);
+      const sc = Math.sign(t.col - m.col);
+      // Push outward step-by-step until Chebyshev > 3, blocked or edge.
+      let cur = { r: t.row, c: t.col };
+      while (true) {
+        const nr = cur.r + sr;
+        const nc = cur.c + sc;
+        if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) break;
+        const cell = grid[nr][nc];
+        if (cell.terrain === 'water') break;
+        if (cell.unit) break;
+        cur = { r: nr, c: nc };
+        const dist = Math.max(Math.abs(nr - m.row), Math.abs(nc - m.col));
+        if (dist > 3) break;
+      }
+      if (cur.r !== t.row || cur.c !== t.col) {
+        grid[t.row][t.col].unit = null;
+        t.row = cur.r; t.col = cur.c;
+        grid[cur.r][cur.c].unit = t;
+      }
+    }
+
+    // Build 7x7 ring cells for the visual impulse.
+    const ringCells: { row: number; col: number }[] = [];
+    for (let dr = -3; dr <= 3; dr++) for (let dc = -3; dc <= 3; dc++) {
+      const r = m.row + dr, c = m.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      ringCells.push({ row: r, col: c });
+    }
+
+    events.push({
+      type: 'impulse',
+      attackerId: m.id,
+      attackerRow: m.row,
+      attackerCol: m.col,
+      attackerEmoji: '🔮',
+      attackerType: 'mage',
+      targetId: m.id,
+      targetRow: m.row,
+      targetCol: m.col,
+      damage: 0,
+      isStrong: false,
+      isWeak: false,
+      isRanged: true,
+      aoeCells: ringCells,
+    });
+    logs.push(`🔮 ${m.team === 'player' ? '👤' : '💀'} Magier-Impuls!`);
+  }
+}
+
 
 /** Spawn a phantom duplicate next to each unspawned doppelganger.
  *  Phantom is invulnerable for 5 ticks, then disappears. */
