@@ -650,10 +650,7 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   if (unit.type === 'lamb') {
     return [...enemies].sort((a, b) => b.attack * b.hp - a.attack * a.hp)[0];
   }
-  // === VAMPIRE: always targets enemy with HIGHEST HP (nearest among ties) ===
-  if (unit.type === 'vampire') {
-    return [...enemies].sort((a, b) => b.hp - a.hp || distance(unit, a) - distance(unit, b))[0];
-  }
+  // (Vampire targeting now handled by switch-after-each-hit block below.)
   // === BANSHEE: always nearest enemy ===
   if (unit.type === 'banshee') {
     return [...enemies].sort((a, b) => distance(unit, a) - distance(unit, b))[0];
