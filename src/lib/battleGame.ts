@@ -246,7 +246,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 85,
     attack: 25,
     cooldown: 2,
-    description: 'Versteckt sich hinter Verbündeten. Greift diagonal 1-3 Felder an.',
+    description: 'Versteckt sich hinter Verbündeten. Greift diagonal 1-3 Felder an. Alle 7 Ticks: Impulswelle stößt alle Feinde im 7×7-Umkreis nach außen.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...DIAGONAL,
