@@ -594,6 +594,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       tickFrostNova(allUnits, newGrid, events, logs);
       // === Rider horn: every 9 ticks, +50% dmg buff to allies in 5x5 for 2 ticks ===
       tickRiderHorn(allUnits, newGrid, events, logs);
+      // === Archer volley: every 4 ticks, 8-direction infinite-range arrow salvo ===
+      tickArcherVolley(allUnits, newGrid, events, logs);
       // === Terrain regen: waterwalker heals on water ===
       tickTerrainHeals(allUnits, newGrid, logs);
 
