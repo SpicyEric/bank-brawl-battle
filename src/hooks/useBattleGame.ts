@@ -590,6 +590,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           if (u.hp <= 0) (u as any).dead = true;
         }
         if (u.bleeding.length === 0) u.bleeding = undefined;
+      }
+
+
 
       // === Lava field DoT (Vulkanit) ===
       processLavaTick(newGrid, logs);
