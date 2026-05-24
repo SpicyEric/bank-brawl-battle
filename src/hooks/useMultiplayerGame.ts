@@ -4,7 +4,7 @@ import {
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
-  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
+  MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, effectiveCooldown, tickTerrainHeals,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
@@ -19,7 +19,7 @@ interface MultiplayerConfig {
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken };
+  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken };
 }
 
 function serializeGrid(grid: Cell[][]) {
@@ -775,6 +775,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       tickMageImpulse(allUnits, newGrid, events, logs);
       // Frost Nova: every 7 ticks freeze enemies in 3x3 for 5 ticks at 30% dmg
       tickFrostNova(allUnits, newGrid, events, logs);
+      // Rider horn: every 9 ticks, +50% dmg buff to allies in 5x5 for 2 ticks
+      tickRiderHorn(allUnits, newGrid, events, logs);
       // Terrain regen: waterwalker heals on water
       tickTerrainHeals(allUnits, newGrid, logs);
       const currentTurn = turnCount;

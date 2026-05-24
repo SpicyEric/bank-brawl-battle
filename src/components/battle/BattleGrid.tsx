@@ -34,6 +34,7 @@ interface FreezeEffect { id: string; row: number; col: number }
 interface ChainEffect { id: string; cells: { row: number; col: number }[]; color: 'lightning' | 'chaindancer' }
 interface ImpulseEffect { id: string; row: number; col: number }
 interface FrostNovaEffect { id: string; row: number; col: number }
+interface RiderHornFlash { id: string; row: number; col: number; kind: 'inner' | 'outer' }
 interface TeleportEffect { id: string; row: number; col: number; kind: 'out' | 'in' }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview }: BattleGridProps) {
@@ -57,6 +58,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const teleportCounter = useRef(0);
   const [frostNovaEffects, setFrostNovaEffects] = useState<FrostNovaEffect[]>([]);
   const frostNovaCounter = useRef(0);
+  const [hornFlashes, setHornFlashes] = useState<RiderHornFlash[]>([]);
+  const hornCounter = useRef(0);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
@@ -229,7 +232,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     for (const evt of events) {
       // Impulse / teleport / spawn are visual-only and must not produce
       // projectiles, damage popups or AOE fire overlays.
-      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn' || evt.type === 'frostNova') continue;
+      if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn' || evt.type === 'frostNova' || evt.type === 'riderHorn') continue;
       if (evt.type === 'heal') healEvents.push(evt);
       else if (evt.type === 'freeze') freezeEvents.push(evt);
       else if (evt.isRanged) rangedDamageEvents.push(evt);
@@ -440,6 +443,31 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       if (evt.type !== 'frostNova') continue;
       frostNovaCounter.current += 1;
       newNovas.push({ id: `nova-${frostNovaCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+    }
+
+    // --- Rider horn: 2-step yellow wave (inner cells now, outer cells after 280ms) ---
+    const newHornInner: RiderHornFlash[] = [];
+    const newHornOuter: RiderHornFlash[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'riderHorn') continue;
+      for (const c of evt.innerCells || []) {
+        hornCounter.current += 1;
+        newHornInner.push({ id: `horn-i-${hornCounter.current}`, row: c.row, col: c.col, kind: 'inner' });
+      }
+      for (const c of evt.outerCells || []) {
+        hornCounter.current += 1;
+        newHornOuter.push({ id: `horn-o-${hornCounter.current}`, row: c.row, col: c.col, kind: 'outer' });
+      }
+    }
+    if (newHornInner.length > 0) {
+      setHornFlashes(prev => [...prev, ...newHornInner]);
+      setTimeout(() => setHornFlashes(prev => prev.filter(f => !newHornInner.find(n => n.id === f.id))), 650);
+    }
+    if (newHornOuter.length > 0) {
+      setTimeout(() => {
+        setHornFlashes(prev => [...prev, ...newHornOuter]);
+        setTimeout(() => setHornFlashes(prev => prev.filter(f => !newHornOuter.find(n => n.id === f.id))), 650);
+      }, 280);
     }
     if (newNovas.length > 0) {
       setFrostNovaEffects(prev => [...prev, ...newNovas]);
@@ -981,6 +1009,23 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           </svg>
         );
       })}
+
+      {/* Rider horn: yellow square flash on each cell of the inner 3×3 then outer 5×5 ring */}
+      {hornFlashes.map(f => (
+        <div
+          key={f.id}
+          className={f.kind === 'inner' ? 'horn-flash-inner' : 'horn-flash-outer'}
+          style={{
+            position: 'absolute',
+            left: `${f.col * cellSize}%`,
+            top: `${visualRow(f.row) * cellSize}%`,
+            width: `${cellSize}%`,
+            height: `${cellSize}%`,
+            pointerEvents: 'none',
+            zIndex: 6,
+          }}
+        />
+      ))}
     </div>
   );
 }

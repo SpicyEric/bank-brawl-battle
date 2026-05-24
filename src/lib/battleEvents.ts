@@ -1,6 +1,6 @@
 // Battle events emitted during combat for animations
 export interface BattleEvent {
-  type: 'hit' | 'kill' | 'heal' | 'freeze' | 'web' | 'chain' | 'spawn' | 'impulse' | 'teleport' | 'frostNova';
+  type: 'hit' | 'kill' | 'heal' | 'freeze' | 'web' | 'chain' | 'spawn' | 'impulse' | 'teleport' | 'frostNova' | 'riderHorn';
   attackerId: string;
   attackerRow: number;
   attackerCol: number;
@@ -22,4 +22,8 @@ export interface BattleEvent {
   chainCells?: { row: number; col: number }[];
   /** Unit ids that were pushed by a mage impulse (used to apply a stronger slide animation). */
   pushedIds?: string[];
+  /** Rider-horn: inner 3x3 cells (flash first). */
+  innerCells?: { row: number; col: number }[];
+  /** Rider-horn: outer ring cells (flash one tick later). */
+  outerCells?: { row: number; col: number }[];
 }

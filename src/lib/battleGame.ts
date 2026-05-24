@@ -53,6 +53,8 @@ export interface Unit {
   parentClonerId?: string; // for clones: id of the cloner that spawned them
   impulseTimer?: number; // mage shockwave cooldown countdown
   frostNovaTimer?: number; // frost mage 3x3 nova cooldown countdown
+  hornTimer?: number; // rider horn ability cooldown countdown (9 ticks)
+  hornBuff?: number; // ticks remaining of +50% damage from rider horn
   phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
   isPhantom?: boolean; // doppelganger phantom flag
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
@@ -184,7 +186,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 70,
     attack: 18,
     cooldown: 2,
-    description: 'Extrem mobiler Springer. Kann bis zu 3 Felder in alle Richtungen springen und über Hindernisse setzen. Wechselt Ziele.',
+    description: 'Extrem mobiler Springer. Springt bis zu 3 Felder in alle Richtungen und über Hindernisse. Wechselt nach jedem Angriff sein Ziel. Bläst alle 9 Ticks ins Horn: Verbündete in 5×5 um sich machen 2 Ticks lang +50% Schaden.',
     movePattern: [
       // Large star pattern: 3 squares in all 8 directions (jumps over obstacles)
       // Cardinal: 2 and 3 steps
@@ -1042,6 +1044,9 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // Shield aura: defender adjacent to friendly tank takes -20% damage
   if (grid && hasAdjacentFriendlyTank(defender, grid)) dmg *= 0.8;
 
+  // Rider horn buff: +50% damage while hornBuff active
+  if ((attacker.hornBuff || 0) > 0) dmg *= 1.5;
+
   return Math.floor(dmg);
 }
 
@@ -1733,6 +1738,68 @@ export function tickFrostNova(
       aoeCells,
     });
     logs.push(`❄️ ${f.team === 'player' ? '👤' : '💀'} Frost-Nova! (${frozenCount} eingefroren)`);
+  }
+}
+
+/** Rider horn: every 9 ticks each rider blasts a horn. Allies in inner 3×3
+ *  AND outer 5×5 ring around the rider get a 2-tick +50% damage buff.
+ *  Visual is a two-step wave: inner cells flash first, then outer ring. */
+export function tickRiderHorn(
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  logs: string[],
+): void {
+  // Decrement existing horn buffs once per battle tick (applied before new buffs).
+  for (const u of allUnits) {
+    if ((u.hornBuff || 0) > 0) {
+      u.hornBuff = (u.hornBuff || 0) - 1;
+      if ((u.hornBuff || 0) <= 0) u.hornBuff = undefined;
+    }
+  }
+
+  const riders = allUnits.filter(u => u.type === 'rider' && u.hp > 0 && !u.dead);
+  for (const r of riders) {
+    if (r.hornTimer === undefined || r.hornTimer <= 0) r.hornTimer = 9;
+    r.hornTimer -= 1;
+    if (r.hornTimer > 0) continue;
+    r.hornTimer = 9;
+
+    const innerCells: { row: number; col: number }[] = [];
+    const outerCells: { row: number; col: number }[] = [];
+    let buffed = 0;
+
+    for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+      const rr = r.row + dr, cc = r.col + dc;
+      if (rr < 0 || rr >= GRID_SIZE || cc < 0 || cc >= GRID_SIZE) continue;
+      const isInner = Math.abs(dr) <= 1 && Math.abs(dc) <= 1;
+      if (isInner) innerCells.push({ row: rr, col: cc });
+      else outerCells.push({ row: rr, col: cc });
+      const u = grid[rr][cc].unit;
+      if (!u || u.hp <= 0 || u.dead) continue;
+      if (u.team !== r.team) continue;
+      u.hornBuff = 2;
+      buffed += 1;
+    }
+
+    events.push({
+      type: 'riderHorn',
+      attackerId: r.id,
+      attackerRow: r.row,
+      attackerCol: r.col,
+      attackerEmoji: '📯',
+      attackerType: 'rider',
+      targetId: r.id,
+      targetRow: r.row,
+      targetCol: r.col,
+      damage: 0,
+      isStrong: false,
+      isWeak: false,
+      isRanged: false,
+      innerCells,
+      outerCells,
+    });
+    logs.push(`📯 ${r.team === 'player' ? '👤' : '💀'} Reiter-Horn! (+50% Schaden für ${buffed} Verbündete, 2 Ticks)`);
   }
 }
 
