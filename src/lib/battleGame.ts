@@ -52,6 +52,7 @@ export interface Unit {
   clonesSpawnedTotal?: number; // lifetime total clones this cloner has spawned (max 3)
   parentClonerId?: string; // for clones: id of the cloner that spawned them
   impulseTimer?: number; // mage shockwave cooldown countdown
+  magnetTimer?: number; // magnetiker pull cooldown countdown (every 4 ticks)
   frostNovaTimer?: number; // frost mage 3x3 nova cooldown countdown
   hornTimer?: number; // rider horn ability cooldown countdown (9 ticks)
   hornBuff?: number; // ticks remaining of +50% damage from rider horn
