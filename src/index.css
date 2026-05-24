@@ -631,3 +631,47 @@
 }
 .teleport-out .teleport-puff-emoji { animation: teleport-emoji-out-anim 0.6s ease-out forwards; }
 .teleport-in  .teleport-puff-emoji { animation: teleport-emoji-in-anim  0.6s ease-out forwards; }
+
+/* Frost Nova: expanding cyan burst over 3x3 around the frost mage */
+@keyframes frost-nova-ring-anim {
+  0%   { transform: scale(0.2); opacity: 0; stroke-width: 1.6; transform-origin: center; transform-box: fill-box; }
+  25%  { opacity: 1; stroke-width: 1.2; }
+  70%  { opacity: 0.85; stroke-width: 0.6; }
+  100% { transform: scale(1.0); opacity: 0; stroke-width: 0.2; }
+}
+.frost-nova-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: frost-nova-ring-anim 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  filter: drop-shadow(0 0 4px hsl(195 100% 80%)) drop-shadow(0 0 8px hsl(210 100% 75%));
+}
+.frost-nova-ring-inner {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: frost-nova-ring-anim 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.1s forwards;
+  filter: drop-shadow(0 0 6px hsl(200 100% 95%));
+}
+@keyframes frost-nova-fill-anim {
+  0%   { transform: scale(0.15); opacity: 0; transform-box: fill-box; transform-origin: center; }
+  30%  { opacity: 0.85; }
+  100% { transform: scale(1.0); opacity: 0; }
+}
+.frost-nova-fill {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: frost-nova-fill-anim 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes frost-nova-flake-anim {
+  0%   { opacity: 0; transform: scale(0.2) rotate(0deg); transform-box: fill-box; transform-origin: center; }
+  30%  { opacity: 1; transform: scale(1.15) rotate(120deg); }
+  100% { opacity: 0; transform: scale(1.4) rotate(240deg); }
+}
+.frost-nova-flake {
+  fill: hsl(200 100% 92%);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: frost-nova-flake-anim 1.0s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+  filter: drop-shadow(0 0 3px hsl(195 100% 85%)) drop-shadow(0 0 6px hsl(210 100% 70%));
+  opacity: 0;
+}
+
