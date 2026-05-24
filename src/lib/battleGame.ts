@@ -896,6 +896,21 @@ export function moveToward(unit: Unit, target: Unit, grid: Cell[][], allUnits?: 
   const possibleMoves = getMoveCells(unit, grid);
   if (possibleMoves.length === 0) return { row: unit.row, col: unit.col };
 
+  // Cloner (original): retreat — pick the move that maximizes min-distance to nearest enemy.
+  if (unit.type === 'cloner' && !unit.isClone) {
+    const enemies = (allUnits || []).filter(u => u.team !== unit.team && u.hp > 0 && !u.dead);
+    if (enemies.length === 0) return { row: unit.row, col: unit.col };
+    const candidates: Position[] = [...possibleMoves, { row: unit.row, col: unit.col }];
+    const minDistTo = (p: Position) => Math.min(...enemies.map(e => distance(p, e)));
+    candidates.sort((a, b) => {
+      const diff = minDistTo(b) - minDistTo(a);
+      if (diff !== 0) return diff;
+      // tie-break: prefer staying still
+      return (a.row === unit.row && a.col === unit.col) ? -1 : 1;
+    });
+    return candidates[0];
+  }
+
   const isRangedKiter = RANGED_KITERS.includes(unit.type);
 
   // --- Magnetic bond: bonded units get pulled back toward tank ---
