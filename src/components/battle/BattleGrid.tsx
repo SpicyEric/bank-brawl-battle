@@ -1057,6 +1057,35 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           }}
         />
       ))}
+
+      {/* Dragon fire-spin beam: per-cell sequential ignition */}
+      {dragonSpinFlames.map(f => (
+        <div
+          key={f.id}
+          className="dragon-fire-cell"
+          style={{
+            position: 'absolute',
+            left: `${f.col * cellSize}%`,
+            top: `${visualRow(f.row) * cellSize}%`,
+            width: `${cellSize}%`,
+            height: `${cellSize}%`,
+            pointerEvents: 'none',
+            zIndex: 7,
+          }}
+        >
+          <div
+            className="dragon-fire-emoji"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: `${cellSize * 0.55}cqw`,
+            }}
+          >🔥</div>
+        </div>
+      ))}
     </div>
   );
 }
