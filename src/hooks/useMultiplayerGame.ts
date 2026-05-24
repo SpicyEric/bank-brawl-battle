@@ -784,6 +784,20 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         if (unit.frozen && unit.frozen > 0) { unit.frozen -= 1; continue; }
         unit.cooldown = Math.max(0, unit.cooldown - 1);
 
+        // Shadowblade: custom teleport-strike behavior (every 5 ticks)
+        if (unit.type === 'shadowblade') {
+          handleShadowbladeTick(unit, allUnits, newGrid, events, logs, (atk, tgt, dmg) => {
+            let d = dmg;
+            if (atk.team === 'player') d = Math.round(d * playerDmgMod);
+            else {
+              d = Math.round(d * enemyDmgMod);
+              if (tgt.team === 'player') d = Math.round(d * shieldWallDefMod);
+            }
+            return d;
+          });
+          continue;
+        }
+
         if (unit.type === 'healer') {
           const allies = allUnits.filter(u => u.team === unit.team && u.id !== unit.id && u.hp > 0 && !u.dead);
           const healable = allies.filter(a => a.hp < a.maxHp);
