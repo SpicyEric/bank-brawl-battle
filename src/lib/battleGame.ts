@@ -173,7 +173,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 95,
     attack: 24,
     cooldown: 3,
-    description: 'Fliegt über Hindernisse. Flächenangriff (3x3, 30% Splash). Ignoriert Blockaden.',
+    description: 'Fliegt über Hindernisse. Flächenangriff (3x3, 30% Splash). Alle 10 Ticks: bleibt stehen und dreht sich 8 Ticks lang im Kreis, speit pro Tick einen 3-Felder-Feuerstrahl in eine Richtung. Getroffene Gegner brennen 8 Ticks (5 Dmg/Tick).',
     movePattern: [
       ...ALL_ADJACENT,
       { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
