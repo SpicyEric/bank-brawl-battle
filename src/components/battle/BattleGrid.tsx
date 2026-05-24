@@ -563,6 +563,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isWebbed = unit ? (unit.webbed ?? 0) > 0 : false;
           const isPhantom = unit ? !!unit.isPhantom && !unit.dead : false;
           const isBurning = unit ? !!(unit.burning && unit.burning.length > 0 && !unit.dead) : false;
+          const isBleeding = unit ? !!(unit.bleeding && unit.bleeding.length > 0 && !unit.dead) : false;
           const isInactive = unit && !isDead && unit.activationTurn !== undefined && unit.activationTurn > 0 && phase === 'place_player';
           const cellKey = `${cell.row}-${cell.col}`;
           const terrain = cell.terrain || 'none';
