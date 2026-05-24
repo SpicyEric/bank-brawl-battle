@@ -690,6 +690,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     {isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🧊</span>}
                     {isWebbed && !isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🕸️</span>}
                     {isBurning && !isFrozen && !isWebbed && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🔥</span>}
+                    {isBleeding && !isFrozen && !isWebbed && !isBurning && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🩸</span>}
                     {isPhantom && <span className="absolute -top-0.5 -left-0.5 text-[8px]">👥</span>}
                   </span>
 
