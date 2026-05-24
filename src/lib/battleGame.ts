@@ -55,6 +55,7 @@ export interface Unit {
   frostNovaTimer?: number; // frost mage 3x3 nova cooldown countdown
   hornTimer?: number; // rider horn ability cooldown countdown (9 ticks)
   hornBuff?: number; // ticks remaining of +50% damage from rider horn
+  volleyTimer?: number; // archer 8-direction volley cooldown countdown (4 ticks)
   phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
   isPhantom?: boolean; // doppelganger phantom flag
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
@@ -215,7 +216,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 65,
     attack: 18,
     cooldown: 2,
-    description: 'Bewegt sich in alle Richtungen (1 Feld). Greift orthogonal bis 3 Felder an.',
+    description: 'Bewegt sich in alle Richtungen (1 Feld). Greift orthogonal bis 3 Felder an. Alle 4 Ticks: 8-Pfeil-Salve in alle Richtungen (orthogonal + diagonal) mit unendlicher Reichweite – jeder Pfeil trifft den ersten Gegner auf seiner Linie.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
@@ -1800,6 +1801,71 @@ export function tickRiderHorn(
       outerCells,
     });
     logs.push(`📯 ${r.team === 'player' ? '👤' : '💀'} Reiter-Horn! (+50% Schaden für ${buffed} Verbündete, 2 Ticks)`);
+  }
+}
+
+/** Archer volley: every 4 ticks each archer fires 8 arrows simultaneously in
+ *  every orthogonal + diagonal direction with infinite range. Each arrow
+ *  pierces past empty cells and allied units, then hits the first enemy it
+ *  encounters for full archer damage (calcDamage). */
+export function tickArcherVolley(
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  logs: string[],
+): void {
+  const dirs: { dr: number; dc: number }[] = [
+    { dr: -1, dc: 0 }, { dr: 1, dc: 0 }, { dr: 0, dc: -1 }, { dr: 0, dc: 1 },
+    { dr: -1, dc: -1 }, { dr: -1, dc: 1 }, { dr: 1, dc: -1 }, { dr: 1, dc: 1 },
+  ];
+  const archers = allUnits.filter(u => u.type === 'archer' && u.hp > 0 && !u.dead);
+  for (const a of archers) {
+    if (a.volleyTimer === undefined || a.volleyTimer <= 0) a.volleyTimer = 4;
+    a.volleyTimer -= 1;
+    if (a.volleyTimer > 0) continue;
+    a.volleyTimer = 4;
+
+    let hitCount = 0;
+    for (const { dr, dc } of dirs) {
+      let r = a.row + dr, c = a.col + dc;
+      let target: Unit | null = null;
+      while (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+        const u = grid[r][c].unit;
+        if (u && u.hp > 0 && !u.dead && u.team !== a.team && !(u.isPhantom && (u.phantom ?? 0) > 0)) {
+          target = u;
+          break;
+        }
+        r += dr; c += dc;
+      }
+      if (!target) continue;
+
+      const dmg = calcDamage(a, target, grid);
+      target.hp = Math.max(0, target.hp - dmg);
+      if (target.hp <= 0) target.dead = true;
+      hitCount += 1;
+
+      const aColor = a.color || UNIT_COLOR_GROUPS[a.type];
+      const tColor = target.color || UNIT_COLOR_GROUPS[target.type];
+      const isStrong = (aColor === 'red' && tColor === 'green') || (aColor === 'green' && tColor === 'blue') || (aColor === 'blue' && tColor === 'red');
+      const isWeak = (tColor === 'red' && aColor === 'green') || (tColor === 'green' && aColor === 'blue') || (tColor === 'blue' && aColor === 'red');
+
+      events.push({
+        type: target.hp <= 0 ? 'kill' : 'hit',
+        attackerId: a.id,
+        attackerRow: a.row,
+        attackerCol: a.col,
+        attackerEmoji: '🏹',
+        attackerType: 'archer',
+        targetId: target.id,
+        targetRow: target.row,
+        targetCol: target.col,
+        damage: dmg,
+        isStrong,
+        isWeak,
+        isRanged: true,
+      });
+    }
+    logs.push(`🏹 ${a.team === 'player' ? '👤' : '💀'} Pfeilsalve! (${hitCount}/8 getroffen)`);
   }
 }
 
