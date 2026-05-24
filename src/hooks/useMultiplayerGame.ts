@@ -937,10 +937,25 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       if (events.length > 0) setBattleEvents(events);
 
       const alive = allUnits.filter(u => u.hp > 0);
-      const pAlive = alive.filter(u => u.team === 'player');
-      const eAlive = alive.filter(u => u.team === 'enemy');
-      setPlayerUnits(pAlive);
-      setEnemyUnits(eAlive);
+      const pAliveAll = alive.filter(u => u.team === 'player');
+      const eAliveAll = alive.filter(u => u.team === 'enemy');
+      // Clones don't count for win evaluation
+      const pAlive = pAliveAll.filter(u => !u.isClone);
+      const eAlive = eAliveAll.filter(u => !u.isClone);
+      const roundEnding = eAlive.length === 0 || pAlive.length === 0 || battleTimer <= 1;
+      if (roundEnding) {
+        for (let r = 0; r < GRID_SIZE; r++) {
+          for (let c = 0; c < GRID_SIZE; c++) {
+            const cu = newGrid[r][c].unit;
+            if (cu?.isClone) newGrid[r][c].unit = undefined;
+          }
+        }
+        setPlayerUnits(pAlive);
+        setEnemyUnits(eAlive);
+      } else {
+        setPlayerUnits(pAliveAll);
+        setEnemyUnits(eAliveAll);
+      }
 
       const newTurn = turnCount + 1;
       setTurnCount(newTurn);
