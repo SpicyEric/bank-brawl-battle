@@ -597,9 +597,13 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           unit.webbed -= 1;
           continue;
         }
-        // Frozen: skip movement, but still allowed to attack at 50% dmg (handled below)
+        // Frozen: skip movement, attack at reduced dmg (50% default, 30% from frost nova)
         const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
-        if (isFrozenNow) unit.frozen = (unit.frozen || 0) - 1;
+        const frozenDmgMul = unit.frozenDmgMul ?? 0.5;
+        if (isFrozenNow) {
+          unit.frozen = (unit.frozen || 0) - 1;
+          if ((unit.frozen || 0) <= 0) unit.frozenDmgMul = undefined;
+        }
 
         unit.cooldown = Math.max(0, unit.cooldown - 1);
 
