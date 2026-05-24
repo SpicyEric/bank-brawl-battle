@@ -61,6 +61,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const frostNovaCounter = useRef(0);
   const [hornFlashes, setHornFlashes] = useState<RiderHornFlash[]>([]);
   const hornCounter = useRef(0);
+  const [dragonSpinFlames, setDragonSpinFlames] = useState<DragonSpinFlame[]>([]);
+  const dragonSpinCounter = useRef(0);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
