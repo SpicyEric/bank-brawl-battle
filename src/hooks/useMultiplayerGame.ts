@@ -862,7 +862,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
         if (!canAttack(unit, target)) {
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const skipMove = isFrozenNow || shouldSkipMove(unit);
+          const skipMove = isFrozenNow || seekerHolds || shouldSkipMove(unit);
           const newPos = skipMove ? { row: unit.row, col: unit.col } : moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             leaveArsonistTrail(newGrid, unit);
@@ -871,9 +871,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             newGrid[unit.row][unit.col].unit = unit;
           }
         } else {
-          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen)
+          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen / seeker holding)
           unit.stuckTurns = 0;
-          if (!isFrozenNow) {
+          if (!isFrozenNow && !seekerHolds) {
             const kitePos = moveToward(unit, target, newGrid, allUnits);
             if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
               leaveArsonistTrail(newGrid, unit);
@@ -883,6 +883,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             }
           }
         }
+
 
         if (canAttack(unit, target) && unit.cooldown <= 0) {
           let dmg = calcDamage(unit, target, newGrid);
