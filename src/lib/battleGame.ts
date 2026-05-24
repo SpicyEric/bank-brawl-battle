@@ -39,6 +39,10 @@ export interface Unit {
   judgeBonus?: number; // extra ATK accrued by judge from fallen allies
   ghost?: number; // banshee: turns remaining as ghost after death
   firstAttackUsed?: boolean; // shadowblade: first attack bonus consumed
+  teleportTimer?: number; // shadowblade: ticks until next teleport-strike
+  homeRow?: number; // shadowblade: row to return to after teleport-strike
+  homeCol?: number; // shadowblade: col to return to after teleport-strike
+  pendingTeleportReturn?: boolean; // shadowblade: must teleport back this tick
   skipNextMove?: boolean; // icegolem: alternate-turn movement
   isClone?: boolean; // spawned by cloner; clones cannot spawn more clones
   cloneTimer?: number; // cloner spawn cooldown countdown
