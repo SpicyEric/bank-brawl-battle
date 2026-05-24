@@ -1672,6 +1672,86 @@ export function tickMageImpulse(
   }
 }
 
+/** Magnetiker pull: every 4 ticks each magnetiker yanks ALL enemies in 7×7 (Chebyshev ≤3)
+ *  as close as possible toward itself (until 1 cell away, blocked, or water). */
+export function tickMagnetPull(
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  logs: string[],
+): void {
+  const magnets = allUnits.filter(u => u.type === 'magnetiker' && u.hp > 0 && !u.dead);
+  for (const m of magnets) {
+    if (m.magnetTimer === undefined || m.magnetTimer <= 0) m.magnetTimer = 4;
+    m.magnetTimer -= 1;
+    if (m.magnetTimer > 0) continue;
+    m.magnetTimer = 4;
+
+    // Collect enemies in 7x7 box, sorted by ascending distance so closest ones fill slots first.
+    const targets: Unit[] = [];
+    for (let dr = -3; dr <= 3; dr++) for (let dc = -3; dc <= 3; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = m.row + dr, c = m.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const u = grid[r][c].unit;
+      if (!u || u.hp <= 0 || u.dead) continue;
+      if (u.team === m.team) continue;
+      targets.push(u);
+    }
+    targets.sort((a, b) => {
+      const da = Math.max(Math.abs(a.row - m.row), Math.abs(a.col - m.col));
+      const db = Math.max(Math.abs(b.row - m.row), Math.abs(b.col - m.col));
+      return da - db;
+    });
+
+    const pushedIds: string[] = [];
+
+    for (const t of targets) {
+      let cur = { r: t.row, c: t.col };
+      // Walk step-by-step toward magnetiker until next step is magnetiker, blocked or water.
+      while (true) {
+        const sr = Math.sign(m.row - cur.r);
+        const sc = Math.sign(m.col - cur.c);
+        if (sr === 0 && sc === 0) break;
+        const nr = cur.r + sr;
+        const nc = cur.c + sc;
+        if (nr === m.row && nc === m.col) break;
+        if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) break;
+        const cell = grid[nr][nc];
+        if (cell.terrain === 'water' && t.type !== 'waterwalker') break;
+        if (cell.unit) break;
+        cur = { r: nr, c: nc };
+      }
+      if (cur.r !== t.row || cur.c !== t.col) {
+        grid[t.row][t.col].unit = null;
+        t.row = cur.r; t.col = cur.c;
+        grid[cur.r][cur.c].unit = t;
+        pushedIds.push(t.id);
+      }
+    }
+
+    events.push({
+      type: 'impulse',
+      attackerId: m.id,
+      attackerRow: m.row,
+      attackerCol: m.col,
+      attackerEmoji: '🧲',
+      attackerType: 'magnetiker',
+      targetId: m.id,
+      targetRow: m.row,
+      targetCol: m.col,
+      damage: 0,
+      isStrong: false,
+      isWeak: false,
+      isRanged: false,
+      pushedIds,
+    });
+    logs.push(`🧲 ${m.team === 'player' ? '👤' : '💀'} Magnetiker zieht alle heran!`);
+  }
+}
+
+
+
 /** Frost Nova: every 7 ticks each frost mage freezes ALL enemies in 3×3 around itself
  *  for 5 ticks at 30% damage. Pure crowd control, no damage. */
 export function tickFrostNova(
