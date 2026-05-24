@@ -155,9 +155,9 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     label: 'Assassine',
     emoji: '🗡️',
     hp: 90,
-    attack: 18,
+    attack: 16,
     cooldown: 1,
-    description: 'Schneller Opportunist. Greift jede Runde an und wechselt zum nächsten verwundeten Ziel. Bewegt sich diagonal (2 Felder).',
+    description: 'Schneller Opportunist. Greift jede Runde an und wechselt zum nächsten verwundeten Ziel. Bewegt sich diagonal (2 Felder). Gegner unter 50% HP nehmen 20 Schaden statt 16.',
     movePattern: [
       ...DIAGONAL,
       { row: -2, col: -2 }, { row: -2, col: 2 },
