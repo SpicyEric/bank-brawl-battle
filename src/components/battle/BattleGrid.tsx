@@ -32,7 +32,7 @@ interface DragonFire { id: string; cells: { row: number; col: number }[] }
 interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
 interface ChainEffect { id: string; cells: { row: number; col: number }[]; color: 'lightning' | 'chaindancer' }
-interface ImpulseEffect { id: string; row: number; col: number }
+interface ImpulseEffect { id: string; row: number; col: number; kind: 'push' | 'pull' }
 interface FrostNovaEffect { id: string; row: number; col: number }
 interface RiderHornFlash { id: string; row: number; col: number; kind: 'inner' | 'outer' }
 interface DragonSpinFlame { id: string; row: number; col: number; delayMs: number }
@@ -430,7 +430,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     for (const evt of events) {
       if (evt.type !== 'impulse') continue;
       impulseCounter.current += 1;
-      newImpulses.push({ id: `impulse-${impulseCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+      newImpulses.push({ id: `impulse-${impulseCounter.current}`, row: evt.attackerRow, col: evt.attackerCol, kind: evt.attackerType === 'magnetiker' ? 'pull' : 'push' });
       if (evt.pushedIds) impulsePushedIdsBatch.push(...evt.pushedIds);
     }
     if (newImpulses.length > 0) {
@@ -972,25 +972,34 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         );
       })}
 
-      {/* Mage impulse: expanding shockwave ring centered on mage, spans 7x7 */}
+      {/* Mage impulse (push, expands) / Magnetiker pull (shrinks inward) */}
       {impulseEffects.map(imp => {
         const cx = imp.col * cellSize + cellSize / 2;
         const cy = visualRow(imp.row) * cellSize + cellSize / 2;
+        const isPull = imp.kind === 'pull';
+        const ringStroke = isPull ? 'hsl(180, 100%, 70%)' : 'hsl(270, 100%, 80%)';
+        const ringStrokeInner = isPull ? 'hsl(200, 100%, 85%)' : 'hsl(290, 100%, 90%)';
+        const fillStop1 = isPull ? 'hsl(180, 100%, 70%)' : 'hsl(270, 100%, 80%)';
+        const fillStop2 = isPull ? 'hsl(200, 100%, 60%)' : 'hsl(280, 100%, 65%)';
+        const fillCls = isPull ? 'magnet-impulse-fill' : 'mage-impulse-fill';
+        const ringCls = isPull ? 'magnet-impulse-ring' : 'mage-impulse-ring';
+        const ringInnerCls = isPull ? 'magnet-impulse-ring-inner' : 'mage-impulse-ring-inner';
         return (
           <svg key={imp.id} className="absolute inset-0 z-[5] pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             <defs>
               <radialGradient id={`imp-grad-${imp.id}`}>
-                <stop offset="0%" stopColor="hsl(270, 100%, 80%)" stopOpacity="0.0" />
-                <stop offset="70%" stopColor="hsl(270, 100%, 75%)" stopOpacity="0.35" />
-                <stop offset="100%" stopColor="hsl(280, 100%, 65%)" stopOpacity="0" />
+                <stop offset="0%" stopColor={fillStop1} stopOpacity="0.0" />
+                <stop offset="70%" stopColor={fillStop1} stopOpacity="0.35" />
+                <stop offset="100%" stopColor={fillStop2} stopOpacity="0" />
               </radialGradient>
             </defs>
-            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill={`url(#imp-grad-${imp.id})`} className="mage-impulse-fill" />
-            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill="none" stroke="hsl(270, 100%, 80%)" strokeWidth="0.8" className="mage-impulse-ring" />
-            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill="none" stroke="hsl(290, 100%, 90%)" strokeWidth="0.4" className="mage-impulse-ring-inner" />
+            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill={`url(#imp-grad-${imp.id})`} className={fillCls} />
+            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill="none" stroke={ringStroke} strokeWidth="0.8" className={ringCls} />
+            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill="none" stroke={ringStrokeInner} strokeWidth="0.4" className={ringInnerCls} />
           </svg>
         );
       })}
+
 
       {/* Shadowblade teleport puffs */}
       {teleportEffects.map(tp => (
