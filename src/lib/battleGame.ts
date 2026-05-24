@@ -1021,9 +1021,11 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   const aColor = getUnitColor(attacker);
   const dColor = getUnitColor(defender);
   if (COLOR_BEATS[aColor] === dColor) {
-    dmg *= COUNTER_MULTIPLIER;
+    // Warrior: +50% damage when countering (instead of +30%)
+    dmg *= attacker.type === 'warrior' ? 1.5 : COUNTER_MULTIPLIER;
   } else if (COLOR_BEATS[dColor] === aColor) {
-    dmg *= WEAKNESS_MULTIPLIER;
+    // Warrior: only -10% damage when weak (instead of -30%)
+    dmg *= attacker.type === 'warrior' ? 0.9 : WEAKNESS_MULTIPLIER;
   }
 
   const attackerTerrain = grid?.[attacker.row]?.[attacker.col]?.terrain;
