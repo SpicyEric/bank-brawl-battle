@@ -444,6 +444,31 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       frostNovaCounter.current += 1;
       newNovas.push({ id: `nova-${frostNovaCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
     }
+
+    // --- Rider horn: 2-step yellow wave (inner cells now, outer cells after 280ms) ---
+    const newHornInner: RiderHornFlash[] = [];
+    const newHornOuter: RiderHornFlash[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'riderHorn') continue;
+      for (const c of evt.innerCells || []) {
+        hornCounter.current += 1;
+        newHornInner.push({ id: `horn-i-${hornCounter.current}`, row: c.row, col: c.col, kind: 'inner' });
+      }
+      for (const c of evt.outerCells || []) {
+        hornCounter.current += 1;
+        newHornOuter.push({ id: `horn-o-${hornCounter.current}`, row: c.row, col: c.col, kind: 'outer' });
+      }
+    }
+    if (newHornInner.length > 0) {
+      setHornFlashes(prev => [...prev, ...newHornInner]);
+      setTimeout(() => setHornFlashes(prev => prev.filter(f => !newHornInner.find(n => n.id === f.id))), 650);
+    }
+    if (newHornOuter.length > 0) {
+      setTimeout(() => {
+        setHornFlashes(prev => [...prev, ...newHornOuter]);
+        setTimeout(() => setHornFlashes(prev => prev.filter(f => !newHornOuter.find(n => n.id === f.id))), 650);
+      }, 280);
+    }
     if (newNovas.length > 0) {
       setFrostNovaEffects(prev => [...prev, ...newNovas]);
       setTimeout(() => setFrostNovaEffects(prev => prev.filter(n => !newNovas.find(nn => nn.id === n.id))), 1100);
