@@ -37,6 +37,7 @@ export interface Unit {
   bondBroken?: boolean; // once bond breaks (blocked move), unit moves freely
   movedWithTank?: boolean; // set to true when unit already moved this tick via tank formation
   burning?: { dmg: number; turns: number }[]; // active burn DoT stacks (arsonist)
+  bleeding?: number[]; // vampire bite DoT queue: dmg values applied one per following tick (e.g. [10,5,3,1])
   judgeBonus?: number; // extra ATK accrued by judge from fallen allies
   ghost?: number; // banshee: visual purple glow flag (>0 = glow active)
   reviveIn?: number; // banshee: ticks until revival from first death
@@ -304,7 +305,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   vampire: {
     label: 'Vampir', emoji: '🧛', hp: 80, attack: 19, cooldown: 2,
-    description: 'Lifesteal 30%. Bei Overheal explodiert er sofort für 25 Splash an angrenzende Feinde.',
+    description: 'Lifesteal 30% des verursachten Schadens. Fügt jedem Ziel Blutung zu (10/5/3/1 HP über die nächsten 4 Ticks). Wechselt nach jedem Angriff das Ziel.',
     movePattern: DIAGONAL,
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -649,10 +650,7 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   if (unit.type === 'lamb') {
     return [...enemies].sort((a, b) => b.attack * b.hp - a.attack * a.hp)[0];
   }
-  // === VAMPIRE: always targets enemy with HIGHEST HP (nearest among ties) ===
-  if (unit.type === 'vampire') {
-    return [...enemies].sort((a, b) => b.hp - a.hp || distance(unit, a) - distance(unit, b))[0];
-  }
+  // (Vampire targeting now handled by switch-after-each-hit block below.)
   // === BANSHEE: always nearest enemy ===
   if (unit.type === 'banshee') {
     return [...enemies].sort((a, b) => distance(unit, a) - distance(unit, b))[0];
@@ -684,8 +682,8 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     if (locked) return locked;
   }
 
-  // === FROST / MAGE: switch target after every attack ===
-  if ((unit.type === 'frost' || unit.type === 'mage') &&
+  // === FROST / MAGE / VAMPIRE: switch target after every attack (nearest other enemy) ===
+  if ((unit.type === 'frost' || unit.type === 'mage' || unit.type === 'vampire') &&
       unit.lastAttackedId && enemies.length > 1) {
     const others = enemies.filter(e => e.id !== unit.lastAttackedId);
     if (others.length > 0) {

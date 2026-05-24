@@ -563,6 +563,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isWebbed = unit ? (unit.webbed ?? 0) > 0 : false;
           const isPhantom = unit ? !!unit.isPhantom && !unit.dead : false;
           const isBurning = unit ? !!(unit.burning && unit.burning.length > 0 && !unit.dead) : false;
+          const isBleeding = unit ? !!(unit.bleeding && unit.bleeding.length > 0 && !unit.dead) : false;
           const isInactive = unit && !isDead && unit.activationTurn !== undefined && unit.activationTurn > 0 && phase === 'place_player';
           const cellKey = `${cell.row}-${cell.col}`;
           const terrain = cell.terrain || 'none';
@@ -654,7 +655,15 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                       }}
                     />
                   )}
-                  {/* Phantom shimmer overlay – doppelganger invulnerable phantom */}
+                  {/* Persistent bleed overlay – vampire bite DoT */}
+                  {isBleeding && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm animate-pulse"
+                      style={{
+                        background: 'radial-gradient(circle at 50% 35%, hsl(0 85% 45% / 0.45), hsl(0 90% 30% / 0.20) 70%, transparent 100%)',
+                        boxShadow: 'inset 0 -6px 8px hsl(0 90% 35% / 0.55)',
+                      }}
+                    />
+                  )}
                   {isPhantom && (
                     <div className="absolute inset-0 z-0 pointer-events-none rounded-sm animate-pulse"
                       style={{
@@ -681,6 +690,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     {isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🧊</span>}
                     {isWebbed && !isFrozen && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🕸️</span>}
                     {isBurning && !isFrozen && !isWebbed && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🔥</span>}
+                    {isBleeding && !isFrozen && !isWebbed && !isBurning && <span className="absolute -top-0.5 -right-0.5 text-[8px]">🩸</span>}
                     {isPhantom && <span className="absolute -top-0.5 -left-0.5 text-[8px]">👥</span>}
                   </span>
 
