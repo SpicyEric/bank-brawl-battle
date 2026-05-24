@@ -407,7 +407,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   waterwalker: {
     label: 'Wasserwandler', emoji: '🌊', hp: 85, attack: 19, cooldown: 2,
-    description: 'Strebt aktiv ins Wasser. Auf Wasser: -30% erlittener Schaden, bleibt stehen und verteidigt seinen Tümpel.',
+    description: 'Strebt zwanghaft in den nächsten Tümpel. Auf Wasser: -30% erlittener Schaden, regeneriert +3 HP pro Tick. Ohne Wasserfeld kämpft er normal.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
