@@ -479,6 +479,32 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       setTimeout(() => setFrostNovaEffects(prev => prev.filter(n => !newNovas.find(nn => nn.id === n.id))), 1100);
     }
 
+    // --- Dragon fire-spin: per-tick 3-cell beam, cells ignite one after another ---
+    const newSpinFlames: DragonSpinFlame[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'dragonSpin') continue;
+      const cells = evt.spinCells || [];
+      cells.forEach((c, i) => {
+        dragonSpinCounter.current += 1;
+        newSpinFlames.push({
+          id: `dspin-${dragonSpinCounter.current}`,
+          row: c.row, col: c.col,
+          delayMs: i * 110,
+        });
+      });
+    }
+    if (newSpinFlames.length > 0) {
+      // Stagger spawn by delayMs, remove each after its animation.
+      for (const f of newSpinFlames) {
+        setTimeout(() => {
+          setDragonSpinFlames(prev => [...prev, f]);
+          setTimeout(() => {
+            setDragonSpinFlames(prev => prev.filter(x => x.id !== f.id));
+          }, 850);
+        }, f.delayMs);
+      }
+    }
+
     // --- Shadowblade teleport puffs ---
     const newTeleports: TeleportEffect[] = [];
     for (const evt of events) {
