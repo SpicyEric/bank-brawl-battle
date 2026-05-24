@@ -1930,6 +1930,7 @@ function fireDragonBeam(
   grid: Cell[][],
   events: BattleEvent[],
   logs: string[],
+  beamOrder: number = 0,
 ): void {
   const { dr, dc } = DRAGON_SPIN_DIRS[dirIdx];
   const cells: { row: number; col: number }[] = [];
@@ -1967,6 +1968,7 @@ function fireDragonBeam(
     isRanged: false,
     spinCells: cells,
     spinDirIdx: dirIdx,
+    spinBeamOrder: beamOrder,
   });
 
   if (hits > 0) {
@@ -1980,13 +1982,16 @@ export function tickDragonSpin(
   events: BattleEvent[],
   logs: string[],
 ): void {
+  const BEAMS_PER_TICK = 4; // 8 directions over 2 ticks = whip swing
   const dragons = allUnits.filter(u => u.type === 'dragon' && u.hp > 0 && !u.dead);
   for (const d of dragons) {
-    // Continuing an active spin: fire the next beam this tick.
+    // Continuing an active spin: fire BEAMS_PER_TICK beams this tick.
     if ((d.spinTicksLeft ?? 0) > 0) {
-      const idx = d.spinDirIdx ?? 0;
-      fireDragonBeam(d, idx, allUnits, grid, events, logs);
-      d.spinDirIdx = ((idx + (d.spinClockwise ? 1 : -1)) + 8) % 8;
+      for (let i = 0; i < BEAMS_PER_TICK; i++) {
+        const idx = d.spinDirIdx ?? 0;
+        fireDragonBeam(d, idx, allUnits, grid, events, logs, i);
+        d.spinDirIdx = ((idx + (d.spinClockwise ? 1 : -1)) + 8) % 8;
+      }
       d.spinTicksLeft = (d.spinTicksLeft ?? 0) - 1;
       if ((d.spinTicksLeft ?? 0) <= 0) {
         d.spinTicksLeft = undefined;
@@ -2016,15 +2021,19 @@ export function tickDragonSpin(
     }
     d.spinClockwise = Math.random() < 0.5;
     d.spinDirIdx = startIdx;
-    d.spinTicksLeft = 8;
-    logs.push(`🐉 ${d.team === 'player' ? '👤' : '💀'} Drache beginnt Feuerwirbel!`);
+    d.spinTicksLeft = 2;
+    logs.push(`🐉 ${d.team === 'player' ? '👤' : '💀'} Drache schwingt Feuerpeitsche!`);
 
-    // Fire the first beam immediately this tick.
-    fireDragonBeam(d, startIdx, allUnits, grid, events, logs);
-    d.spinDirIdx = ((startIdx + (d.spinClockwise ? 1 : -1)) + 8) % 8;
+    // Fire first batch of BEAMS_PER_TICK beams immediately this tick.
+    for (let i = 0; i < BEAMS_PER_TICK; i++) {
+      const idx = d.spinDirIdx ?? 0;
+      fireDragonBeam(d, idx, allUnits, grid, events, logs, i);
+      d.spinDirIdx = ((idx + (d.spinClockwise ? 1 : -1)) + 8) % 8;
+    }
     d.spinTicksLeft -= 1;
   }
 }
+
 
 
 

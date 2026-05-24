@@ -30,4 +30,6 @@ export interface BattleEvent {
   spinCells?: { row: number; col: number }[];
   /** Dragon fire-spin: beam direction index (0..7) for this tick. */
   spinDirIdx?: number;
+  /** Dragon fire-spin: order of this beam within the current tick (0..N-1). */
+  spinBeamOrder?: number;
 }
