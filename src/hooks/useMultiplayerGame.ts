@@ -826,7 +826,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
         if (!canAttack(unit, target)) {
           unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const newPos = moveToward(unit, target, newGrid, allUnits);
+          const skipMove = shouldSkipMove(unit);
+          const newPos = skipMove ? { row: unit.row, col: unit.col } : moveToward(unit, target, newGrid, allUnits);
           if (newPos.row !== unit.row || newPos.col !== unit.col) {
             newGrid[unit.row][unit.col].unit = null;
             unit.row = newPos.row; unit.col = newPos.col;
