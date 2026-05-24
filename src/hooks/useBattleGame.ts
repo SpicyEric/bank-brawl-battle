@@ -1009,8 +1009,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     if (battleRef.current) clearInterval(battleRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
 
-    const pAlive = playerUnits.filter(u => u.hp > 0 && !u.dead);
-    const eAlive = enemyUnits.filter(u => u.hp > 0 && !u.dead);
+    const pAlive = playerUnits.filter(u => u.hp > 0 && !u.dead && !u.isClone);
+    const eAlive = enemyUnits.filter(u => u.hp > 0 && !u.dead && !u.isClone);
 
     if (pAlive.length > eAlive.length) {
       const newPS = playerScoreRef.current + 1;
