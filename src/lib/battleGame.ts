@@ -52,6 +52,7 @@ export interface Unit {
   clonesSpawnedTotal?: number; // lifetime total clones this cloner has spawned (max 3)
   parentClonerId?: string; // for clones: id of the cloner that spawned them
   impulseTimer?: number; // mage shockwave cooldown countdown
+  frostNovaTimer?: number; // frost mage 3x3 nova cooldown countdown
   phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
   isPhantom?: boolean; // doppelganger phantom flag
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
