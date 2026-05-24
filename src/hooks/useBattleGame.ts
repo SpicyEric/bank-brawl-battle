@@ -743,23 +743,38 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
 
           // Judge: +8 ATK for each fallen ally — recalculated below at end of tick.
 
-          // Lightning: chain to adjacent enemies for 50% damage
+          // Lightning: chain hops within radius 2 around last hit target.
+          // Damage multipliers per hop after primary: 50%, 40%, 30%, 20%, 10%.
           let lightningChainCells: { row: number; col: number }[] | undefined;
           if (unit.type === 'lightning') {
             lightningChainCells = [{ row: target.row, col: target.col }];
-            const chainDmg = Math.round(dmg * 0.5);
-            for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-              if (dr === 0 && dc === 0) continue;
-              const ar = target.row + dr, ac = target.col + dc;
-              if (ar < 0 || ar >= GRID_SIZE || ac < 0 || ac >= GRID_SIZE) continue;
-              const cu = newGrid[ar][ac].unit;
-              if (cu && cu.hp > 0 && !cu.dead && cu.team !== unit.team && cu.id !== target.id) {
+            const hopMults = [0.5, 0.4, 0.3, 0.2, 0.1];
+            const hit = new Set<string>([target.id]);
+            let current: { row: number; col: number } = { row: target.row, col: target.col };
+            for (const mult of hopMults) {
+              // Find nearest enemy (Chebyshev ≤2) to current that hasn't been hit.
+              let best: { u: any; dist: number } | null = null;
+              for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                const ar = current.row + dr, ac = current.col + dc;
+                if (ar < 0 || ar >= GRID_SIZE || ac < 0 || ac >= GRID_SIZE) continue;
+                const cu = newGrid[ar][ac].unit;
+                if (!cu || cu.hp <= 0 || cu.dead) continue;
+                if (cu.team === unit.team) continue;
+                if (hit.has(cu.id)) continue;
                 if (cu.isPhantom && (cu.phantom ?? 0) > 0) continue;
-                cu.hp = Math.max(0, cu.hp - chainDmg);
-                if (cu.hp <= 0) (cu as any).dead = true;
-                lightningChainCells.push({ row: ar, col: ac });
-                logs.push(`⚡ Blitz → ${UNIT_DEFS[cu.type].emoji} ${chainDmg} (Kettenblitz)`);
+                const d = Math.max(Math.abs(dr), Math.abs(dc));
+                if (!best || d < best.dist) best = { u: cu, dist: d };
               }
+              if (!best) break;
+              const cu = best.u;
+              const chainDmg = Math.max(1, Math.round(dmg * mult));
+              cu.hp = Math.max(0, cu.hp - chainDmg);
+              if (cu.hp <= 0) (cu as any).dead = true;
+              hit.add(cu.id);
+              lightningChainCells.push({ row: cu.row, col: cu.col });
+              logs.push(`⚡ Blitz → ${UNIT_DEFS[cu.type].emoji} ${chainDmg} (Kettenblitz ${Math.round(mult * 100)}%)`);
+              current = { row: cu.row, col: cu.col };
             }
           }
 
