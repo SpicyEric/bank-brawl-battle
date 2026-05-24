@@ -186,7 +186,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const confirmPlacementRef = useRef<(() => void) | null>(null);
 
   const playerMaxUnits = getMaxUnits(playerScore, enemyScore, roundNumber);
-  const enemyMaxUnits = getMaxUnits(enemyScore, playerScore, roundNumber);
+  // AI always gets the same cap as the player (symmetric round escalation)
+  const enemyMaxUnits = playerMaxUnits;
 
   // Slot mode: slots can be reused on the battlefield (mono comps allowed).
   // placedSlots is kept empty so the picker never disables a slot during placement.
