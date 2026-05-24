@@ -1331,14 +1331,15 @@ export function applyPostAttackEffects(
 /** Apply death-trigger effects: mirror explosion, lamb heal, banshee ghost.
  *  Returns true if the unit should NOT be marked dead yet (e.g. banshee turned ghost). */
 export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[][], logs: string[]): boolean {
-  // Banshee → ghost form (3 turns +10 ATK)
-  if (deadUnit.type === 'banshee' && deadUnit.ghost === undefined) {
-    deadUnit.ghost = 3;
-    deadUnit.hp = 1;
-    (deadUnit as any).dead = false;
-    deadUnit.attack += 10;
-    logs.push(`👻 Banshee erhebt sich als Geist (+10 ATK, 3 Runden)`);
-    return true; // not really dead
+  // Banshee → fake death: appears dead & blocks the cell for 3 ticks, then revives at full HP.
+  // Second death is permanent.
+  if (deadUnit.type === 'banshee' && !deadUnit.bansheeRevived && deadUnit.reviveIn === undefined) {
+    deadUnit.reviveIn = 3;
+    deadUnit.hp = 0;
+    (deadUnit as any).dead = true;
+    deadUnit.ghost = 0; // no glow while "dead"
+    logs.push(`💀 Banshee gefallen – erhebt sich in 3 Runden wieder`);
+    return false; // truly dead for now (cell stays blocked); caller leaves dead=true
   }
   // Mirror death explosion: 20 dmg to adjacent enemies
   if (deadUnit.type === 'mirror') {
