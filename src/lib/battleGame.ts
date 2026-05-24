@@ -37,6 +37,7 @@ export interface Unit {
   bondBroken?: boolean; // once bond breaks (blocked move), unit moves freely
   movedWithTank?: boolean; // set to true when unit already moved this tick via tank formation
   burning?: { dmg: number; turns: number }[]; // active burn DoT stacks (arsonist)
+  bleeding?: number[]; // vampire bite DoT queue: dmg values applied one per following tick (e.g. [10,5,3,1])
   judgeBonus?: number; // extra ATK accrued by judge from fallen allies
   ghost?: number; // banshee: visual purple glow flag (>0 = glow active)
   reviveIn?: number; // banshee: ticks until revival from first death
