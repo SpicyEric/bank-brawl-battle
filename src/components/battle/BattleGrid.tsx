@@ -861,6 +861,26 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           </svg>
         );
       })}
+
+      {/* Mage impulse: expanding shockwave ring centered on mage, spans 7x7 */}
+      {impulseEffects.map(imp => {
+        const cx = imp.col * cellSize + cellSize / 2;
+        const cy = visualRow(imp.row) * cellSize + cellSize / 2;
+        return (
+          <svg key={imp.id} className="absolute inset-0 z-40 pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <radialGradient id={`imp-grad-${imp.id}`}>
+                <stop offset="0%" stopColor="hsl(270, 100%, 80%)" stopOpacity="0.0" />
+                <stop offset="70%" stopColor="hsl(270, 100%, 75%)" stopOpacity="0.35" />
+                <stop offset="100%" stopColor="hsl(280, 100%, 65%)" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill={`url(#imp-grad-${imp.id})`} className="mage-impulse-fill" />
+            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill="none" stroke="hsl(270, 100%, 80%)" strokeWidth="0.8" className="mage-impulse-ring" />
+            <circle cx={cx} cy={cy} r={cellSize * 3.5} fill="none" stroke="hsl(290, 100%, 90%)" strokeWidth="0.4" className="mage-impulse-ring-inner" />
+          </svg>
+        );
+      })}
     </div>
   );
 }
