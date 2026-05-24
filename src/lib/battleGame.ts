@@ -61,9 +61,10 @@ export interface Unit {
   spinTicksLeft?: number; // dragon: ticks remaining in active fire spin (8 = just started)
   spinDirIdx?: number; // dragon: current beam direction (0..7)
   spinClockwise?: boolean; // dragon: rotation direction this spin
-  phantom?: number; // doppelganger phantom: ticks left of invulnerability; disappears after
-  isPhantom?: boolean; // doppelganger phantom flag
+  phantom?: number; // doppelganger phantom: ticks left of invulnerability (0 = vulnerable, still alive with 20 HP)
+  isPhantom?: boolean; // doppelganger phantom flag (kept true for life of phantom for visuals)
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
+  phantomId?: string; // link from original doppelganger → spawned phantom (original idles until phantom dies)
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
