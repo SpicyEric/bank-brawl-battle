@@ -286,7 +286,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // Mechanics marked "(geplant)" in the description are currently approximated via stats/patterns.
   banshee: {
     label: 'Banshee', emoji: '👻', hp: 70, attack: 16, cooldown: 2,
-    description: 'Diagonale Bewegung. Bleibt nach dem Tod 3 Runden als Geist aktiv (+10 ATK).',
+    description: 'Diagonale Bewegung. Stirbt einmalig nur scheinbar – steht nach 3 Runden mit voller HP wieder auf (zweiter Tod ist endgültig).',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
