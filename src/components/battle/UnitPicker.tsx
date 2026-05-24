@@ -92,7 +92,7 @@ export function UnitPicker({
       // Long press → info modal
       longPressTimer.current = setTimeout(() => {
         didLongPress.current = true;
-        setInfoUnit(type);
+        setInfoUnit({ type, color: SLOT_COLORS[idx] });
         dragStart.current = null;
       }, LONG_PRESS_MS);
       try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
