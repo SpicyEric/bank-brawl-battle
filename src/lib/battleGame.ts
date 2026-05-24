@@ -1282,7 +1282,7 @@ export function applyPostAttackEffects(
   // Icegolem: 25% chance to freeze melee attacker for 1 turn
   if (target.type === 'icegolem' && attacker.hp > 0 && Math.random() < 0.25) {
     const dist = Math.abs(attacker.row - target.row) + Math.abs(attacker.col - target.col);
-    if (dist <= 2) {
+    if (dist <= 2 && !isImmuneToFreeze(attacker, grid)) {
       attacker.frozen = Math.max(attacker.frozen || 0, 1);
       logs.push(`🧊 Eisgolem friert ${UNIT_DEFS[attacker.type].emoji} ein`);
     }
