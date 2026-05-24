@@ -606,6 +606,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       for (const unit of acting) {
         if (unit.hp <= 0) continue;
 
+        // Dragon mid fire-spin: skip movement/attack entirely.
+        if (unit.type === 'dragon' && (unit.spinTicksLeft ?? 0) > 0) continue;
+
         // Webbed: can't act at all (spiderqueen net)
         if (unit.webbed && unit.webbed > 0) {
           unit.webbed -= 1;
