@@ -898,6 +898,23 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           </svg>
         );
       })}
+
+      {/* Shadowblade teleport puffs */}
+      {teleportEffects.map(tp => (
+        <div
+          key={tp.id}
+          className={`absolute pointer-events-none z-40 ${tp.kind === 'out' ? 'teleport-out' : 'teleport-in'}`}
+          style={{
+            left: `${tp.col * cellSize}%`,
+            top: `${visualRow(tp.row) * cellSize}%`,
+            width: `${cellSize}%`,
+            height: `${cellSize}%`,
+          }}
+        >
+          <div className="absolute inset-0 teleport-puff-bg" />
+          <div className="absolute inset-0 flex items-center justify-center text-2xl teleport-puff-emoji">💨</div>
+        </div>
+      ))}
     </div>
   );
 }
