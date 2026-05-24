@@ -445,7 +445,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
 
 export const UNIT_TYPES: UnitType[] = Object.keys(UNIT_DEFS) as UnitType[];
 export const BASE_UNITS = 5;
-export const MAX_UNITS = 7; // absolute cap
+export const MAX_UNITS = 20; // absolute cap (limited by available rows: 3×8=24 cells)
 
 // Comeback mechanic: behind by 2+ → +1, behind by 4+ → +2
 // Round escalation: round 1 = 1 unit, round 2 = 2, ... until BASE_UNITS reached.
