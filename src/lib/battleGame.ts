@@ -1968,6 +1968,7 @@ function fireDragonBeam(
     isRanged: false,
     spinCells: cells,
     spinDirIdx: dirIdx,
+    spinBeamOrder: beamOrder,
   });
 
   if (hits > 0) {
