@@ -444,6 +444,18 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       setTimeout(() => setImpulsePushedIds(new Set()), 1700);
     }
 
+    // --- Mirror death explosion (red 3x3 shockwave) ---
+    const newMirrorBlasts: { id: string; row: number; col: number }[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'mirrorExplode') continue;
+      mirrorExplosionCounter.current += 1;
+      newMirrorBlasts.push({ id: `mirror-x-${mirrorExplosionCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+    }
+    if (newMirrorBlasts.length > 0) {
+      setMirrorExplosions(prev => [...prev, ...newMirrorBlasts]);
+      setTimeout(() => setMirrorExplosions(prev => prev.filter(m => !newMirrorBlasts.find(nb => nb.id === m.id))), 1100);
+    }
+
     // --- Frost Nova (3x3 freeze burst) ---
     const newNovas: FrostNovaEffect[] = [];
     for (const evt of events) {
