@@ -7,7 +7,7 @@ import {
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
   applyPostAttackEffects, applyDeathEffects, processLavaTick, processGhostTick, shouldSkipMove,
-  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack,
+  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
@@ -580,6 +580,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       processGhostTick(allUnits, newGrid, logs);
       // === Doppelganger phantom timers ===
       tickPhantomTimers(allUnits, newGrid, logs);
+      // === Cloner: spawn clones every 3 ticks ===
+      tickClonerSpawns(allUnits, newGrid, logs);
 
 
 

@@ -369,7 +369,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   cloner: {
     label: 'Kloner', emoji: '🧬', hp: 90, attack: 12, cooldown: 2,
-    description: 'Spawnt alle 4 Ticks einen Klon (ein neuer Kämpfer). Klone können sich nicht weiter klonen.',
+    description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt alle 3 Ticks einen Klon, der auf Feinde zustürmt.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
@@ -896,6 +896,21 @@ export function moveToward(unit: Unit, target: Unit, grid: Cell[][], allUnits?: 
   const possibleMoves = getMoveCells(unit, grid);
   if (possibleMoves.length === 0) return { row: unit.row, col: unit.col };
 
+  // Cloner (original): retreat — pick the move that maximizes min-distance to nearest enemy.
+  if (unit.type === 'cloner' && !unit.isClone) {
+    const enemies = (allUnits || []).filter(u => u.team !== unit.team && u.hp > 0 && !u.dead);
+    if (enemies.length === 0) return { row: unit.row, col: unit.col };
+    const candidates: Position[] = [...possibleMoves, { row: unit.row, col: unit.col }];
+    const minDistTo = (p: Position) => Math.min(...enemies.map(e => distance(p, e)));
+    candidates.sort((a, b) => {
+      const diff = minDistTo(b) - minDistTo(a);
+      if (diff !== 0) return diff;
+      // tie-break: prefer staying still
+      return (a.row === unit.row && a.col === unit.col) ? -1 : 1;
+    });
+    return candidates[0];
+  }
+
   const isRangedKiter = RANGED_KITERS.includes(unit.type);
 
   // --- Magnetic bond: bonded units get pulled back toward tank ---
@@ -1378,6 +1393,15 @@ export function processGhostTick(units: Unit[], grid: Cell[][], logs: string[]):
 
 /** Icegolem alternates movement; returns true if this unit should skip its move this tick. */
 export function shouldSkipMove(unit: Unit): boolean {
+  if (unit.type === 'cloner' && !unit.isClone) {
+    // Cloner moves every 2nd tick
+    if (unit.skipNextMove) {
+      unit.skipNextMove = false;
+      return true;
+    }
+    unit.skipNextMove = true;
+    return false;
+  }
   if (unit.type !== 'icegolem') return false;
   if (unit.skipNextMove) {
     unit.skipNextMove = false;
@@ -1385,6 +1409,52 @@ export function shouldSkipMove(unit: Unit): boolean {
   }
   unit.skipNextMove = true;
   return false;
+}
+
+/** Cloner spawns a clone every 3 ticks in an adjacent empty cell.
+ *  Clones (isClone=true) behave as normal aggressive units, cannot spawn further clones. */
+export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[]): Unit[] {
+  const spawned: Unit[] = [];
+  const cloners = allUnits.filter(u => u.type === 'cloner' && !u.isClone && u.hp > 0 && !u.dead);
+  const offsets = [
+    { r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 },
+    { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
+  ];
+  for (const c of cloners) {
+    if (c.cloneTimer === undefined || c.cloneTimer <= 0) c.cloneTimer = 3;
+    c.cloneTimer -= 1;
+    if (c.cloneTimer > 0) continue;
+    for (const o of offsets) {
+      const r = c.row + o.r, col = c.col + o.c;
+      if (r < 0 || r >= GRID_SIZE || col < 0 || col >= GRID_SIZE) continue;
+      const cell = grid[r][col];
+      if (cell.unit || cell.terrain === 'water') continue;
+      const clone: Unit = {
+        ...c,
+        id: crypto.randomUUID(),
+        row: r, col,
+        hp: c.maxHp,
+        isClone: true,
+        cloneTimer: undefined,
+        skipNextMove: false,
+        cooldown: 0,
+        bondedToTankId: undefined,
+        movedWithTank: false,
+        slotIndex: undefined,
+        activationTurn: 0,
+        startRow: r,
+        stuckTurns: 0,
+        lastAttackedId: undefined,
+      };
+      grid[r][col].unit = clone;
+      spawned.push(clone);
+      logs.push(`🧬 Kloner spawnt einen Klon!`);
+      break;
+    }
+    c.cloneTimer = 3;
+  }
+  allUnits.push(...spawned);
+  return spawned;
 }
 
 /** Spawn a phantom duplicate next to each unspawned doppelganger.
