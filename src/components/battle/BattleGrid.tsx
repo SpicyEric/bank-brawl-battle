@@ -405,6 +405,18 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         setTimeout(() => setChainEffects(prev => prev.filter(c => !newChains.find(nc => nc.id === c.id))), 900);
       }, delay);
     }
+
+    // --- Mage impulse (shockwave) ---
+    const newImpulses: ImpulseEffect[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'impulse') continue;
+      impulseCounter.current += 1;
+      newImpulses.push({ id: `impulse-${impulseCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+    }
+    if (newImpulses.length > 0) {
+      setImpulseEffects(prev => [...prev, ...newImpulses]);
+      setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 900);
+    }
   };
 
   const cellSize = 100 / GRID_SIZE;
