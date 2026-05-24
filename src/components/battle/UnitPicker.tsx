@@ -55,11 +55,11 @@ export function UnitPicker({
   const isDragging = useRef(false);
   const [dragGhost, setDragGhost] = useState<{ x: number; y: number; emoji: string; type: UnitType } | null>(null);
 
-  const startPress = useCallback((type: UnitType) => {
+  const startPress = useCallback((type: UnitType, color?: ColorGroup) => {
     didLongPress.current = false;
     longPressTimer.current = setTimeout(() => {
       didLongPress.current = true;
-      setInfoUnit(type);
+      setInfoUnit({ type, color });
     }, LONG_PRESS_MS);
   }, []);
 
