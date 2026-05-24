@@ -895,7 +895,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         const cx = imp.col * cellSize + cellSize / 2;
         const cy = visualRow(imp.row) * cellSize + cellSize / 2;
         return (
-          <svg key={imp.id} className="absolute inset-0 z-40 pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <svg key={imp.id} className="absolute inset-0 z-[5] pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             <defs>
               <radialGradient id={`imp-grad-${imp.id}`}>
                 <stop offset="0%" stopColor="hsl(270, 100%, 80%)" stopOpacity="0.0" />
