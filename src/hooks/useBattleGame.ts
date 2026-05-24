@@ -835,6 +835,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
               hit.add(cu.id);
               lightningChainCells.push({ row: cu.row, col: cu.col });
               logs.push(`⚡ Blitz → ${UNIT_DEFS[cu.type].emoji} ${chainDmg} (Kettenblitz ${Math.round(mult * 100)}%)`);
+              // Mirror reflects chain-lightning hops too.
+              applyMirrorReflect(unit, cu, chainDmg, logs);
               current = { row: cu.row, col: cu.col };
             }
           }
