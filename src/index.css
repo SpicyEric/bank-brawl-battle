@@ -565,3 +565,33 @@
 .chain-flash {
   animation: chain-flash-anim 0.9s ease-out forwards;
 }
+
+/* Mage impulse: massive expanding shockwave from mage cell */
+@keyframes mage-impulse-ring-anim {
+  0%   { transform: scale(0.15); opacity: 0; stroke-width: 1.6; transform-origin: center; transform-box: fill-box; }
+  20%  { opacity: 1; stroke-width: 1.2; }
+  60%  { opacity: 0.9; stroke-width: 0.6; }
+  100% { transform: scale(1.0); opacity: 0; stroke-width: 0.2; }
+}
+.mage-impulse-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mage-impulse-ring-anim 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  filter: drop-shadow(0 0 4px hsl(270 100% 75%)) drop-shadow(0 0 8px hsl(280 100% 70%));
+}
+.mage-impulse-ring-inner {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mage-impulse-ring-anim 0.85s cubic-bezier(0.22, 1, 0.36, 1) 0.08s forwards;
+  filter: drop-shadow(0 0 6px hsl(290 100% 90%));
+}
+@keyframes mage-impulse-fill-anim {
+  0%   { transform: scale(0.1); opacity: 0; transform-box: fill-box; transform-origin: center; }
+  25%  { opacity: 0.9; }
+  100% { transform: scale(1.0); opacity: 0; }
+}
+.mage-impulse-fill {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mage-impulse-fill-anim 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
