@@ -448,12 +448,14 @@ export const BASE_UNITS = 5;
 export const MAX_UNITS = 7; // absolute cap
 
 // Comeback mechanic: behind by 2+ → +1, behind by 4+ → +2
-export function getMaxUnits(myScore: number, opponentScore: number): number {
+// Round escalation: round 1 = 1 unit, round 2 = 2, ... until BASE_UNITS reached.
+export function getMaxUnits(myScore: number, opponentScore: number, roundNumber: number = 999): number {
   const deficit = opponentScore - myScore;
   let bonus = 0;
   if (deficit >= 4) bonus = 2;
   else if (deficit >= 2) bonus = 1;
-  return Math.min(BASE_UNITS + bonus, MAX_UNITS);
+  const cap = Math.min(BASE_UNITS + bonus, MAX_UNITS);
+  return Math.min(roundNumber, cap);
 }
 export const GRID_SIZE = 8;
 export const PLAYER_ROWS = [5, 6, 7];
