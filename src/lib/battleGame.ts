@@ -621,9 +621,9 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
 
-  // === LAMB TAUNT: enemy lamb provokes all units within a 7x7 area (Chebyshev ≤ 3). ===
+  // === LAMB TAUNT: enemy lamb provokes ALL units within a 7x7 area (Chebyshev ≤ 3). ===
   const enemyLamb = enemies.find(e => e.type === 'lamb' && distance(unit, e) <= 3);
-  if (enemyLamb && unit.type !== 'sniper' && unit.type !== 'healer') {
+  if (enemyLamb) {
     return enemyLamb;
   }
   // === SNIPER: always shoots lowest-HP enemy on the entire field ===
