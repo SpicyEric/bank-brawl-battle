@@ -1411,7 +1411,7 @@ export function shouldSkipMove(unit: Unit): boolean {
   return false;
 }
 
-/** Cloner spawns a clone every 4 ticks in an adjacent empty cell.
+/** Cloner spawns a clone every 5 ticks in an adjacent empty cell.
  *  Clones (isClone=true) behave as normal aggressive units, cannot spawn further clones. */
 export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[]): Unit[] {
   const spawned: Unit[] = [];
@@ -1421,7 +1421,7 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
     { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
   ];
   for (const c of cloners) {
-    if (c.cloneTimer === undefined || c.cloneTimer <= 0) c.cloneTimer = 4;
+    if (c.cloneTimer === undefined || c.cloneTimer <= 0) c.cloneTimer = 5;
     c.cloneTimer -= 1;
     if (c.cloneTimer > 0) continue;
     for (const o of offsets) {
@@ -1433,8 +1433,8 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
         ...c,
         id: crypto.randomUUID(),
         row: r, col,
-        hp: 20,
-        maxHp: 20,
+        hp: 10,
+        maxHp: 10,
         attack: 6,
         isClone: true,
         cloneTimer: undefined,
@@ -1453,7 +1453,7 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
       logs.push(`🧬 Kloner spawnt einen Klon!`);
       break;
     }
-    c.cloneTimer = 4;
+    c.cloneTimer = 5;
   }
   allUnits.push(...spawned);
   return spawned;
