@@ -1014,6 +1014,26 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         );
       })}
 
+      {/* Mirror death explosion: red expanding shockwave covering 3x3 around the mirror cell */}
+      {mirrorExplosions.map(mx => {
+        const cx = mx.col * cellSize + cellSize / 2;
+        const cy = visualRow(mx.row) * cellSize + cellSize / 2;
+        return (
+          <svg key={mx.id} className="absolute inset-0 z-[6] pointer-events-none w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <radialGradient id={`mx-grad-${mx.id}`}>
+                <stop offset="0%" stopColor="hsl(0, 100%, 90%)" stopOpacity="0.9" />
+                <stop offset="55%" stopColor="hsl(8, 100%, 60%)" stopOpacity="0.7" />
+                <stop offset="100%" stopColor="hsl(0, 100%, 45%)" stopOpacity="0" />
+              </radialGradient>
+            </defs>
+            <circle cx={cx} cy={cy} r={cellSize * 1.5} fill={`url(#mx-grad-${mx.id})`} className="mirror-explode-fill" />
+            <circle cx={cx} cy={cy} r={cellSize * 1.5} fill="none" stroke="hsl(0, 100%, 70%)" strokeWidth="1.2" className="mirror-explode-ring" />
+            <circle cx={cx} cy={cy} r={cellSize * 1.5} fill="none" stroke="hsl(20, 100%, 80%)" strokeWidth="0.6" className="mirror-explode-ring-inner" />
+          </svg>
+        );
+      })}
+
 
       {/* Shadowblade teleport puffs */}
       {teleportEffects.map(tp => (
