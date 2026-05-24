@@ -626,6 +626,36 @@
   animation: magnet-impulse-fill-anim 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+/* Mirror death explosion: short red shockwave that expands across the 3x3 around the mirror */
+@keyframes mirror-explode-ring-anim {
+  0%   { transform: scale(0.2); opacity: 0; stroke-width: 1.8; transform-origin: center; transform-box: fill-box; }
+  25%  { opacity: 1; stroke-width: 1.4; }
+  70%  { opacity: 0.9; stroke-width: 0.7; }
+  100% { transform: scale(1.0); opacity: 0; stroke-width: 0.2; }
+}
+.mirror-explode-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mirror-explode-ring-anim 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  filter: drop-shadow(0 0 4px hsl(0 100% 60%)) drop-shadow(0 0 8px hsl(15 100% 55%));
+}
+.mirror-explode-ring-inner {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mirror-explode-ring-anim 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.06s forwards;
+  filter: drop-shadow(0 0 6px hsl(20 100% 80%));
+}
+@keyframes mirror-explode-fill-anim {
+  0%   { transform: scale(0.15); opacity: 0; transform-box: fill-box; transform-origin: center; }
+  25%  { opacity: 1; }
+  100% { transform: scale(1.05); opacity: 0; }
+}
+.mirror-explode-fill {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: mirror-explode-fill-anim 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
 /* Shadowblade teleport puff */
 @keyframes teleport-out-bg-anim {
   0%   { background: radial-gradient(circle, hsl(280 90% 60% / 0.0) 0%, transparent 70%); transform: scale(0.4); opacity: 0; }
