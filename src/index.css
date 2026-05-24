@@ -595,3 +595,39 @@
   transform-origin: center;
   animation: mage-impulse-fill-anim 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
+
+/* Shadowblade teleport puff */
+@keyframes teleport-out-bg-anim {
+  0%   { background: radial-gradient(circle, hsl(280 90% 60% / 0.0) 0%, transparent 70%); transform: scale(0.4); opacity: 0; }
+  30%  { background: radial-gradient(circle, hsl(280 90% 60% / 0.65) 0%, hsl(260 80% 40% / 0.35) 60%, transparent 80%); transform: scale(1.15); opacity: 1; }
+  100% { background: radial-gradient(circle, hsl(280 90% 60% / 0) 0%, transparent 70%); transform: scale(1.4); opacity: 0; }
+}
+@keyframes teleport-in-bg-anim {
+  0%   { background: radial-gradient(circle, hsl(280 100% 75% / 0) 0%, transparent 70%); transform: scale(1.4); opacity: 0; }
+  35%  { background: radial-gradient(circle, hsl(290 100% 80% / 0.7) 0%, hsl(270 90% 55% / 0.4) 55%, transparent 80%); transform: scale(1.1); opacity: 1; }
+  100% { background: radial-gradient(circle, hsl(290 100% 80% / 0) 0%, transparent 70%); transform: scale(0.6); opacity: 0; }
+}
+.teleport-out .teleport-puff-bg {
+  animation: teleport-out-bg-anim 0.6s ease-out forwards;
+  border-radius: 50%;
+  filter: blur(2px);
+  box-shadow: 0 0 20px hsl(280 90% 60% / 0.7), inset 0 0 14px hsl(290 100% 75% / 0.6);
+}
+.teleport-in .teleport-puff-bg {
+  animation: teleport-in-bg-anim 0.6s ease-out forwards;
+  border-radius: 50%;
+  filter: blur(2px);
+  box-shadow: 0 0 22px hsl(290 100% 75% / 0.8), inset 0 0 16px hsl(280 100% 80% / 0.7);
+}
+@keyframes teleport-emoji-out-anim {
+  0%   { opacity: 0; transform: scale(0.3) translateY(0); filter: drop-shadow(0 0 4px hsl(280 90% 70%)); }
+  35%  { opacity: 0.9; transform: scale(1.2) translateY(-3px); filter: drop-shadow(0 0 8px hsl(280 100% 75%)); }
+  100% { opacity: 0; transform: scale(1.7) translateY(-10px); }
+}
+@keyframes teleport-emoji-in-anim {
+  0%   { opacity: 0; transform: scale(1.7) translateY(-10px); filter: drop-shadow(0 0 8px hsl(290 100% 80%)); }
+  40%  { opacity: 1; transform: scale(1.1) translateY(-2px); filter: drop-shadow(0 0 10px hsl(290 100% 85%)); }
+  100% { opacity: 0; transform: scale(0.4) translateY(0); }
+}
+.teleport-out .teleport-puff-emoji { animation: teleport-emoji-out-anim 0.6s ease-out forwards; }
+.teleport-in  .teleport-puff-emoji { animation: teleport-emoji-in-anim  0.6s ease-out forwards; }

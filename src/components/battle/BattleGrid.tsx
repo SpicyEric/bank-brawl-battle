@@ -33,6 +33,7 @@ interface HealGlow { id: string; row: number; col: number }
 interface FreezeEffect { id: string; row: number; col: number }
 interface ChainEffect { id: string; cells: { row: number; col: number }[]; color: 'lightning' | 'chaindancer' }
 interface ImpulseEffect { id: string; row: number; col: number }
+interface TeleportEffect { id: string; row: number; col: number; kind: 'out' | 'in' }
 
 export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
@@ -50,6 +51,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [chainEffects, setChainEffects] = useState<ChainEffect[]>([]);
   const [impulseEffects, setImpulseEffects] = useState<ImpulseEffect[]>([]);
   const impulseCounter = useRef(0);
+  const [teleportEffects, setTeleportEffects] = useState<TeleportEffect[]>([]);
+  const teleportCounter = useRef(0);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
@@ -416,6 +419,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     if (newImpulses.length > 0) {
       setImpulseEffects(prev => [...prev, ...newImpulses]);
       setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 900);
+    }
+
+    // --- Shadowblade teleport puffs ---
+    const newTeleports: TeleportEffect[] = [];
+    for (const evt of events) {
+      if (evt.type !== 'teleport') continue;
+      teleportCounter.current += 1;
+      newTeleports.push({ id: `tp-out-${teleportCounter.current}`, row: evt.attackerRow, col: evt.attackerCol, kind: 'out' });
+      teleportCounter.current += 1;
+      newTeleports.push({ id: `tp-in-${teleportCounter.current}`, row: evt.targetRow, col: evt.targetCol, kind: 'in' });
+    }
+    if (newTeleports.length > 0) {
+      setTeleportEffects(prev => [...prev, ...newTeleports]);
+      setTimeout(() => setTeleportEffects(prev => prev.filter(t => !newTeleports.find(nt => nt.id === t.id))), 700);
     }
   };
 
@@ -881,6 +898,23 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           </svg>
         );
       })}
+
+      {/* Shadowblade teleport puffs */}
+      {teleportEffects.map(tp => (
+        <div
+          key={tp.id}
+          className={`absolute pointer-events-none z-40 ${tp.kind === 'out' ? 'teleport-out' : 'teleport-in'}`}
+          style={{
+            left: `${tp.col * cellSize}%`,
+            top: `${visualRow(tp.row) * cellSize}%`,
+            width: `${cellSize}%`,
+            height: `${cellSize}%`,
+          }}
+        >
+          <div className="absolute inset-0 teleport-puff-bg" />
+          <div className="absolute inset-0 flex items-center justify-center text-2xl teleport-puff-emoji">💨</div>
+        </div>
+      ))}
     </div>
   );
 }

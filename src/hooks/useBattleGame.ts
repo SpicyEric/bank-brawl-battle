@@ -7,7 +7,7 @@ import {
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
   applyPostAttackEffects, applyDeathEffects, processLavaTick, processGhostTick, shouldSkipMove,
-  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse,
+  spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, handleShadowbladeTick,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
@@ -600,6 +600,20 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         if (isFrozenNow) unit.frozen = (unit.frozen || 0) - 1;
 
         unit.cooldown = Math.max(0, unit.cooldown - 1);
+
+        // Shadowblade: custom teleport-strike behavior (every 5 ticks)
+        if (unit.type === 'shadowblade' && !isFrozenNow) {
+          handleShadowbladeTick(unit, allUnits, newGrid, events, logs, (atk, tgt, dmg) => {
+            let d = dmg;
+            if (atk.team === 'player') d = Math.round(d * playerDmgMod);
+            else {
+              d = Math.round(d * enemyDmgMod);
+              if (tgt.team === 'player') d = Math.round(d * shieldWallDefMod);
+            }
+            return d;
+          });
+          continue;
+        }
 
         // Healer: heal allies first, attack only if no one to heal
         if (unit.type === 'healer') {
