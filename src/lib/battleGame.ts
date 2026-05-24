@@ -1044,6 +1044,9 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // Shield aura: defender adjacent to friendly tank takes -20% damage
   if (grid && hasAdjacentFriendlyTank(defender, grid)) dmg *= 0.8;
 
+  // Rider horn buff: +50% damage while hornBuff active
+  if ((attacker.hornBuff || 0) > 0) dmg *= 1.5;
+
   return Math.floor(dmg);
 }
 
