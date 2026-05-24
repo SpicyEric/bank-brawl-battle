@@ -318,7 +318,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   lightning: {
     label: 'Blitzmagier', emoji: '🌩️', hp: 75, attack: 18, cooldown: 2,
-    description: 'Kettenblitz: springt auf alle Feinde im Radius 2 ums Primärziel (50% Schaden).',
+    description: 'Kettenblitz: springt vom Ziel zu Feinden im Radius 2 weiter (50/40/30/20/10% Schaden).',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
