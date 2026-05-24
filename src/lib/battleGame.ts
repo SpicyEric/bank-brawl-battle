@@ -155,9 +155,9 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     label: 'Assassine',
     emoji: '🗡️',
     hp: 90,
-    attack: 18,
+    attack: 16,
     cooldown: 1,
-    description: 'Schneller Opportunist. Greift jede Runde an und wechselt zum nächsten verwundeten Ziel. Bewegt sich diagonal (2 Felder).',
+    description: 'Schneller Opportunist. Greift jede Runde an und wechselt zum nächsten verwundeten Ziel. Bewegt sich diagonal (2 Felder). Gegner unter 50% HP nehmen 20 Schaden statt 16.',
     movePattern: [
       ...DIAGONAL,
       { row: -2, col: -2 }, { row: -2, col: 2 },
@@ -1015,7 +1015,11 @@ function hasAdjacentFriendlyTank(defender: Unit, grid: Cell[][]): boolean {
 // Calculate damage with counter system + terrain bonuses + shield aura
 export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): number {
   
-  const baseAtk = attacker.attack + (attacker.judgeBonus || 0);
+  let baseAtk = attacker.attack + (attacker.judgeBonus || 0);
+  // Assassin: +4 damage against enemies below 50% HP
+  if (attacker.type === 'assassin' && defender.hp < defender.maxHp * 0.5) {
+    baseAtk += 4;
+  }
   let dmg = baseAtk * (0.95 + Math.random() * 0.1);
 
   const aColor = getUnitColor(attacker);
