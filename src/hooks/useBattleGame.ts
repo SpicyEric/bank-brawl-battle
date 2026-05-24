@@ -587,6 +587,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       tickMageImpulse(allUnits, newGrid, events, logs);
       // === Frost Nova: every 7 ticks freeze enemies in 3x3 for 5 ticks at 30% dmg ===
       tickFrostNova(allUnits, newGrid, events, logs);
+      // === Terrain regen: waterwalker heals on water ===
+      tickTerrainHeals(allUnits, newGrid, logs);
 
 
 
