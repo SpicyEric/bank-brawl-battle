@@ -77,6 +77,27 @@ export type Database = {
         }
         Relationships: []
       }
+      unit_icon_assignments: {
+        Row: {
+          icon_filename: string
+          slot: string
+          unit_type: string
+          updated_at: string
+        }
+        Insert: {
+          icon_filename: string
+          slot: string
+          unit_type: string
+          updated_at?: string
+        }
+        Update: {
+          icon_filename?: string
+          slot?: string
+          unit_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

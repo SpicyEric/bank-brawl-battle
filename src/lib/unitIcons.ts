@@ -1,12 +1,15 @@
 import type { UnitType } from './battleGame';
+import { supabase } from '@/integrations/supabase/client';
 
 const STORAGE_KEY = 'unitIconMap.v1';
 const ATTACK_KEY = 'unitAttackIconMap.v1';
 const CLONE_KEY = 'unitCloneIconMap.v1';
+const MIGRATED_FLAG = 'unitIconMap.migratedToCloud.v1';
 
-export type UnitIconMap = Partial<Record<UnitType, string>>; // value = icon filename e.g. "icon042.png"
+export type UnitIconMap = Partial<Record<UnitType, string>>;
+export type Slot = 'unit' | 'attack' | 'clone';
 
-// Build list of available icon filenames (1023 icons: icon001.png .. icon1023.png)
+// Build list of available icon filenames (1023 icons)
 export const ALL_ICONS: string[] = Array.from({ length: 1023 }, (_, i) =>
   `icon${String(i + 1).padStart(3, '0')}.png`
 );
@@ -16,14 +19,20 @@ export function iconUrl(filename: string): string {
 }
 
 interface Caches {
-  unit: UnitIconMap | null;
-  attack: UnitIconMap | null;
-  clone: UnitIconMap | null;
+  unit: UnitIconMap;
+  attack: UnitIconMap;
+  clone: UnitIconMap;
 }
-const cache: Caches = { unit: null, attack: null, clone: null };
+const cache: Caches = { unit: {}, attack: {}, clone: {} };
 const listeners = new Set<() => void>();
+let loaded = false;
+let loadingPromise: Promise<void> | null = null;
 
-function load(key: string): UnitIconMap {
+function emit() {
+  listeners.forEach(l => l());
+}
+
+function loadLocal(key: string): UnitIconMap {
   try {
     const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : {};
@@ -32,47 +41,164 @@ function load(key: string): UnitIconMap {
   }
 }
 
-export function loadIconMap(): UnitIconMap {
-  if (!cache.unit) cache.unit = load(STORAGE_KEY);
-  return cache.unit!;
-}
-export function loadAttackIconMap(): UnitIconMap {
-  if (!cache.attack) cache.attack = load(ATTACK_KEY);
-  return cache.attack!;
-}
-export function loadCloneIconMap(): UnitIconMap {
-  if (!cache.clone) cache.clone = load(CLONE_KEY);
-  return cache.clone!;
+function writeLocalMirror() {
+  // Keep localStorage as offline mirror
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cache.unit));
+    localStorage.setItem(ATTACK_KEY, JSON.stringify(cache.attack));
+    localStorage.setItem(CLONE_KEY, JSON.stringify(cache.clone));
+  } catch {}
 }
 
-export function saveIconMap(map: UnitIconMap) {
-  cache.unit = { ...map };
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cache.unit)); } catch {}
-  listeners.forEach(l => l());
+/** Loads assignments from backend. If backend is empty and we have local data, migrate it up. */
+export async function initIconAssignments(): Promise<void> {
+  if (loaded) return;
+  if (loadingPromise) return loadingPromise;
+
+  // Seed cache from local storage immediately so first paint isn't blank
+  cache.unit = loadLocal(STORAGE_KEY);
+  cache.attack = loadLocal(ATTACK_KEY);
+  cache.clone = loadLocal(CLONE_KEY);
+  emit();
+
+  loadingPromise = (async () => {
+    const { data, error } = await supabase
+      .from('unit_icon_assignments')
+      .select('slot, unit_type, icon_filename');
+
+    if (error) {
+      console.warn('[unitIcons] backend load failed, using local cache', error);
+      loaded = true;
+      return;
+    }
+
+    const remote: Caches = { unit: {}, attack: {}, clone: {} };
+    for (const row of data ?? []) {
+      const slot = row.slot as Slot;
+      if (remote[slot]) remote[slot][row.unit_type as UnitType] = row.icon_filename;
+    }
+
+    const remoteEmpty =
+      Object.keys(remote.unit).length === 0 &&
+      Object.keys(remote.attack).length === 0 &&
+      Object.keys(remote.clone).length === 0;
+
+    const alreadyMigrated = (() => {
+      try { return localStorage.getItem(MIGRATED_FLAG) === '1'; } catch { return false; }
+    })();
+
+    const localHasData =
+      Object.keys(cache.unit).length +
+      Object.keys(cache.attack).length +
+      Object.keys(cache.clone).length > 0;
+
+    if (remoteEmpty && localHasData && !alreadyMigrated) {
+      // Migrate local → cloud (one-time)
+      const rows: { slot: Slot; unit_type: string; icon_filename: string }[] = [];
+      (['unit','attack','clone'] as Slot[]).forEach(slot => {
+        for (const [unit_type, icon_filename] of Object.entries(cache[slot])) {
+          if (icon_filename) rows.push({ slot, unit_type, icon_filename });
+        }
+      });
+      if (rows.length) {
+        const { error: upErr } = await supabase.from('unit_icon_assignments').upsert(rows);
+        if (upErr) console.warn('[unitIcons] migration upload failed', upErr);
+        else console.log(`[unitIcons] migrated ${rows.length} assignments from localStorage to cloud`);
+      }
+      try { localStorage.setItem(MIGRATED_FLAG, '1'); } catch {}
+    } else {
+      // Use remote as source of truth
+      cache.unit = remote.unit;
+      cache.attack = remote.attack;
+      cache.clone = remote.clone;
+      writeLocalMirror();
+      emit();
+    }
+
+    loaded = true;
+
+    // Subscribe to realtime changes
+    supabase
+      .channel('unit_icon_assignments_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'unit_icon_assignments' }, payload => {
+        const row: any = payload.new ?? payload.old;
+        if (!row) return;
+        const slot = row.slot as Slot;
+        if (!cache[slot]) return;
+        if (payload.eventType === 'DELETE') {
+          delete cache[slot][row.unit_type as UnitType];
+        } else {
+          cache[slot][row.unit_type as UnitType] = row.icon_filename;
+        }
+        writeLocalMirror();
+        emit();
+      })
+      .subscribe();
+  })();
+
+  return loadingPromise;
 }
-export function saveAttackIconMap(map: UnitIconMap) {
-  cache.attack = { ...map };
-  try { localStorage.setItem(ATTACK_KEY, JSON.stringify(cache.attack)); } catch {}
-  listeners.forEach(l => l());
+
+// Fire init on module load (best-effort, non-blocking)
+if (typeof window !== 'undefined') {
+  initIconAssignments().catch(() => {});
 }
-export function saveCloneIconMap(map: UnitIconMap) {
-  cache.clone = { ...map };
-  try { localStorage.setItem(CLONE_KEY, JSON.stringify(cache.clone)); } catch {}
-  listeners.forEach(l => l());
-}
+
+export function loadIconMap(): UnitIconMap { return cache.unit; }
+export function loadAttackIconMap(): UnitIconMap { return cache.attack; }
+export function loadCloneIconMap(): UnitIconMap { return cache.clone; }
 
 export function getUnitIcon(type: UnitType): string | null {
-  return loadIconMap()[type] ?? null;
+  return cache.unit[type] ?? null;
 }
 export function getAttackIcon(type: UnitType | string | undefined): string | null {
   if (!type) return null;
-  return loadAttackIconMap()[type as UnitType] ?? null;
+  return cache.attack[type as UnitType] ?? null;
 }
 export function getCloneIcon(type: UnitType): string | null {
-  return loadCloneIconMap()[type] ?? null;
+  return cache.clone[type] ?? null;
 }
+
+async function persistDiff(slot: Slot, next: UnitIconMap) {
+  const prev = cache[slot];
+  const toUpsert: { slot: Slot; unit_type: string; icon_filename: string }[] = [];
+  const toDelete: string[] = [];
+
+  for (const [k, v] of Object.entries(next)) {
+    if (v && prev[k as UnitType] !== v) toUpsert.push({ slot, unit_type: k, icon_filename: v });
+  }
+  for (const k of Object.keys(prev)) {
+    if (!next[k as UnitType]) toDelete.push(k);
+  }
+
+  if (toUpsert.length) {
+    const { error } = await supabase.from('unit_icon_assignments').upsert(toUpsert);
+    if (error) console.warn('[unitIcons] upsert failed', error);
+  }
+  if (toDelete.length) {
+    const { error } = await supabase
+      .from('unit_icon_assignments')
+      .delete()
+      .eq('slot', slot)
+      .in('unit_type', toDelete);
+    if (error) console.warn('[unitIcons] delete failed', error);
+  }
+}
+
+function setMap(slot: Slot, next: UnitIconMap) {
+  const copy = { ...next };
+  // Fire-and-forget backend sync
+  persistDiff(slot, copy).catch(e => console.warn('[unitIcons] persist failed', e));
+  cache[slot] = copy;
+  writeLocalMirror();
+  emit();
+}
+
+export function saveIconMap(map: UnitIconMap) { setMap('unit', map); }
+export function saveAttackIconMap(map: UnitIconMap) { setMap('attack', map); }
+export function saveCloneIconMap(map: UnitIconMap) { setMap('clone', map); }
 
 export function subscribeIconMap(cb: () => void): () => void {
   listeners.add(cb);
-  return () => listeners.delete(cb);
+  return () => { listeners.delete(cb); };
 }
