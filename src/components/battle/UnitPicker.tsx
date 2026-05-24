@@ -195,7 +195,7 @@ export function UnitPicker({
         {dragGhost && (
           <div className="drag-ghost" style={{ left: dragGhost.x, top: dragGhost.y }}>{getUnitIcon(dragGhost.type) ? <img src={iconUrl(getUnitIcon(dragGhost.type)!)} alt="" className="w-8 h-8" style={{ imageRendering: 'pixelated' }} /> : dragGhost.emoji}</div>
         )}
-        {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
+        {infoUnit && <UnitInfoModal unitType={infoUnit.type} colorOverride={infoUnit.color} onClose={() => setInfoUnit(null)} />}
       </>
     );
   }
