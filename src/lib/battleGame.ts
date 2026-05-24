@@ -305,7 +305,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   vampire: {
     label: 'Vampir', emoji: '🧛', hp: 80, attack: 19, cooldown: 2,
-    description: 'Lifesteal 30%. Bei Overheal explodiert er sofort für 25 Splash an angrenzende Feinde.',
+    description: 'Lifesteal 30% des verursachten Schadens. Fügt jedem Ziel Blutung zu (10/5/3/1 HP über die nächsten 4 Ticks). Wechselt nach jedem Angriff das Ziel.',
     movePattern: DIAGONAL,
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
