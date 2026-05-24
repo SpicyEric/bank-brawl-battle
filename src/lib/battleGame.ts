@@ -487,8 +487,8 @@ export const ROUND_TIME_LIMIT = 45; // seconds
 export const PLACE_TIME_LIMIT = 15; // seconds for placement phase (difficulty 2+)
 export const MULTI_PLACE_TIME_LIMIT = 20; // seconds for multiplayer placement phase
 
-export const COUNTER_MULTIPLIER = 1.4;
-export const WEAKNESS_MULTIPLIER = 0.6;
+export const COUNTER_MULTIPLIER = 1.3;
+export const WEAKNESS_MULTIPLIER = 0.7;
 
 export function createEmptyGrid(): Cell[][] {
   return Array.from({ length: GRID_SIZE }, (_, row) =>
@@ -630,6 +630,11 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   if (unit.type === 'sniper') {
     return [...enemies].sort((a, b) => a.hp - b.hp)[0];
   }
+  // === ASSASSIN: ALWAYS hunts the globally lowest-HP enemy. Re-evaluates every tick.
+  //     Tiebreaker: nearest. No lock-on, no column bias, no tank-aggro detour. ===
+  if (unit.type === 'assassin') {
+    return [...enemies].sort((a, b) => a.hp - b.hp || distance(unit, a) - distance(unit, b))[0];
+  }
   // === LAMB (own lamb): taunts the strongest enemy ===
   if (unit.type === 'lamb') {
     return [...enemies].sort((a, b) => b.attack * b.hp - a.attack * a.hp)[0];
@@ -669,19 +674,11 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     if (locked) return locked;
   }
 
-  // === ASSASSIN / FROST / MAGE: switch target after every attack ===
-  if ((unit.type === 'assassin' || unit.type === 'frost' || unit.type === 'mage') &&
+  // === FROST / MAGE: switch target after every attack ===
+  if ((unit.type === 'frost' || unit.type === 'mage') &&
       unit.lastAttackedId && enemies.length > 1) {
     const others = enemies.filter(e => e.id !== unit.lastAttackedId);
     if (others.length > 0) {
-      // Assassin: prefer wounded among other targets; frost/mage: nearest
-      if (unit.type === 'assassin') {
-        const wounded = others.filter(e => e.hp < e.maxHp * 0.7);
-        if (wounded.length > 0) {
-          wounded.sort((a, b) => a.hp - b.hp);
-          return wounded[0];
-        }
-      }
       others.sort((a, b) => distance(unit, a) - distance(unit, b));
       return others[0];
     }
@@ -1067,23 +1064,28 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
   const count = maxCount;
   const availableTypes = UNIT_TYPES.filter(t => !bannedUnits.includes(t));
 
-  // Count player unit types
-  const playerTypes: Record<string, number> = {};
+  // Count player units by their EFFECTIVE color (slot-assigned), not by type default.
+  const playerColorCounts: Record<ColorGroup, number> = { red: 0, green: 0, blue: 0 };
   for (const u of playerUnits) {
-    playerTypes[u.type] = (playerTypes[u.type] || 0) + 1;
+    playerColorCounts[getUnitColor(u)]++;
   }
 
-  // Find counters for the most common player types
-  const counterPicks: UnitType[] = [];
-  const sortedTypes = Object.entries(playerTypes).sort((a, b) => b[1] - a[1]);
+  // Determine player's dominant color → AI should counter it.
+  // RPS reminder: red>green, green>blue, blue>red. So counter(red)=blue, counter(green)=red, counter(blue)=green.
+  const COUNTER_COLOR: Record<ColorGroup, ColorGroup> = { red: 'blue', green: 'red', blue: 'green' };
+  const colorMembers: Record<ColorGroup, UnitType[]> = {
+    red: (Object.keys(UNIT_COLOR_GROUPS) as UnitType[]).filter(t => UNIT_COLOR_GROUPS[t] === 'red'),
+    green: (Object.keys(UNIT_COLOR_GROUPS) as UnitType[]).filter(t => UNIT_COLOR_GROUPS[t] === 'green'),
+    blue: (Object.keys(UNIT_COLOR_GROUPS) as UnitType[]).filter(t => UNIT_COLOR_GROUPS[t] === 'blue'),
+  };
 
-  for (const [pType] of sortedTypes) {
-    for (const [uType, def] of Object.entries(UNIT_DEFS)) {
-      if (def.strongVs.includes(pType as UnitType) && !bannedUnits.includes(uType as UnitType)) {
-        counterPicks.push(uType as UnitType);
-      }
-    }
-  }
+  const dominantPlayerColor: ColorGroup =
+    playerColorCounts.red >= playerColorCounts.green && playerColorCounts.red >= playerColorCounts.blue ? 'red'
+      : playerColorCounts.green >= playerColorCounts.blue ? 'green' : 'blue';
+  const targetCounterColor: ColorGroup = COUNTER_COLOR[dominantPlayerColor];
+
+  // Counter pool: all unit types whose default color counters the player's dominant color.
+  const counterPicks: UnitType[] = colorMembers[targetCounterColor].filter(t => !bannedUnits.includes(t));
 
   // Difficulty-based counter chance
   const counterChance = difficulty === 1 ? 0 : difficulty === 2 ? 0.4 : difficulty === 3 ? 0.6 : difficulty === 4 ? 0.8 : 0.95;
@@ -1093,24 +1095,12 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
 
   // At difficulty 5, build an optimal composition: pure counters with color advantage
   if (difficulty >= 5 && playerUnits.length > 0) {
-    const redCount = playerUnits.filter(u => ['warrior', 'assassin', 'dragon'].includes(u.type)).length;
-    const greenCount = playerUnits.filter(u => ['tank', 'mage', 'healer'].includes(u.type)).length;
-    const blueCount = playerUnits.filter(u => ['rider', 'archer', 'frost'].includes(u.type)).length;
-
-    const counterColor = redCount >= greenCount && redCount >= blueCount ? 'blue'
-      : greenCount >= blueCount ? 'red' : 'green';
-
-    const colorUnits: Record<string, UnitType[]> = {
-      red: ['warrior', 'assassin', 'dragon'],
-      green: ['tank', 'mage', 'healer'],
-      blue: ['rider', 'archer', 'frost'],
-    };
-
-    const mainPool = colorUnits[counterColor].filter(t => !bannedUnits.includes(t));
+    const mainPool = colorMembers[targetCounterColor].filter(t => !bannedUnits.includes(t));
     if (mainPool.length === 0) return generateAIPlacement(playerUnits, maxCount, currentGrid, difficulty, []); // fallback
     // Difficulty 5: Force at least 1 tank for shield formation
     const hasTankInPool = mainPool.includes('tank');
     let forceTank = !hasTankInPool && !bannedUnits.includes('tank') && Math.random() < 0.5;
+
     
     for (let i = 0; i < count; i++) {
       let type: UnitType;

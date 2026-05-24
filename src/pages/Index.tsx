@@ -7,7 +7,7 @@ import { UnitPicker } from '@/components/battle/UnitPicker';
 import { BattleLog } from '@/components/battle/BattleLog';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 import { useMusic } from '@/hooks/useMusic';
-import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT, OVERTIME_THRESHOLD } from '@/lib/battleGame';
+import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT, OVERTIME_THRESHOLD, ColorGroup } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
 import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, sfxFocusFire, sfxSacrifice, sfxShieldWall, setSfxMuted } from '@/lib/sfx';
 import {
@@ -52,7 +52,7 @@ function SinglePlayerGame() {
 function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; roster?: UnitType[] }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('battle');
-  const [inspectUnit, setInspectUnit] = useState<UnitType | null>(null);
+  const [inspectUnit, setInspectUnit] = useState<{ type: UnitType; color?: ColorGroup } | null>(null);
   const [lastPlaced, setLastPlaced] = useState<{ row: number; col: number; type: UnitType } | null>(null);
   const [dragPreview, setDragPreview] = useState<{ row: number; col: number; type: UnitType } | null>(null);
   const [phaseOverlay, setPhaseOverlay] = useState<string | null>(null);
@@ -206,7 +206,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
               return;
             }
             const unit = game.grid[row][col].unit;
-            if (unit) setInspectUnit(unit.type);
+            if (unit) setInspectUnit({ type: unit.type, color: unit.color as ColorGroup | undefined });
           }}
           lastPlaced={lastPlaced}
           battleEvents={game.battleEvents}
@@ -505,7 +505,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
       </div>
 
       {inspectUnit && (
-        <UnitInfoModal unitType={inspectUnit} onClose={() => setInspectUnit(null)} />
+        <UnitInfoModal unitType={inspectUnit.type} colorOverride={inspectUnit.color} onClose={() => setInspectUnit(null)} />
       )}
       {/* Opponent disconnect overlay */}
       {game.opponentLeft && (

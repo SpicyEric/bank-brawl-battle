@@ -46,7 +46,7 @@ export function UnitPicker({
   roster, selectedSlot = null, onSelectSlot, bannedSlots = [], placedSlots = [],
   onDragHover, onDragDrop,
 }: UnitPickerProps) {
-  const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
+  const [infoUnit, setInfoUnit] = useState<{ type: UnitType; color?: ColorGroup } | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const didLongPress = useRef(false);
   const dragStart = useRef<{ x: number; y: number; idx: number; type: UnitType } | null>(null);
@@ -55,11 +55,11 @@ export function UnitPicker({
   const isDragging = useRef(false);
   const [dragGhost, setDragGhost] = useState<{ x: number; y: number; emoji: string; type: UnitType } | null>(null);
 
-  const startPress = useCallback((type: UnitType) => {
+  const startPress = useCallback((type: UnitType, color?: ColorGroup) => {
     didLongPress.current = false;
     longPressTimer.current = setTimeout(() => {
       didLongPress.current = true;
-      setInfoUnit(type);
+      setInfoUnit({ type, color });
     }, LONG_PRESS_MS);
   }, []);
 
@@ -92,7 +92,7 @@ export function UnitPicker({
       // Long press → info modal
       longPressTimer.current = setTimeout(() => {
         didLongPress.current = true;
-        setInfoUnit(type);
+        setInfoUnit({ type, color: SLOT_COLORS[idx] });
         dragStart.current = null;
       }, LONG_PRESS_MS);
       try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch {}
@@ -195,7 +195,7 @@ export function UnitPicker({
         {dragGhost && (
           <div className="drag-ghost" style={{ left: dragGhost.x, top: dragGhost.y }}>{getUnitIcon(dragGhost.type) ? <img src={iconUrl(getUnitIcon(dragGhost.type)!)} alt="" className="w-8 h-8" style={{ imageRendering: 'pixelated' }} /> : dragGhost.emoji}</div>
         )}
-        {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
+        {infoUnit && <UnitInfoModal unitType={infoUnit.type} colorOverride={infoUnit.color} onClose={() => setInfoUnit(null)} />}
       </>
     );
   }
@@ -261,7 +261,7 @@ export function UnitPicker({
         </div>
       </div>
 
-      {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
+      {infoUnit && <UnitInfoModal unitType={infoUnit.type} colorOverride={infoUnit.color} onClose={() => setInfoUnit(null)} />}
     </>
   );
 }
