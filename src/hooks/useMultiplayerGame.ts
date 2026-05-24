@@ -972,8 +972,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
               logs: [...logs].slice(0, 40),
               events,
               timer: newTimer,
-              playerUnits: pAlive.map(serializeUnit),
-              enemyUnits: eAlive.map(serializeUnit),
+              playerUnits: (roundEnding ? pAlive : pAliveAll).map(serializeUnit),
+              enemyUnits: (roundEnding ? eAlive : eAliveAll).map(serializeUnit),
               turnCount: newTurn,
               // Morale states from host perspective
               playerMorale: moralePhase.current === 'none' ? null : moralePhase.current,
