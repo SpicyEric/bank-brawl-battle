@@ -412,7 +412,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   spiderqueen: {
     label: 'Spinnenkönigin', emoji: '🕷️', hp: 70, attack: 15, cooldown: 2,
-    description: 'Bewegt sich in alle 8 Richtungen (bis 2 Felder). 35% Chance, Ziel im Netz zu fangen (3 Runden).',
+    description: 'Bewegt sich in alle 8 Richtungen (bis 2 Felder). 25% Chance, Ziel im Netz zu fangen (5 Ticks: kein Move, kein Angriff).',
     movePattern: [
       ...ALL_ADJACENT,
       { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
@@ -430,7 +430,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   doppelganger: {
     label: 'Doppelgänger', emoji: '👥', hp: 85, attack: 17, cooldown: 2,
-    description: 'Spawnt zu Beginn der Runde ein Phantom-Duplikat (5 Ticks unverwundbar). Gegner unterscheiden Original und Phantom nicht.',
+    description: 'Spawnt zu Rundenstart ein lila leuchtendes Phantom (20 HP, 5 Dmg, 5 Ticks unverwundbar) irgendwo in den 3 Gegnerlinien. Original bleibt still, bis das Phantom stirbt.',
     movePattern: DIAGONAL,
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -451,7 +451,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   chaindancer: {
-    label: 'Kettentänzer', emoji: '🪢', hp: 65, attack: 22, cooldown: 3,
+    label: 'Kettentänzer', emoji: '🪢', hp: 75, attack: 22, cooldown: 3,
     description: 'Kettenangriff: Schaden springt diagonal durch bis zu 3 Feinde (jeweils 70% Schaden). Diagonale Bewegung bis 2 Felder.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
