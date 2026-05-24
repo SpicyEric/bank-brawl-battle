@@ -1515,7 +1515,7 @@ export function tickMageImpulse(
     for (const t of targets) {
       const sr = Math.sign(t.row - m.row);
       const sc = Math.sign(t.col - m.col);
-      // Push outward step-by-step until Chebyshev > 3, blocked or edge.
+      // Push outward step-by-step until blocked, water or map edge.
       let cur = { r: t.row, c: t.col };
       while (true) {
         const nr = cur.r + sr;
@@ -1525,8 +1525,6 @@ export function tickMageImpulse(
         if (cell.terrain === 'water') break;
         if (cell.unit) break;
         cur = { r: nr, c: nc };
-        const dist = Math.max(Math.abs(nr - m.row), Math.abs(nc - m.col));
-        if (dist > 3) break;
       }
       if (cur.r !== t.row || cur.c !== t.col) {
         grid[t.row][t.col].unit = null;
