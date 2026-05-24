@@ -233,6 +233,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       // Impulse / teleport / spawn are visual-only and must not produce
       // projectiles, damage popups or AOE fire overlays.
       if (evt.type === 'impulse' || evt.type === 'teleport' || evt.type === 'spawn' || evt.type === 'frostNova' || evt.type === 'riderHorn') continue;
+      if (evt.type === 'volleyMiss') { rangedDamageEvents.push(evt); continue; }
       if (evt.type === 'heal') healEvents.push(evt);
       else if (evt.type === 'freeze') freezeEvents.push(evt);
       else if (evt.isRanged) rangedDamageEvents.push(evt);
@@ -328,6 +329,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         const rangedPopups: DamagePopup[] = [];
         const rangedDragonFires: DragonFire[] = [];
         for (const evt of rangedDamageEvents) {
+          if (evt.type === 'volleyMiss') continue; // visual-only arrow, no popup/shake
           const key = `${evt.targetRow}-${evt.targetCol}`;
           rangedShake.add(key);
           popupCounter.current += 1;

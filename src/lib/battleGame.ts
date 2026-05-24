@@ -1829,7 +1829,9 @@ export function tickArcherVolley(
     for (const { dr, dc } of dirs) {
       let r = a.row + dr, c = a.col + dc;
       let target: Unit | null = null;
+      let lastR = a.row, lastC = a.col;
       while (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+        lastR = r; lastC = c;
         const u = grid[r][c].unit;
         if (u && u.hp > 0 && !u.dead && u.team !== a.team && !(u.isPhantom && (u.phantom ?? 0) > 0)) {
           target = u;
@@ -1837,7 +1839,26 @@ export function tickArcherVolley(
         }
         r += dr; c += dc;
       }
-      if (!target) continue;
+
+      if (!target) {
+        // No enemy in this direction: still emit a visual-only arrow flying to map edge.
+        events.push({
+          type: 'volleyMiss',
+          attackerId: a.id,
+          attackerRow: a.row,
+          attackerCol: a.col,
+          attackerEmoji: '🏹',
+          attackerType: 'archer',
+          targetId: a.id,
+          targetRow: lastR,
+          targetCol: lastC,
+          damage: 0,
+          isStrong: false,
+          isWeak: false,
+          isRanged: true,
+        });
+        continue;
+      }
 
       const dmg = calcDamage(a, target, grid);
       target.hp = Math.max(0, target.hp - dmg);
