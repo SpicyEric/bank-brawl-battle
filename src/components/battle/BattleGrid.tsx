@@ -25,6 +25,8 @@ interface BattleGridProps {
   flipped?: boolean;
   /** While the player is dragging a unit, show alternating attack/move preview around this cell */
   dragPreview?: { row: number; col: number; type: UnitType } | null;
+  /** Increments each new match — re-rolls battlefield background */
+  matchId?: number;
 }
 
 interface UnitPos { row: number; col: number }
@@ -41,7 +43,7 @@ interface RiderHornFlash { id: string; row: number; col: number; kind: 'inner' |
 interface DragonSpinFlame { id: string; row: number; col: number; delayMs: number }
 interface TeleportEffect { id: string; row: number; col: number; kind: 'out' | 'in' }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview, matchId }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,24 +86,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const prevFocus = useRef(false);
   const prevSacrifice = useRef(false);
 
-  // Random battlefield background per round (re-rolls on each new placement phase)
+  // Random battlefield background per MATCH (re-rolls when matchId changes)
   const BATTLEFIELDS = useMemo(() => [
     { id: 'grass' as const, url: battlefieldGrass },
     { id: 'desert' as const, url: battlefieldDesert },
   ], []);
   const [battlefield, setBattlefield] = useState(() => BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
   const battlefieldBg = battlefield.url;
-  const prevPhaseRef = useRef<Phase>(phase);
+  const prevMatchIdRef = useRef<number | undefined>(matchId);
   useEffect(() => {
-    const prev = prevPhaseRef.current;
-    const isNewRoundStart =
-      (phase === 'place_player' || phase === 'place_enemy') &&
-      (prev === 'round_won' || prev === 'round_lost' || prev === 'round_draw' || prev === 'battle');
-    if (isNewRoundStart) {
+    if (matchId !== undefined && matchId !== prevMatchIdRef.current) {
       setBattlefield(BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+      prevMatchIdRef.current = matchId;
     }
-    prevPhaseRef.current = phase;
-  }, [phase, BATTLEFIELDS]);
+  }, [matchId, BATTLEFIELDS]);
 
 
   // War cry flash animation (own or opponent)
