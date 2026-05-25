@@ -162,6 +162,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     setPlayerFatigue({});
     setEnemyFatigue({});
     setPlaceTimer(PLACE_TIME_LIMIT);
+    aiDripStartedRef.current = false;
+    for (const t of aiDripTimeoutsRef.current) clearTimeout(t);
+    aiDripTimeoutsRef.current = [];
   }, []);
 
   // Placement timer countdown (difficulty 2+)
