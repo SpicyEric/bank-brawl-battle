@@ -651,18 +651,24 @@ const LANE_EXEMPT_TYPES = new Set<UnitType>([
 ]);
 
 function laneToleranceFor(type: UnitType): number {
-  // Hard overrides for units whose movePattern doesn't include any orthogonal step
+  // Hard overrides: assassin uses a 5-column corridor so its diagonal jumps can advance.
   if (type === 'assassin') return 2;
   const def = UNIT_DEFS[type];
+  // Tolerance = smallest sideways step among moves that ALSO advance a row.
+  // Guarantees every mobile unit has at least one legal forward move inside its corridor.
   let minSide = Infinity;
   for (const m of def.movePattern) {
-    if (m.row === 0 && m.col === 0) continue;
-    // forward-progressing move
+    if (m.row === 0) continue; // pure sideways doesn't help advance the lane
     const sideways = Math.abs(m.col);
     if (sideways < minSide) minSide = sideways;
   }
   if (!isFinite(minSide)) return 0;
   return Math.max(0, minSide);
+}
+
+// Break a unit's lane discipline permanently for the rest of the combat phase.
+function breakLane(unit: Unit) {
+  unit.laneBroken = true;
 }
 
 function isLaneActive(unit: Unit): boolean {
@@ -794,7 +800,8 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   }
 
   // Lane discipline: while in lane mode, prefer enemies inside the unit's lane corridor.
-  if (isLaneActive(unit)) {
+  const laneActive = isLaneActive(unit);
+  if (laneActive) {
     const tol = laneToleranceFor(unit.type);
     const laneEnemies = enemies.filter(e => Math.abs(e.col - unit.laneCol!) <= tol);
     if (laneEnemies.length > 0) {
@@ -807,6 +814,13 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
         return distance(unit, a) - distance(unit, b);
       });
       return laneEnemies[0];
+    }
+    // No lane enemies → if an out-of-lane enemy is already in our attack pattern,
+    // commit to it but break the lane (we're actively in combat now).
+    const inAttackRange = enemies.find(e => canAttack(unit, e));
+    if (inAttackRange) {
+      breakLane(unit);
+      return inAttackRange;
     }
   }
 
@@ -822,6 +836,7 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
       if (aColDist !== bColDist) return aColDist - bColDist;
       return distance(unit, a) - distance(unit, b);
     });
+    if (laneActive) breakLane(unit);
     return columnEnemies[0];
   }
 
@@ -835,11 +850,13 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
       if (aFront !== bFront) return bFront - aFront;
       return distance(unit, a) - distance(unit, b);
     });
+    if (laneActive) breakLane(unit);
     return frontlineSorted[0];
   }
 
   // Ranged units: target closest enemy
   enemies.sort((a, b) => distance(unit, a) - distance(unit, b));
+  if (laneActive) breakLane(unit);
   return enemies[0];
 }
 
