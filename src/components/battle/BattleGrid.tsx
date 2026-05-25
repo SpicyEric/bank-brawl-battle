@@ -709,7 +709,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {isImpact && <div className="placement-impact" />}
               {/* Terrain emoji (show when no unit or unit is dead) */}
               {hasTerrain && (!unit || isDead) && (
-                <span className="text-base select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{terrain === 'forest' && battlefield.id === 'desert' ? '🌵' : TERRAIN_DEFS[terrain].emoji}</span>
+                <span className="text-[11px] select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{terrain === 'forest' && battlefield.id === 'desert' ? '🌵' : TERRAIN_DEFS[terrain].emoji}</span>
               )}
               {isDead && (
                 <span className="text-sm opacity-40 select-none">💀</span>
@@ -780,8 +780,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                         : isFrozen
                         ? 'drop-shadow(0 0 5px hsl(210, 80%, 60%)) drop-shadow(0 0 10px hsl(210, 80%, 60%))'
                         : (flipped ? unit.team === 'enemy' : unit.team === 'player')
-                          ? 'drop-shadow(0 0 4px hsl(152, 60%, 48%)) drop-shadow(0 0 8px hsl(152, 60%, 48%))'
-                          : 'drop-shadow(0 0 4px hsl(0, 72%, 55%)) drop-shadow(0 0 8px hsl(0, 72%, 55%))',
+                          ? 'drop-shadow(0 0 5px hsl(152, 80%, 50%)) drop-shadow(0 0 10px hsl(152, 80%, 50%)) drop-shadow(0 0 16px hsl(152, 85%, 45%))'
+                          : 'drop-shadow(0 0 5px hsl(0, 85%, 55%)) drop-shadow(0 0 10px hsl(0, 85%, 55%)) drop-shadow(0 0 16px hsl(0, 85%, 50%))',
                     }}
                   >
                     {unit.type && <UnitGlyph type={unit.type} isClone={unit.isClone} className="inline-block w-5 h-5 sm:w-6 sm:h-6 align-middle" />}
