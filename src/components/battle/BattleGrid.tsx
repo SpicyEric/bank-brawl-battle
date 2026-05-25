@@ -824,7 +824,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                 // Row-by-row marching entry: uniform offset that ticks down.
                 // Player marches up from below: visual offset = +entryStep rows.
                 // Enemy marches down from above: visual offset = -entryStep rows.
-                const entryDr = entryStep > 0
+                const entryDr = entryStep > 0 && !isBattleWorld
                   ? (unit.team === 'player' ? entryStep : -entryStep)
                   : 0;
                 const visualDr = (flipped ? -entryDr : entryDr);
@@ -973,7 +973,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }, { row: -1, col: -1 }, { row: -1, col: 1 }, { row: 1, col: -1 }, { row: 1, col: 1 }]) {
             const r = tankCell.row + offset.row;
             const c = tankCell.col + offset.col;
-            if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+            if (isVisibleRow(r) && c >= 0 && c < GRID_SIZE) {
               const neighbor = grid[r][c];
               if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === tank.team && neighbor.unit.id !== tank.id) {
                 if (hideEnemyUnits && isPlacing && tank.team === 'enemy') continue;
