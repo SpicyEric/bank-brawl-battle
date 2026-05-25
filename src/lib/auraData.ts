@@ -89,11 +89,13 @@ export async function loadAuraData(): Promise<{ zones: AuraZoneMap; effects: Aur
   return { zones: cachedZones ?? {}, effects: cachedEffects ?? {} };
 }
 
-/** Compute per-cell aura overlay map ("r-c" -> 'buff' | 'nerf') from all placed units.
- *  Buff wins over nerf if both occur on the same cell.
- *  Cells already occupied by a unit are still marked (visual hint). */
-export function computeAuraOverlay(units: Unit[], zones: AuraZoneMap): Map<string, 'buff' | 'nerf'> {
-  const out = new Map<string, 'buff' | 'nerf'>();
+/** Per-cell aura counts: how many buff- and nerf-sources affect each cell.
+ *  Buffs and nerfs stack independently and can both be > 0 on the same cell. */
+export type AuraOverlayCell = { buff: number; nerf: number };
+export type AuraOverlayMap = Map<string, AuraOverlayCell>;
+
+export function computeAuraOverlay(units: Unit[], zones: AuraZoneMap): AuraOverlayMap {
+  const out: AuraOverlayMap = new Map();
   for (const u of units) {
     if (!u || u.dead || u.hp <= 0) continue;
     const z = zones[u.type];
@@ -106,9 +108,9 @@ export function computeAuraOverlay(units: Unit[], zones: AuraZoneMap): Map<strin
       const c = u.col + dc;
       if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
       const key = `${r}-${c}`;
-      const cur = out.get(key);
-      if (cur === 'buff') continue;
-      out.set(key, kind);
+      const cur = out.get(key) ?? { buff: 0, nerf: 0 };
+      if (kind === 'buff') cur.buff += 1; else cur.nerf += 1;
+      out.set(key, cur);
     }
   }
   return out;
