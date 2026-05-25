@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { UNIT_TYPES, UNIT_DEFS, UnitType, ColorGroup } from '@/lib/battleGame';
@@ -12,6 +12,15 @@ import { toast } from 'sonner';
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
 const ROSTER_SIZE = 9;
 const LONG_PRESS_MS = 800;
+
+function shuffle<T>(arr: readonly T[]): T[] {
+  const out = arr.slice();
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
 
 const COLOR_RING: Record<ColorGroup, string> = {
   red: 'border-unit-red/40 bg-unit-red/15',
@@ -35,6 +44,9 @@ export default function UnitRoster() {
   const [slots, setSlots] = useState<(UnitType | null)[]>(Array(ROSTER_SIZE).fill(null));
   const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(null);
   const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
+  // Randomize the picker order once per mount so players don't always reach
+  // for the same units in the same spots.
+  const pickerOrder = useMemo(() => shuffle(UNIT_TYPES), []);
 
   // Multiplayer state
   const [submitting, setSubmitting] = useState(false);
@@ -192,7 +204,7 @@ export default function UnitRoster() {
           Gedrückt halten = Info
         </p>
         <div className="grid grid-cols-3 gap-1.5">
-          {UNIT_TYPES.map(t => {
+          {pickerOrder.map(t => {
             const def = UNIT_DEFS[t];
             const isPlaced = placedUnits.has(t);
             const isSelected = selectedUnit === t;

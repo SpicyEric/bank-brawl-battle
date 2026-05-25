@@ -56,6 +56,14 @@ let cachedZones: AuraZoneMap | null = null;
 let cachedEffects: AuraEffectMap | null = null;
 let pending: Promise<void> | null = null;
 
+// Legacy DB rows that contain the actual data for some code unit-types.
+const UNIT_TYPE_ALIASES: Record<string, UnitType> = {
+  frostmage: 'frost',
+  volcanit: 'vulkanit',
+  shieldbearer: 'tank',
+  shaman: 'healer',
+};
+
 export async function loadAuraData(): Promise<{ zones: AuraZoneMap; effects: AuraEffectMap }> {
   if (cachedZones && cachedEffects) return { zones: cachedZones, effects: cachedEffects };
   if (!pending) {
@@ -67,7 +75,8 @@ export async function loadAuraData(): Promise<{ zones: AuraZoneMap; effects: Aur
       const zones: AuraZoneMap = {};
       const effects: AuraEffectMap = {};
       for (const row of data ?? []) {
-        const ut = row.unit_type as UnitType;
+        const rawType = row.unit_type as string;
+        const ut = (UNIT_TYPE_ALIASES[rawType] ?? rawType) as UnitType;
         const z: Partial<Record<ZonePos, Exclude<ZoneType, 'neutral'>>> = {};
         const stored = (row.aura_zones as any)?.zones;
         if (Array.isArray(stored)) {
@@ -77,9 +86,15 @@ export async function loadAuraData(): Promise<{ zones: AuraZoneMap; effects: Aur
             }
           }
         }
-        zones[ut] = z;
+        // Don't overwrite an existing non-empty entry with an empty alias row.
+        const existing = zones[ut];
+        if (!existing || Object.keys(existing).length === 0) zones[ut] = z;
         const ae = row.aura_effect as any;
-        if (ae && typeof ae === 'object') effects[ut] = { buff: ae.buff ?? null, nerf: ae.nerf ?? null };
+        if (ae && typeof ae === 'object') {
+          const eff = { buff: ae.buff ?? null, nerf: ae.nerf ?? null };
+          const cur = effects[ut];
+          if (!cur || (!cur.buff && !cur.nerf)) effects[ut] = eff;
+        }
       }
       cachedZones = zones;
       cachedEffects = effects;

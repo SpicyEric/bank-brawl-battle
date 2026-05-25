@@ -1,5 +1,8 @@
-import { UnitType, UNIT_DEFS, UNIT_COLOR_GROUPS, COLOR_BEATS, ColorGroup, getPatternDisplay } from '@/lib/battleGame';
+import { useEffect, useState } from 'react';
+import { UnitType, UNIT_DEFS, UNIT_COLOR_GROUPS, COLOR_BEATS, ColorGroup } from '@/lib/battleGame';
 import { UnitGlyph } from '@/components/UnitGlyph';
+import { loadAuraData, ZONE_DELTA, type AuraZoneMap, type AuraEffectMap, type ZonePos } from '@/lib/auraData';
+import { describeEffect } from '@/lib/effectLabels';
 
 const COLOR_LABEL: Record<ColorGroup, string> = {
   red: '🔴 Rot',
@@ -10,9 +13,7 @@ const COLOR_LABEL: Record<ColorGroup, string> = {
 interface UnitInfoModalProps {
   unitType: UnitType;
   onClose: () => void;
-  /** Hide color affiliation (badge + strong/weak section) – used in roster where units are color-neutral */
   hideColorInfo?: boolean;
-  /** Override color (when inspecting a placed unit whose slot color differs from the type default) */
   colorOverride?: ColorGroup;
 }
 
@@ -21,9 +22,21 @@ export function UnitInfoModal({ unitType, onClose, hideColorInfo, colorOverride 
   const colorGroup = colorOverride ?? UNIT_COLOR_GROUPS[unitType];
   const beats = COLOR_BEATS[colorGroup];
   const losesTo = (Object.entries(COLOR_BEATS) as [ColorGroup, ColorGroup][]).find(([, v]) => v === colorGroup)?.[0] as ColorGroup;
-  const moveGrid = getPatternDisplay(def.movePattern, 7);
-  const attackGrid = getPatternDisplay(def.attackPattern, 7);
-  const center = 3;
+
+  const [zones, setZones] = useState<AuraZoneMap>({});
+  const [effects, setEffects] = useState<AuraEffectMap>({});
+  useEffect(() => {
+    let active = true;
+    loadAuraData().then(({ zones, effects }) => {
+      if (!active) return;
+      setZones(zones);
+      setEffects(effects);
+    });
+    return () => { active = false; };
+  }, []);
+
+  const myZones = zones[unitType] ?? {};
+  const myEffect = effects[unitType] ?? { buff: null, nerf: null };
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
@@ -46,28 +59,30 @@ export function UnitInfoModal({ unitType, onClose, hideColorInfo, colorOverride 
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <div className="bg-muted rounded-lg p-2">
-            <p className="text-[10px] text-muted-foreground uppercase">HP</p>
-            <p className="font-bold text-foreground text-sm">{def.hp}</p>
-          </div>
-          <div className="bg-muted rounded-lg p-2">
-            <p className="text-[10px] text-muted-foreground uppercase">Angriff</p>
-            <p className="font-bold text-foreground text-sm">{def.attack}</p>
-          </div>
-          <div className="bg-muted rounded-lg p-2">
-            <p className="text-[10px] text-muted-foreground uppercase">Cooldown</p>
-            <p className="font-bold text-foreground text-sm">{def.cooldown}</p>
+        <div className="grid grid-cols-4 gap-2 text-center">
+          <Stat label="HP" value={def.hp} />
+          <Stat label="Angriff" value={def.attack} />
+          <Stat label="Cooldown" value={def.cooldown} />
+          <Stat label="Reichweite" value={def.attackRange ?? 1} />
+        </div>
+
+        {/* Aura zones (single 3×3 grid centered on the unit) */}
+        <div className="space-y-2">
+          <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-center">Aura-Zonen</p>
+          <AuraZoneGrid zones={myZones} />
+          <div className="grid grid-cols-2 gap-2 text-[11px]">
+            <div className="rounded-lg border border-green-500/40 bg-green-500/10 p-2">
+              <div className="font-semibold text-green-500 mb-0.5">＋ Buff</div>
+              <div className="text-foreground/90">{describeEffect(myEffect.buff)}</div>
+            </div>
+            <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-2">
+              <div className="font-semibold text-red-500 mb-0.5">− Nerf</div>
+              <div className="text-foreground/90">{describeEffect(myEffect.nerf)}</div>
+            </div>
           </div>
         </div>
 
-        {/* Patterns */}
-        <div className="grid grid-cols-2 gap-3">
-          <PatternGrid title="Bewegung" grid={moveGrid} center={center} color="bg-primary/60" />
-          <PatternGrid title="Angriff" grid={attackGrid} center={center} color="bg-danger/60" />
-        </div>
-
-        {/* Color counter info – hidden in roster (units are color-neutral until placed) */}
+        {/* Color counter info */}
         {!hideColorInfo && (
           <div className="space-y-1.5">
             <div className="flex items-center gap-2 text-xs">
@@ -92,26 +107,47 @@ export function UnitInfoModal({ unitType, onClose, hideColorInfo, colorOverride 
   );
 }
 
-function PatternGrid({ title, grid, center, color }: { title: string; grid: boolean[][]; center: number; color: string }) {
+function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="space-y-1.5">
-      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider text-center">{title}</p>
-      <div className="grid gap-[1px] mx-auto" style={{ gridTemplateColumns: `repeat(${grid[0].length}, 1fr)`, width: 'fit-content' }}>
-        {grid.map((row, r) =>
-          row.map((active, c) => {
-            const isCenter = r === center && c === center;
-            return (
-              <div
-                key={`${r}-${c}`}
-                className={`w-4 h-4 rounded-sm ${
-                  isCenter ? 'bg-primary/60 border border-primary' :
-                  active ? `${color}` : 'bg-muted/40'
-                }`}
-              />
+    <div className="bg-muted rounded-lg p-2">
+      <p className="text-[10px] text-muted-foreground uppercase">{label}</p>
+      <p className="font-bold text-foreground text-sm">{value}</p>
+    </div>
+  );
+}
+
+function AuraZoneGrid({ zones }: { zones: Partial<Record<ZonePos, 'buff' | 'nerf'>> }) {
+  // 3×3 grid with center = the unit itself, surrounded by 8 aura positions.
+  return (
+    <div className="grid grid-cols-3 gap-1 w-fit mx-auto">
+      {[-1, 0, 1].map(dr =>
+        [-1, 0, 1].map(dc => {
+          const isCenter = dr === 0 && dc === 0;
+          let kind: 'buff' | 'nerf' | undefined;
+          if (!isCenter) {
+            const pos = (Object.keys(ZONE_DELTA) as ZonePos[]).find(
+              p => ZONE_DELTA[p].dr === dr && ZONE_DELTA[p].dc === dc
             );
-          })
-        )}
-      </div>
+            if (pos) kind = zones[pos];
+          }
+          return (
+            <div
+              key={`${dr}-${dc}`}
+              className={`w-9 h-9 rounded-md border flex items-center justify-center text-xs font-bold ${
+                isCenter
+                  ? 'bg-primary/20 border-primary text-primary'
+                  : kind === 'buff'
+                  ? 'bg-green-500/20 border-green-500 text-green-500'
+                  : kind === 'nerf'
+                  ? 'bg-red-500/20 border-red-500 text-red-500'
+                  : 'bg-muted/40 border-border'
+              }`}
+            >
+              {isCenter ? '★' : kind === 'buff' ? '＋' : kind === 'nerf' ? '−' : ''}
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }
