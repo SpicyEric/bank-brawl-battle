@@ -948,7 +948,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     return null;
                   })()}
                 </div>
-              )}
+                );
+              })()}
             </button>
           );
         })}
