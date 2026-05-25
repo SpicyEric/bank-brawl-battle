@@ -1513,12 +1513,12 @@ export function isImmuneToFire(unit: Unit, grid: Cell[][]): boolean {
   return unit.type === 'mountaineer' && grid[unit.row]?.[unit.col]?.terrain === 'hill';
 }
 
-/** Effective cooldown considering terrain bonuses (ranger forest=1, mountaineer hill=2). */
+/** Effective cooldown considering terrain bonuses (ranger forest=1, mountaineer hill=1). */
 export function effectiveCooldown(unit: Unit, grid: Cell[][]): number {
   const t = grid[unit.row]?.[unit.col]?.terrain;
   let cd = unit.maxCooldown;
   if (unit.type === 'ranger' && t === 'forest') cd = 1;
-  else if (unit.type === 'mountaineer' && t === 'hill') cd = 2;
+  else if (unit.type === 'mountaineer' && t === 'hill') cd = 1;
   // Obelisk buff: halve cooldown (rounded up), minimum 1
   if ((unit.obeliskBuff || 0) > 0) cd = Math.max(1, Math.ceil(cd / 2));
   return cd;
