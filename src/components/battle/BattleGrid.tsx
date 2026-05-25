@@ -33,6 +33,8 @@ interface BattleGridProps {
   auraZones?: import('@/lib/auraData').AuraZoneMap;
   /** Cells belonging to the currently selected formation (shown highlighted during combat). */
   selectedFormationCells?: Set<string>;
+  /** Hide enemy units from view (used during full-grid placement; spy button temporarily reveals them). */
+  hideEnemyUnits?: boolean;
 }
 
 interface UnitPos { row: number; col: number }
@@ -49,7 +51,7 @@ interface RiderHornFlash { id: string; row: number; col: number; kind: 'inner' |
 interface DragonSpinFlame { id: string; row: number; col: number; delayMs: number }
 interface TeleportEffect { id: string; row: number; col: number; kind: 'out' | 'in' }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview, matchId, auraOverlay, auraZones, selectedFormationCells }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview, matchId, auraOverlay, auraZones, selectedFormationCells, hideEnemyUnits }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -142,6 +144,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
     prevSacrifice.current = !!sacrificeFlash;
   }, [sacrificeFlash]);
+
+  // Battle entry animation: when phase transitions into 'battle', briefly slide
+  // all units in from off-grid (player from bottom, enemy from top).
+  const [battleEntry, setBattleEntry] = useState(false);
+  const prevPhaseForEntry = useRef(phase);
+  useEffect(() => {
+    if (prevPhaseForEntry.current !== 'battle' && phase === 'battle') {
+      setBattleEntry(true);
+      const t = setTimeout(() => setBattleEntry(false), 850);
+      prevPhaseForEntry.current = phase;
+      return () => clearTimeout(t);
+    }
+    prevPhaseForEntry.current = phase;
+  }, [phase]);
 
   // Brief one-shot aura pulse after placing a unit (replaces old attack/move flash)
   const [placementPulse, setPlacementPulse] = useState<Map<string, 'buff' | 'nerf'>>(new Map());
@@ -651,12 +667,14 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
 
       <div className="grid grid-cols-8 gap-[2px] w-full h-full bg-border rounded-xl overflow-hidden border border-border">
          {(flipped ? [...grid].reverse().flat() : grid.flat()).map((cell) => {
-          const isPlayerZone = flipped ? cell.row < 4 : PLAYER_ROWS.includes(cell.row);
-          const isEnemyZone = flipped ? PLAYER_ROWS.includes(cell.row) : cell.row < 4;
+          const isPlayerZone = isPlacing; // full grid is buildable during placement
+          const isEnemyZone = false;
           const unit = cell.unit;
+          // Hide enemy units during placement (unless spying via hideEnemyUnits=false).
+          const isHiddenEnemy = !!(unit && unit.team === 'enemy' && hideEnemyUnits && isPlacing);
           const def = unit ? UNIT_DEFS[unit.type] : null;
           const colorGroup = unit && !unit.dead ? (unit.color || UNIT_COLOR_GROUPS[unit.type]) : null;
-          const showColorDot = colorGroup && (alwaysShowColorDots || phase === 'place_player' || phase === 'place_enemy');
+          const showColorDot = colorGroup && (alwaysShowColorDots || phase === 'place_player' || phase === 'place_enemy') && !isHiddenEnemy;
           const hpPercent = unit && !unit.dead ? (unit.hp / unit.maxHp) * 100 : 0;
           const isLow = unit && !unit.dead ? unit.hp / unit.maxHp < 0.3 : false;
           const isFlashing = flashCells.has(`${cell.row}-${cell.col}`);
@@ -675,8 +693,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isDragOrigin = dragOriginKey === cellKey;
           const dragAuraKind = !isDragOrigin ? dragAuraCells.get(cellKey) : undefined;
           const pulseKind = placementPulse.get(cellKey);
-          // Enemy unit overlay during placement (live-placement view)
-          const showEnemyOverlay = unit && !isDead && isPlacing
+          // Enemy live-placement overlay (kept for non-placement spy reveal; suppressed when hiding).
+          const showEnemyOverlay = unit && !isDead && isPlacing && !isHiddenEnemy
             && (flipped ? unit.team === 'player' : unit.team === 'enemy');
 
 
@@ -781,9 +799,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {isDead && (
                 <span className="text-sm opacity-40 select-none">💀</span>
               )}
-              {unit && !isDead && (
+              {unit && !isDead && !isHiddenEnemy && (
                 <div
-                  className="absolute inset-0 flex flex-col items-center justify-center z-10"
+                  className={`absolute inset-0 flex flex-col items-center justify-center z-10 ${
+                    battleEntry ? (unit.team === 'player' ? 'battle-entry-player' : 'battle-entry-enemy') : ''
+                  }`}
                   style={{
                     ...slideStyle,
                     transition: offset
@@ -915,6 +935,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
               const neighbor = grid[r][c];
               if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === tank.team && neighbor.unit.id !== tank.id) {
+                if (hideEnemyUnits && isPlacing && tank.team === 'enemy') continue;
                 bonds.push({ tankRow: tankCell.row, tankCol: tankCell.col, unitRow: r, unitCol: c, team: tank.team });
               }
             }

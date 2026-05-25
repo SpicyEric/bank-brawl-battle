@@ -100,6 +100,37 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
   const [matchId, setMatchId] = useState(0);
   const prevGameOver = useRef(game.gameOver);
 
+  // === Spy: hold a button during placement to peek at opponent for up to 3s, once per match ===
+  const [spyUsed, setSpyUsed] = useState(false);
+  const [spying, setSpying] = useState(false);
+  const spyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startSpy = () => {
+    if (spyUsed || spying || isMultiplayer) return;
+    setSpying(true);
+    spyTimerRef.current = setTimeout(() => {
+      setSpying(false);
+      setSpyUsed(true);
+      spyTimerRef.current = null;
+    }, 3000);
+  };
+  const stopSpy = () => {
+    if (!spying) return;
+    if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
+    setSpying(false);
+    setSpyUsed(true);
+  };
+  // Reset spy state on each new match
+  useEffect(() => {
+    setSpyUsed(false);
+    setSpying(false);
+    if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
+  }, [matchId]);
+  // Auto-stop spy if phase changes away from placement
+  useEffect(() => {
+    if (game.phase !== 'place_player' && spying) stopSpy();
+  }, [game.phase]);
+  const hideEnemyUnits = !isMultiplayer && game.phase === 'place_player' && !spying;
+
   // Aura zones (loaded once from DB), recomputed overlay each render based on placed units
   const [auraZones, setAuraZones] = useState<import('@/lib/auraData').AuraZoneMap>({});
   useEffect(() => {
@@ -327,6 +358,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
           auraOverlay={auraOverlay}
           auraZones={auraZones}
           selectedFormationCells={selectedFormationCells}
+          hideEnemyUnits={hideEnemyUnits}
         />
 
 
@@ -360,6 +392,25 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 </span>
               </div>
             )}
+            {!isMultiplayer && (
+              <button
+                onPointerDown={(e) => { e.preventDefault(); startSpy(); }}
+                onPointerUp={stopSpy}
+                onPointerLeave={stopSpy}
+                onPointerCancel={stopSpy}
+                onContextMenu={(e) => e.preventDefault()}
+                disabled={spyUsed && !spying}
+                className={`w-full py-2.5 rounded-xl font-semibold text-xs transition-all select-none touch-none active:scale-[0.98] ${
+                  spying
+                    ? 'bg-primary text-primary-foreground shadow-[0_0_14px_hsl(var(--primary)/0.6)] animate-pulse'
+                    : spyUsed
+                    ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
+                    : 'bg-card border border-primary/50 text-primary hover:bg-primary/10'
+                }`}
+              >
+                {spying ? '👁️ SPIONIERE… (loslassen)' : spyUsed ? '👁️ Spionage verbraucht' : '👁️ Gegner spionieren (halten, max. 3s, einmalig)'}
+              </button>
+            )}
             <UnitPicker
               selected={game.selectedUnit}
               onSelect={game.setSelectedUnit}
@@ -374,10 +425,10 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               placedSlots={game.placedSlots}
               onDragHover={(row, col, type) => {
                 if (row === null || col === null || !type) { setDragPreview(null); return; }
-                // Only show preview on valid placement zones (4-row half)
-                const isPlayerRow = roster
-                  ? (flipped ? row < 4 : [4, 5, 6, 7].includes(row))
-                  : [4, 5, 6, 7].includes(row);
+                // SP: full grid is buildable. MP: keep the 4-row half restriction.
+                const isPlayerRow = isMultiplayer
+                  ? (roster ? (flipped ? row < 4 : [4, 5, 6, 7].includes(row)) : [4, 5, 6, 7].includes(row))
+                  : true;
                 const targetCell = game.grid[row]?.[col];
                 if (!isPlayerRow || !targetCell || targetCell.unit || targetCell.terrain === 'water') {
                   setDragPreview(null);
@@ -390,8 +441,10 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 if (!roster) return;
                 const cell = game.grid[row]?.[col];
                 if (!cell || cell.unit || cell.terrain === 'water') return;
-                const playerRows = [4, 5, 6, 7];
-                if (!playerRows.includes(row)) return;
+                if (isMultiplayer) {
+                  const playerRows = flipped ? [0, 1, 2, 3] : [4, 5, 6, 7];
+                  if (!playerRows.includes(row)) return;
+                }
                 const type = roster[slotIdx];
                 game.setSelectedSlot(slotIdx);
                 game.placeUnit(row, col, slotIdx);

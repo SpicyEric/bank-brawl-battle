@@ -537,8 +537,10 @@ export function getMaxUnits(myScore: number, opponentScore: number, roundNumber:
   return Math.min(roundNumber + bonus, MAX_UNITS);
 }
 export const GRID_SIZE = 8;
-export const PLAYER_ROWS = [4, 5, 6, 7];
-export const ENEMY_ROWS = [0, 1, 2, 3];
+// Full-grid placement: both sides can build anywhere on the 8x8 board.
+// (Spy/intro mechanic keeps each side's formation hidden from the other.)
+export const PLAYER_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
+export const ENEMY_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
 export const POINTS_TO_WIN = 8;
 export const OVERTIME_THRESHOLD = 7; // at this score, 2-point lead required
 export const AUTO_OVERTIMES = 3; // first 3 overtimes are automatic
@@ -608,16 +610,9 @@ export function generateTerrain(grid: Cell[][]): Cell[][] {
 // Calculate activation turn based on row distance from center
 // Player rows: 5 (front, turn 0), 6 (mid, turn 2), 7 (back, turn 3)
 // Enemy rows: 2 (front, turn 0), 1 (mid, turn 2), 0 (back, turn 3)
-export function getActivationTurn(row: number, team: Team): number {
-  if (team === 'player') {
-    if (row === 5) return 0;
-    if (row === 6) return 2;
-    return 3; // row 7
-  } else {
-    if (row === 2) return 0;
-    if (row === 1) return 2;
-    return 3; // row 0
-  }
+export function getActivationTurn(_row: number, _team: Team): number {
+  // Full-grid placement + simultaneous start: every unit activates on turn 0.
+  return 0;
 }
 
 export function createUnit(type: UnitType, team: Team, row: number, col: number, color?: 'red' | 'blue' | 'green', slotIndex?: number): Unit {
@@ -1306,14 +1301,15 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
 
       let row: number, col: number;
       let attempts = 0;
-      const isRanged = type === 'archer' || type === 'frost' || type === 'mage';
-      const isTank = type === 'tank';
-      const preferredRow = isTank ? 2 : isRanged ? 0 : 1;
       do {
-        row = Math.random() < 0.7 ? preferredRow : Math.floor(Math.random() * 3);
+        row = Math.floor(Math.random() * GRID_SIZE);
         col = Math.floor(Math.random() * GRID_SIZE);
         attempts++;
-      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
+      } while ((
+        usedCells.has(`${row},${col}`) ||
+        (currentGrid && currentGrid[row]?.[col]?.terrain === 'water') ||
+        (currentGrid && currentGrid[row]?.[col]?.unit)
+      ) && attempts < 30);
       if (attempts >= 30) continue;
       usedCells.add(`${row},${col}`);
       placements.push({ type, row, col });
@@ -1346,32 +1342,15 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
 
     let row: number, col: number;
     let attempts = 0;
-
-    if (difficulty >= 4) {
-      const isRanged = type === 'archer' || type === 'frost' || type === 'mage';
-      const isTank = type === 'tank';
-      const preferredRow = isTank ? 2 : isRanged ? 0 : 1;
-      do {
-        row = Math.random() < 0.6 ? preferredRow : Math.floor(Math.random() * 3);
-        col = Math.floor(Math.random() * GRID_SIZE);
-        attempts++;
-      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
-    } else if (difficulty >= 3 && currentGrid) {
-      do {
-        row = Math.floor(Math.random() * 3);
-        col = Math.floor(Math.random() * GRID_SIZE);
-        attempts++;
-        if (attempts < 15 && Math.random() < 0.3 && currentGrid[row]?.[col]?.terrain === 'none') {
-          continue;
-        }
-      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
-    } else {
-      do {
-        row = Math.floor(Math.random() * 3);
-        col = Math.floor(Math.random() * GRID_SIZE);
-        attempts++;
-      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
-    }
+    do {
+      row = Math.floor(Math.random() * GRID_SIZE);
+      col = Math.floor(Math.random() * GRID_SIZE);
+      attempts++;
+    } while ((
+      usedCells.has(`${row},${col}`) ||
+      (currentGrid && currentGrid[row]?.[col]?.terrain === 'water') ||
+      (currentGrid && currentGrid[row]?.[col]?.unit)
+    ) && attempts < 30);
 
     if (attempts >= 30) continue;
     usedCells.add(`${row},${col}`);
@@ -1421,7 +1400,7 @@ function _applyAuraClustering(
       const [ar, ac] = key.split(',').map(Number);
       for (const [dr, dc] of ADJ) {
         const r = ar + dr, c = ac + dc;
-        if (r < 0 || r > 2 || c < 0 || c >= GRID_SIZE) continue;
+        if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
         const k2 = `${r},${c}`;
         if (usedCells.has(k2)) continue;
         if (currentGrid && currentGrid[r]?.[c]?.terrain === 'water') continue;
@@ -1465,7 +1444,7 @@ function _applyTankBondFormation(
       for (const offset of adjacentOffsets) {
         const r = tank.row + offset.row;
         const c = tank.col + offset.col;
-        if (r < 0 || r > 2 || c < 0 || c >= GRID_SIZE) continue; // enemy rows 0-2
+        if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
         const key = `${r},${c}`;
         if (usedCells.has(key) && !(r === unit.row && c === unit.col)) continue;
         if (currentGrid && currentGrid[r]?.[c]?.terrain === 'water') continue;
