@@ -424,136 +424,170 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
 
     // --- Chain effects (lightning chains + chaindancer) ---
-    const newChains: ChainEffect[] = [];
+    type ChainEntry = { eff: ChainEffect; delay: number };
+    const chainEntries: ChainEntry[] = [];
     for (const evt of events) {
       if (!evt.chainCells || evt.chainCells.length < 2) continue;
       chainCounter.current += 1;
-      newChains.push({
-        id: `chain-${chainCounter.current}`,
-        cells: evt.chainCells,
-        color: evt.type === 'chain' ? 'chaindancer' : 'lightning',
+      const baseDelay = evt.type === 'chain' ? 0 : PROJECTILE_FLIGHT_TIME;
+      chainEntries.push({
+        eff: {
+          id: `chain-${chainCounter.current}`,
+          cells: evt.chainCells,
+          color: evt.type === 'chain' ? 'chaindancer' : 'lightning',
+        },
+        delay: baseDelay + delayFor(evt.attackerId),
       });
     }
-    if (newChains.length > 0) {
-      const delay = newChains[0].color === 'lightning' ? PROJECTILE_FLIGHT_TIME : 0;
+    for (const { eff, delay } of chainEntries) {
       setTimeout(() => {
-        setChainEffects(prev => [...prev, ...newChains]);
-        setTimeout(() => setChainEffects(prev => prev.filter(c => !newChains.find(nc => nc.id === c.id))), 900);
+        setChainEffects(prev => [...prev, eff]);
+        setTimeout(() => setChainEffects(prev => prev.filter(c => c.id !== eff.id)), 900);
       }, delay);
     }
 
     // --- Mage impulse (shockwave) ---
-    const newImpulses: ImpulseEffect[] = [];
-    const impulsePushedIdsBatch: string[] = [];
+    type ImpulseEntry = { eff: ImpulseEffect; pushedIds: string[]; delay: number };
+    const impulseEntries: ImpulseEntry[] = [];
     for (const evt of events) {
       if (evt.type !== 'impulse') continue;
       impulseCounter.current += 1;
-      newImpulses.push({ id: `impulse-${impulseCounter.current}`, row: evt.attackerRow, col: evt.attackerCol, kind: evt.attackerType === 'magnetiker' ? 'pull' : 'push' });
-      if (evt.pushedIds) impulsePushedIdsBatch.push(...evt.pushedIds);
+      impulseEntries.push({
+        eff: { id: `impulse-${impulseCounter.current}`, row: evt.attackerRow, col: evt.attackerCol, kind: evt.attackerType === 'magnetiker' ? 'pull' : 'push' },
+        pushedIds: evt.pushedIds || [],
+        delay: delayFor(evt.attackerId),
+      });
     }
-    if (newImpulses.length > 0) {
-      setImpulseEffects(prev => [...prev, ...newImpulses]);
-      setTimeout(() => setImpulseEffects(prev => prev.filter(i => !newImpulses.find(ni => ni.id === i.id))), 1500);
-    }
-    if (impulsePushedIdsBatch.length > 0) {
-      setImpulsePushedIds(new Set(impulsePushedIdsBatch));
-      setTimeout(() => setImpulsePushedIds(new Set()), 1700);
+    for (const { eff, pushedIds, delay } of impulseEntries) {
+      setTimeout(() => {
+        setImpulseEffects(prev => [...prev, eff]);
+        setTimeout(() => setImpulseEffects(prev => prev.filter(i => i.id !== eff.id)), 1500);
+        if (pushedIds.length > 0) {
+          setImpulsePushedIds(prev => {
+            const next = new Set(prev);
+            pushedIds.forEach(id => next.add(id));
+            return next;
+          });
+          setTimeout(() => setImpulsePushedIds(prev => {
+            const next = new Set(prev);
+            pushedIds.forEach(id => next.delete(id));
+            return next;
+          }), 1700);
+        }
+      }, delay);
     }
 
     // --- Mirror death explosion (red 3x3 shockwave) ---
-    const newMirrorBlasts: { id: string; row: number; col: number }[] = [];
+    type MirrorEntry = { eff: { id: string; row: number; col: number }; delay: number };
+    const mirrorEntries: MirrorEntry[] = [];
     for (const evt of events) {
       if (evt.type !== 'mirrorExplode') continue;
       mirrorExplosionCounter.current += 1;
-      newMirrorBlasts.push({ id: `mirror-x-${mirrorExplosionCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+      mirrorEntries.push({
+        eff: { id: `mirror-x-${mirrorExplosionCounter.current}`, row: evt.attackerRow, col: evt.attackerCol },
+        delay: delayFor(evt.attackerId),
+      });
     }
-    if (newMirrorBlasts.length > 0) {
-      setMirrorExplosions(prev => [...prev, ...newMirrorBlasts]);
-      setTimeout(() => setMirrorExplosions(prev => prev.filter(m => !newMirrorBlasts.find(nb => nb.id === m.id))), 1100);
+    for (const { eff, delay } of mirrorEntries) {
+      setTimeout(() => {
+        setMirrorExplosions(prev => [...prev, eff]);
+        setTimeout(() => setMirrorExplosions(prev => prev.filter(m => m.id !== eff.id)), 1100);
+      }, delay);
     }
 
     // --- Frost Nova (3x3 freeze burst) ---
-    const newNovas: FrostNovaEffect[] = [];
+    type NovaEntry = { eff: FrostNovaEffect; delay: number };
+    const novaEntries: NovaEntry[] = [];
     for (const evt of events) {
       if (evt.type !== 'frostNova') continue;
       frostNovaCounter.current += 1;
-      newNovas.push({ id: `nova-${frostNovaCounter.current}`, row: evt.attackerRow, col: evt.attackerCol });
+      novaEntries.push({
+        eff: { id: `nova-${frostNovaCounter.current}`, row: evt.attackerRow, col: evt.attackerCol },
+        delay: delayFor(evt.attackerId),
+      });
+    }
+    for (const { eff, delay } of novaEntries) {
+      setTimeout(() => {
+        setFrostNovaEffects(prev => [...prev, eff]);
+        setTimeout(() => setFrostNovaEffects(prev => prev.filter(n => n.id !== eff.id)), 1100);
+      }, delay);
     }
 
     // --- Rider horn: 2-step yellow wave (inner cells now, outer cells after 280ms) ---
-    const newHornInner: RiderHornFlash[] = [];
-    const newHornOuter: RiderHornFlash[] = [];
+    type HornEntry = { inner: RiderHornFlash[]; outer: RiderHornFlash[]; delay: number };
+    const hornEntries: HornEntry[] = [];
     for (const evt of events) {
       if (evt.type !== 'riderHorn') continue;
+      const inner: RiderHornFlash[] = [];
+      const outer: RiderHornFlash[] = [];
       for (const c of evt.innerCells || []) {
         hornCounter.current += 1;
-        newHornInner.push({ id: `horn-i-${hornCounter.current}`, row: c.row, col: c.col, kind: 'inner' });
+        inner.push({ id: `horn-i-${hornCounter.current}`, row: c.row, col: c.col, kind: 'inner' });
       }
       for (const c of evt.outerCells || []) {
         hornCounter.current += 1;
-        newHornOuter.push({ id: `horn-o-${hornCounter.current}`, row: c.row, col: c.col, kind: 'outer' });
+        outer.push({ id: `horn-o-${hornCounter.current}`, row: c.row, col: c.col, kind: 'outer' });
       }
+      hornEntries.push({ inner, outer, delay: delayFor(evt.attackerId) });
     }
-    if (newHornInner.length > 0) {
-      setHornFlashes(prev => [...prev, ...newHornInner]);
-      setTimeout(() => setHornFlashes(prev => prev.filter(f => !newHornInner.find(n => n.id === f.id))), 650);
-    }
-    if (newHornOuter.length > 0) {
+    for (const { inner, outer, delay } of hornEntries) {
       setTimeout(() => {
-        setHornFlashes(prev => [...prev, ...newHornOuter]);
-        setTimeout(() => setHornFlashes(prev => prev.filter(f => !newHornOuter.find(n => n.id === f.id))), 650);
-      }, 280);
-    }
-    if (newNovas.length > 0) {
-      setFrostNovaEffects(prev => [...prev, ...newNovas]);
-      setTimeout(() => setFrostNovaEffects(prev => prev.filter(n => !newNovas.find(nn => nn.id === n.id))), 1100);
+        if (inner.length > 0) {
+          setHornFlashes(prev => [...prev, ...inner]);
+          setTimeout(() => setHornFlashes(prev => prev.filter(f => !inner.find(n => n.id === f.id))), 650);
+        }
+        if (outer.length > 0) {
+          setTimeout(() => {
+            setHornFlashes(prev => [...prev, ...outer]);
+            setTimeout(() => setHornFlashes(prev => prev.filter(f => !outer.find(n => n.id === f.id))), 650);
+          }, 280);
+        }
+      }, delay);
     }
 
     // --- Dragon fire-spin: per-tick 3-cell beam, cells ignite one after another ---
-    const newSpinFlames: DragonSpinFlame[] = [];
     for (const evt of events) {
       if (evt.type !== 'dragonSpin') continue;
       const cells = evt.spinCells || [];
       const beamOrder = evt.spinBeamOrder ?? 0;
-      // Whip-swing pacing: beams sweep fast within a tick, cells inside a beam
-      // ignite outward almost instantly.
       const BEAM_GAP = 70; // ms between consecutive beams
       const CELL_GAP = 30; // ms between cells along a beam
+      const baseDelay = delayFor(evt.attackerId);
       cells.forEach((c, i) => {
         dragonSpinCounter.current += 1;
-        newSpinFlames.push({
+        const flame: DragonSpinFlame = {
           id: `dspin-${dragonSpinCounter.current}`,
           row: c.row, col: c.col,
           delayMs: beamOrder * BEAM_GAP + i * CELL_GAP,
-        });
-      });
-    }
-    if (newSpinFlames.length > 0) {
-      // Stagger spawn by delayMs, remove each after its animation.
-      for (const f of newSpinFlames) {
+        };
         setTimeout(() => {
-          setDragonSpinFlames(prev => [...prev, f]);
+          setDragonSpinFlames(prev => [...prev, flame]);
           setTimeout(() => {
-            setDragonSpinFlames(prev => prev.filter(x => x.id !== f.id));
+            setDragonSpinFlames(prev => prev.filter(x => x.id !== flame.id));
           }, 850);
-        }, f.delayMs);
-      }
+        }, baseDelay + flame.delayMs);
+      });
     }
 
     // --- Shadowblade teleport puffs ---
-    const newTeleports: TeleportEffect[] = [];
+    type TeleportEntry = { effs: TeleportEffect[]; delay: number };
+    const teleportEntries: TeleportEntry[] = [];
     for (const evt of events) {
       if (evt.type !== 'teleport') continue;
       teleportCounter.current += 1;
-      newTeleports.push({ id: `tp-out-${teleportCounter.current}`, row: evt.attackerRow, col: evt.attackerCol, kind: 'out' });
+      const out: TeleportEffect = { id: `tp-out-${teleportCounter.current}`, row: evt.attackerRow, col: evt.attackerCol, kind: 'out' };
       teleportCounter.current += 1;
-      newTeleports.push({ id: `tp-in-${teleportCounter.current}`, row: evt.targetRow, col: evt.targetCol, kind: 'in' });
+      const inn: TeleportEffect = { id: `tp-in-${teleportCounter.current}`, row: evt.targetRow, col: evt.targetCol, kind: 'in' };
+      teleportEntries.push({ effs: [out, inn], delay: delayFor(evt.attackerId) });
     }
-    if (newTeleports.length > 0) {
-      setTeleportEffects(prev => [...prev, ...newTeleports]);
-      setTimeout(() => setTeleportEffects(prev => prev.filter(t => !newTeleports.find(nt => nt.id === t.id))), 700);
+    for (const { effs, delay } of teleportEntries) {
+      setTimeout(() => {
+        setTeleportEffects(prev => [...prev, ...effs]);
+        setTimeout(() => setTeleportEffects(prev => prev.filter(t => !effs.find(nt => nt.id === t.id))), 700);
+      }, delay);
     }
   };
+
 
   const cellSize = 100 / GRID_SIZE;
   // When flipped, visual row position is inverted for overlay effects
