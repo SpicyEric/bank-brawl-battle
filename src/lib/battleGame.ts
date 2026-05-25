@@ -414,7 +414,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   mountaineer: {
     label: 'Bergkrieger', emoji: '🪨', hp: 130, attack: 26, cooldown: 2,
-    description: 'Strebt zwanghaft auf den nächsten Hügel und belagert ihn. Auf Hügel: Cooldown 2, immun gegen Einfrieren und Feuerschaden. Wechselt nach 4 Idle-Ticks zu einem neuen Hügel.',
+    description: 'Strebt zwanghaft auf den nächsten Hügel und belagert ihn. Auf Hügel: Cooldown 1, immun gegen Einfrieren und Feuerschaden. Wechselt nach 4 Idle-Ticks zu einem neuen Hügel.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
@@ -483,7 +483,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // ===== NEW UNITS v3 =====
   bomber: {
     label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 0, cooldown: 5,
-    description: 'Bewegt sich in alle 8 Richtungen (1 Feld). Greift nicht direkt an. Alle 4 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (30 Dmg, 3×3). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
+    description: 'Bewegt sich in alle 8 Richtungen (1 Feld). Greift nicht direkt an. Alle 5 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (30 Dmg, 3×3). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
     movePattern: ALL_ADJACENT,
     attackPattern: [], // never attacks directly
     strongVs: [], weakVs: [],
