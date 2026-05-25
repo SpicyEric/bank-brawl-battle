@@ -727,6 +727,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {showDragAttack && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-attack" />}
               {showDragMove && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-move" />}
               {isDragOrigin && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-origin" />}
+              {/* Placement attack/move flash overlays (transparent, don't replace cell bg) */}
+              {isFlashing && <div className="placement-attack-flash" />}
+              {isMoveFlashing && !isFlashing && <div className="placement-move-flash" />}
               {/* Placement impact */}
               {isImpact && <div className="placement-impact" />}
               {/* Terrain emoji (show when no unit or unit is dead) */}
