@@ -190,10 +190,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
 
   const confirmPlacementRef = useRef<(() => void) | null>(null);
 
-  // Eliminations-Modus: feste 9 Einheiten (kein Eskalations-Cap mehr)
-  const playerMaxUnits = hasRoster ? 9 : getMaxUnits(playerScore, enemyScore, roundNumber);
-  // AI bekommt ebenfalls 9 Einheiten
-  const enemyMaxUnits = hasRoster ? 9 : playerMaxUnits;
+  // Rundenskalierung: Runde 1 = 9 Einheiten, +2 pro Runde bis Runde 5 = 17.
+  const rosterMaxUnits = Math.min(9 + (roundNumber - 1) * 2, 17);
+  const playerMaxUnits = hasRoster ? rosterMaxUnits : getMaxUnits(playerScore, enemyScore, roundNumber);
+  const enemyMaxUnits = hasRoster ? rosterMaxUnits : playerMaxUnits;
 
   // Slot mode: slots can be reused on the battlefield (mono comps allowed).
   // placedSlots is kept empty so the picker never disables a slot during placement.
