@@ -1301,14 +1301,15 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
 
       let row: number, col: number;
       let attempts = 0;
-      const isRanged = type === 'archer' || type === 'frost' || type === 'mage';
-      const isTank = type === 'tank';
-      const preferredRow = isTank ? 2 : isRanged ? 0 : 1;
       do {
-        row = Math.random() < 0.7 ? preferredRow : Math.floor(Math.random() * 3);
+        row = Math.floor(Math.random() * GRID_SIZE);
         col = Math.floor(Math.random() * GRID_SIZE);
         attempts++;
-      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
+      } while ((
+        usedCells.has(`${row},${col}`) ||
+        (currentGrid && currentGrid[row]?.[col]?.terrain === 'water') ||
+        (currentGrid && currentGrid[row]?.[col]?.unit)
+      ) && attempts < 30);
       if (attempts >= 30) continue;
       usedCells.add(`${row},${col}`);
       placements.push({ type, row, col });
@@ -1341,32 +1342,15 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
 
     let row: number, col: number;
     let attempts = 0;
-
-    if (difficulty >= 4) {
-      const isRanged = type === 'archer' || type === 'frost' || type === 'mage';
-      const isTank = type === 'tank';
-      const preferredRow = isTank ? 2 : isRanged ? 0 : 1;
-      do {
-        row = Math.random() < 0.6 ? preferredRow : Math.floor(Math.random() * 3);
-        col = Math.floor(Math.random() * GRID_SIZE);
-        attempts++;
-      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
-    } else if (difficulty >= 3 && currentGrid) {
-      do {
-        row = Math.floor(Math.random() * 3);
-        col = Math.floor(Math.random() * GRID_SIZE);
-        attempts++;
-        if (attempts < 15 && Math.random() < 0.3 && currentGrid[row]?.[col]?.terrain === 'none') {
-          continue;
-        }
-      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
-    } else {
-      do {
-        row = Math.floor(Math.random() * 3);
-        col = Math.floor(Math.random() * GRID_SIZE);
-        attempts++;
-      } while ((usedCells.has(`${row},${col}`) || (currentGrid && currentGrid[row]?.[col]?.terrain === 'water')) && attempts < 30);
-    }
+    do {
+      row = Math.floor(Math.random() * GRID_SIZE);
+      col = Math.floor(Math.random() * GRID_SIZE);
+      attempts++;
+    } while ((
+      usedCells.has(`${row},${col}`) ||
+      (currentGrid && currentGrid[row]?.[col]?.terrain === 'water') ||
+      (currentGrid && currentGrid[row]?.[col]?.unit)
+    ) && attempts < 30);
 
     if (attempts >= 30) continue;
     usedCells.add(`${row},${col}`);
