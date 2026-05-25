@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { UnitType, UNIT_DEFS, UNIT_COLOR_GROUPS, COLOR_BEATS, ColorGroup } from '@/lib/battleGame';
 import { UnitGlyph } from '@/components/UnitGlyph';
-import { loadAuraData, ZONE_POSITIONS, ZONE_DELTA, type AuraZoneMap, type AuraEffectMap, type ZonePos } from '@/lib/auraData';
+import { loadAuraData, ZONE_DELTA, type AuraZoneMap, type AuraEffectMap, type ZonePos } from '@/lib/auraData';
 import { describeEffect } from '@/lib/effectLabels';
 
 const COLOR_LABEL: Record<ColorGroup, string> = {
