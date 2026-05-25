@@ -57,6 +57,8 @@ export interface SimReport {
   vsMatrix: Record<UnitType, Record<UnitType, { games: number; wins: number }>>;
   // Synergy matrix: synergy[a][b] = win rate when a & b on same team (a !== b)
   synergyMatrix: Record<UnitType, Record<UnitType, { games: number; wins: number }>>;
+  rosterP1?: UnitType[];
+  rosterP2?: UnitType[];
 }
 
 function emptyUnitStat(type: UnitType): UnitStat {
