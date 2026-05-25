@@ -268,7 +268,18 @@ function simulateOneBattle(p1Types: UnitType[], p2Types: UnitType[]): BattleResu
 
       // Shadowblade custom teleport-strike
       if (unit.type === 'shadowblade' && !isFrozenNow) {
-        handleShadowbladeTick(unit, allUnits, grid, events, logs, (_atk, _tgt, dmg) => dmg);
+        handleShadowbladeTick(unit, allUnits, grid, events, logs, (atk, tgt, dmg) => {
+          const applied = Math.min(dmg, tgt.hp);
+          if (applied > 0) {
+            ensureStats(atk.id).damageDealt += applied;
+            ensureStats(tgt.id).damageTaken += applied;
+            if (tgt.hp - applied <= 0) {
+              ensureStats(tgt.id).died = true;
+              ensureStats(atk.id).kills += 1;
+            }
+          }
+          return dmg;
+        });
         continue;
       }
 
