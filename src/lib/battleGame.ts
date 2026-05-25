@@ -2674,7 +2674,7 @@ export function applyShadowpriestCurse(
   }
 }
 
-/** Shadowpriest soul harvest: every 8 ticks, +5 perm ATK and cooldown→2 per cursed enemy. */
+/** Shadowpriest soul harvest: every 7 ticks, +5 perm ATK per cursed enemy. */
 export function tickShadowpriestHarvest(
   allUnits: Unit[],
   _grid: Cell[][],
@@ -2682,14 +2682,13 @@ export function tickShadowpriestHarvest(
 ): void {
   const priests = allUnits.filter(u => u.type === 'shadowpriest' && u.hp > 0 && !u.dead);
   for (const p of priests) {
-    if (p.soulHarvestTimer === undefined) p.soulHarvestTimer = 8;
+    if (p.soulHarvestTimer === undefined) p.soulHarvestTimer = 7;
     p.soulHarvestTimer -= 1;
     if (p.soulHarvestTimer > 0) continue;
-    p.soulHarvestTimer = 8;
+    p.soulHarvestTimer = 7;
     const cursedEnemies = allUnits.filter(u => u.team !== p.team && u.cursed && u.hp > 0 && !u.dead).length;
     if (cursedEnemies > 0) {
       p.permAtkBonus = (p.permAtkBonus || 0) + 5 * cursedEnemies;
-      p.maxCooldown = Math.max(1, Math.min(p.maxCooldown, 2));
       logs.push(`🕯️ Seelenraub: +${5 * cursedEnemies} Angriff (${cursedEnemies} verflucht)`);
     }
   }
