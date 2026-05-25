@@ -1383,7 +1383,61 @@ export function generateAIPlacement(playerUnits: Unit[], maxCount: number = BASE
     _applyTankBondFormation(placements, usedCells, currentGrid, tankBondChance);
   }
 
+  // Cluster pass: keep AI units adjacent to each other so aura buff/nerf zones overlap.
+  // Active for difficulty >= 2 (Normal+). At higher difficulties we force a tighter cluster.
+  if (difficulty >= 2) {
+    const clusterIntensity = difficulty === 2 ? 0.6 : difficulty === 3 ? 0.8 : 1.0;
+    _applyAuraClustering(placements, usedCells, currentGrid, clusterIntensity);
+  }
+
   return placements;
+}
+
+// Move unanchored units to cells 8-adjacent to already-placed units → tight aura formations.
+function _applyAuraClustering(
+  placements: { type: UnitType; row: number; col: number }[],
+  usedCells: Set<string>,
+  currentGrid?: Cell[][],
+  intensity: number = 0.7,
+): void {
+  if (placements.length < 2) return;
+  const ADJ = [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]] as const;
+  const anchored = new Set<string>([`${placements[0].row},${placements[0].col}`]);
+  for (let i = 1; i < placements.length; i++) {
+    const u = placements[i];
+    // Already adjacent to an anchored unit? mark and continue.
+    const isAdjAnchored = ADJ.some(([dr, dc]) => anchored.has(`${u.row + dr},${u.col + dc}`));
+    if (isAdjAnchored) {
+      anchored.add(`${u.row},${u.col}`);
+      continue;
+    }
+    if (Math.random() > intensity) {
+      anchored.add(`${u.row},${u.col}`);
+      continue;
+    }
+    // Find an empty 8-adjacent cell next to any anchored unit (enemy rows 0..2 only).
+    const candidates: { row: number; col: number }[] = [];
+    for (const key of anchored) {
+      const [ar, ac] = key.split(',').map(Number);
+      for (const [dr, dc] of ADJ) {
+        const r = ar + dr, c = ac + dc;
+        if (r < 0 || r > 2 || c < 0 || c >= GRID_SIZE) continue;
+        const k2 = `${r},${c}`;
+        if (usedCells.has(k2)) continue;
+        if (currentGrid && currentGrid[r]?.[c]?.terrain === 'water') continue;
+        candidates.push({ row: r, col: c });
+      }
+    }
+    if (candidates.length > 0) {
+      const oldKey = `${u.row},${u.col}`;
+      const pick = candidates[Math.floor(Math.random() * candidates.length)];
+      usedCells.delete(oldKey);
+      u.row = pick.row;
+      u.col = pick.col;
+      usedCells.add(`${pick.row},${pick.col}`);
+    }
+    anchored.add(`${u.row},${u.col}`);
+  }
 }
 
 // Rearrange non-tank units to be adjacent to tanks for bond formation

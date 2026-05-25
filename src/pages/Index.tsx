@@ -312,6 +312,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
           sacrificeFlash={game.sacrificeUsed}
           dragPreview={dragPreview}
           auraOverlay={auraOverlay}
+          auraZones={auraZones}
           selectedFormationCells={selectedFormationCells}
         />
 
