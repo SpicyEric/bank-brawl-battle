@@ -5,7 +5,9 @@ import {
   generateTerrain, getActivationTurn, setBondsForPlacement,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
-  handleTerrainSeeker, isImmuneToFreeze, effectiveCooldown, tickTerrainHeals,
+  handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
+  processLavaTick, processGhostTick, tickPhantomTimers,
+  tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
@@ -23,13 +25,19 @@ const SLOT_COLORS: ('red' | 'green' | 'blue')[] = ['red','red','red','green','gr
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning, color: (u as any).color, slotIndex: (u as any).slotIndex };
+  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning, bleeding: u.bleeding, bombPlaceTimer: (u as any).bombPlaceTimer, bombSpecialTimer: (u as any).bombSpecialTimer, obeliskBeamTimer: (u as any).obeliskBeamTimer, obeliskBeamLeft: (u as any).obeliskBeamLeft, obeliskBuff: (u as any).obeliskBuff, color: (u as any).color, slotIndex: (u as any).slotIndex };
 }
 
 function serializeGrid(grid: Cell[][]) {
   return grid.map(row => row.map(cell => ({
     row: cell.row, col: cell.col, terrain: cell.terrain,
     unit: cell.unit ? serializeUnit(cell.unit) : null,
+    lavaTicks: cell.lavaTicks,
+    lavaOwnerTeam: cell.lavaOwnerTeam,
+    lavaDmg: cell.lavaDmg,
+    bomb: cell.bomb ?? null,
+    obeliskAura: cell.obeliskAura,
+    obeliskAuraTeam: cell.obeliskAuraTeam,
   })));
 }
 
@@ -790,6 +798,37 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       const logs: string[] = [];
       const events: BattleEvent[] = [];
+
+      // === Burn DoT (Arsonist) ===
+      for (const u of allUnits) {
+        if (!u.burning || u.burning.length === 0 || u.hp <= 0) continue;
+        if (isImmuneToFire(u, newGrid)) { u.burning = []; continue; }
+        let totalBurn = 0;
+        u.burning = u.burning.filter(b => { totalBurn += b.dmg; b.turns -= 1; return b.turns > 0; });
+        if (totalBurn > 0) {
+          u.hp = Math.max(0, u.hp - totalBurn);
+          logs.push(`🔥 ${UNIT_DEFS[u.type].emoji} brennt: -${totalBurn} ❤️${u.hp <= 0 ? ' ☠️' : ''}`);
+          if (u.hp <= 0) (u as any).dead = true;
+        }
+      }
+      // === Bleed DoT (Vampir) ===
+      for (const u of allUnits) {
+        if (!u.bleeding || u.bleeding.length === 0 || u.hp <= 0 || u.dead) continue;
+        const tick = u.bleeding.shift()!;
+        if (tick > 0) {
+          u.hp = Math.max(0, u.hp - tick);
+          logs.push(`🩸 ${UNIT_DEFS[u.type].emoji} blutet: -${tick} ❤️${u.hp <= 0 ? ' ☠️' : ''}`);
+          if (u.hp <= 0) (u as any).dead = true;
+        }
+        if (u.bleeding.length === 0) u.bleeding = undefined;
+      }
+
+      // Lava field DoT (Vulkanit)
+      processLavaTick(newGrid, logs);
+      // Banshee ghost tick
+      processGhostTick(allUnits, newGrid, logs);
+      // Doppelganger phantom timers
+      tickPhantomTimers(allUnits, newGrid, logs);
       // Cloner: spawn clones every 6 ticks (max 3 lifetime)
       tickClonerSpawns(allUnits, newGrid, logs);
       // Mage impulse: every 7 ticks push enemies in 7x7 outward
@@ -805,6 +844,14 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       tickDragonSpin(allUnits, newGrid, events, logs);
       // Terrain regen: waterwalker heals on water
       tickTerrainHeals(allUnits, newGrid, logs);
+      // Obelisk aura/beam (refresh buffs each tick)
+      tickObeliskAura(allUnits, newGrid, events, logs);
+      // Bomber places bombs / hails on enemies
+      tickBomberActions(allUnits, newGrid, events, logs);
+      // Bomb fuses count down and detonate
+      tickBombFuses(newGrid, allUnits, events, logs);
+      // Shadowpriest soul harvest
+      tickShadowpriestHarvest(allUnits, newGrid, logs);
       const currentTurn = turnCount;
       const acting = allUnits.filter(u => {
         if (u.hp <= 0) return false;
