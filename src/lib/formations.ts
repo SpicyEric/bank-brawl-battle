@@ -58,7 +58,7 @@ export function canMoveFormation(formation: Unit[], dr: number, dc: number, grid
     if (!cell) return false;
     if (cell.terrain === 'water') return false;
     const occ = cell.unit;
-    if (occ && !ids.has(occ.id)) return false;
+    if (occ && !occ.dead && occ.hp > 0 && !ids.has(occ.id)) return false;
   }
   return true;
 }
