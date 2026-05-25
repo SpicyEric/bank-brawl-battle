@@ -772,15 +772,18 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {/* Aura overlay (placement preview) */}
               {auraOverlay && (() => {
                 const k = auraOverlay.get(cellKey);
-                if (!k) return null;
-                const isBuff = k === 'buff';
+                if (!k || (k.buff === 0 && k.nerf === 0)) return null;
+                const net = k.buff - k.nerf;
+                const isBuff = net >= 0 && k.buff > 0;
                 const pulsing = !!pulseKind;
+                const count = isBuff ? k.buff : k.nerf;
+                const label = `${isBuff ? '+' : '−'}${count > 1 ? count : ''}`;
                 return (
                   <div
                     className={`absolute inset-0 z-[6] pointer-events-none flex items-center justify-center rounded-sm ${isBuff ? 'bg-green-500/25 ring-1 ring-green-400/60' : 'bg-red-500/25 ring-1 ring-red-400/60'} ${pulsing ? 'placement-aura-pulse' : ''}`}
                   >
                     <span className={`text-base font-black drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ${isBuff ? 'text-green-200' : 'text-red-200'}`}>
-                      {isBuff ? '+' : '−'}
+                      {label}
                     </span>
                   </div>
                 );
