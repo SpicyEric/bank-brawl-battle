@@ -334,7 +334,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   vulkanit: {
     label: 'Vulkanit', emoji: '🌋', hp: 90, attack: 20, cooldown: 3,
-    description: 'Hinterlässt nach jedem Angriff ein Lava-Plus (5 Felder) um das Ziel (8 Schaden / Runde, 3 Runden).',
+    description: 'Hinterlässt nach jedem Angriff ein Lava-Plus (5 Felder) um das Ziel (6 Schaden / Runde, 3 Runden).',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
