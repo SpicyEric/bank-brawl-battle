@@ -115,7 +115,7 @@ const Simulator = () => {
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-muted-foreground mt-2">Beide Teams werden zufällig aus allen {UNIT_TYPES.length} Einheiten gewählt – ideal für Balance-Auswertung.</p>
+            <p className="text-[11px] text-muted-foreground mt-2">Pro Match zieht jede Seite einen 9er-Roster (mit Wiederholung, also z.B. 3 Bogenschützen möglich) aus allen {UNIT_TYPES.length} Einheiten und stellt davon zufällig {teamSize} aufs Feld. Die ersten {UNIT_TYPES.length} Matches sind garantierte Mono-Tests (5× eine Einheit vs. Zufall), damit jede Einheit min. einmal solo geprüft wird.</p>
           </div>
 
           <button onClick={run} disabled={running}
