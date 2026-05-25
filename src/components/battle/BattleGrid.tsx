@@ -792,6 +792,16 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                       }}
                     />
                   )}
+                  {/* Curse overlay – shadowpriest stacks (subtle at 1-2, intense at 3) */}
+                  {(unit.curseStacks || 0) > 0 && (
+                    <div
+                      className={`absolute inset-0 z-0 pointer-events-none rounded-sm ${unit.cursed ? 'cell-cursed-3' : 'cell-cursed'}`}
+                    />
+                  )}
+                  {/* Obelisk buff aura on unit */}
+                  {(unit.obeliskBuff || 0) > 0 && (
+                    <div className="absolute inset-0 z-0 pointer-events-none rounded-sm cell-obelisk-buff" />
+                  )}
                   <span
                     className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''} ${isPhantom ? 'opacity-70' : ''} ${unit.ghost && unit.ghost > 0 ? 'ghost-active' : ''}`}
                     style={{
