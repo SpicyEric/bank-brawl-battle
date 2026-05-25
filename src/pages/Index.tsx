@@ -648,13 +648,12 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
         {(game.phase === 'round_won' || game.phase === 'round_lost' || game.phase === 'round_draw') && (
           <div className="text-center space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              Stand: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>
-              {game.inOvertime && <span className="text-warning text-xs ml-2">(2 Punkte Vorsprung nötig)</span>}
+              Runden: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>
             </p>
             {game.gameOver ? (
               <div className="space-y-3">
                 <p className="text-xl font-bold text-foreground">
-                  {game.gameWon ? '🎉 SPIEL GEWONNEN!' : '😢 SPIEL VERLOREN!'}
+                  {game.gameWon ? '🎉 MATCH GEWONNEN!' : '😢 MATCH VERLOREN!'}
                 </p>
                 <button
                   onClick={() => navigate('/')}
@@ -672,7 +671,12 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Match-Ende wird berechnet...</p>
+                <button
+                  onClick={game.nextRound}
+                  className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
+                >
+                  ⚔️ Nächste Runde
+                </button>
               </div>
             )}
           </div>
