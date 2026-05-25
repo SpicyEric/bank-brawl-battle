@@ -40,6 +40,8 @@ interface UnitPickerProps {
   onDragDrop?: (row: number, col: number, slotIdx: number) => void;
 }
 
+const DRAG_Y_OFFSET = 105;
+
 export function UnitPicker({
   selected, onSelect, placedCount, maxUnits,
   bannedUnits = [], fatigue = {}, unitTypes,
