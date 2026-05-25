@@ -1361,18 +1361,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       return next;
     });
 
-    // Track overtime
-    if (inOvertime) {
-      const newOT = overtimeCount + 1;
-      setOvertimeCount(newOT);
-      if (newOT >= AUTO_OVERTIMES && !gameOver) {
-        setDrawOfferPending(true);
-        return;
-      }
-    }
-    setDrawOfferPending(false);
     startNextRound();
-  }, [playerStarts, inOvertime, overtimeCount, gameOver, playerUnits, enemyUnits, playerBannedUnits, enemyBannedUnits]);
+  }, [playerStarts, playerUnits, enemyUnits, playerBannedUnits, enemyBannedUnits]);
 
   const startNextRound = useCallback(() => {
     const newStarts = !playerStarts;
