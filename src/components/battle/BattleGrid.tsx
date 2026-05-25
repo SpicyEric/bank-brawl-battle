@@ -179,7 +179,6 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       setPlacementPulse(new Map());
       setImpactCell(null);
     }, 750);
-    void cells;
   }, [lastPlaced, auraZones]);
 
   // Compute drag preview aura cells (shown while a unit is being dragged over a cell)
