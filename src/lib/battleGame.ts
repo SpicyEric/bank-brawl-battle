@@ -367,8 +367,8 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   lightning: {
-    label: 'Blitzmagier', emoji: '🌩️', hp: 75, attack: 18, cooldown: 2,
-    description: 'Kettenblitz: springt vom Ziel zu Feinden im Radius 2 weiter (50/40/30/20/10% Schaden).',
+    label: 'Blitzmagier', emoji: '🌩️', hp: 70, attack: 18, cooldown: 2,
+    description: 'Kettenblitz: springt vom Ziel zu Feinden im Radius 2 weiter (30/20/15/10/5% Schaden).',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
