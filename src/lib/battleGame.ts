@@ -68,6 +68,18 @@ export interface Unit {
   isPhantom?: boolean; // doppelganger phantom flag (kept true for life of phantom for visuals)
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
   phantomId?: string; // link from original doppelganger → spawned phantom (original idles until phantom dies)
+  // v3:
+  bombPlaceTimer?: number; // bomber: ticks until next bomb placement (every 3)
+  bombSpecialTimer?: number; // bomber: ticks until next bomb hail (every 12)
+  obeliskBeamTimer?: number; // obelisk: ticks until next beam burst (every 3)
+  obeliskBeamLeft?: number; // obelisk: ticks remaining the beam is active (2 ticks)
+  obeliskBuff?: number; // recipient: ticks of +30% dmg & cooldown soft-cap 1
+  curseStacks?: number; // shadowpriest target: number of curse stacks (0..3)
+  cursed?: boolean; // shadowpriest target: triple-curse triggered
+  unhealable?: boolean; // shadowpriest curse: cannot be healed
+  curseAtkMul?: number; // shadowpriest curse: damage multiplier (0.5)
+  soulHarvestTimer?: number; // shadowpriest: ticks until next harvest (every 8)
+  permAtkBonus?: number; // shadowpriest: permanent ATK bonus from harvests
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -87,6 +99,9 @@ export interface Cell {
   lavaTicks?: number; // vulkanit lava: ticks remaining
   lavaOwnerTeam?: Team; // immune team
   lavaDmg?: number; // per-tick damage (default 8)
+  bomb?: { fuse: number; dmg: number; ownerTeam: Team } | null; // bomber: armed bomb on cell
+  obeliskAura?: number; // visual aura intensity 0=none, 1=plus, 2=beam (set transiently per tick)
+  obeliskAuraTeam?: Team; // team whose obelisk is buffing this cell
 }
 
 // Movement patterns: relative offsets the unit can move to per turn
@@ -1052,7 +1067,9 @@ function hasAdjacentFriendlyTank(defender: Unit, grid: Cell[][]): boolean {
 // Calculate damage with counter system + terrain bonuses + shield aura
 export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): number {
   
-  let baseAtk = attacker.attack + (attacker.judgeBonus || 0);
+  let baseAtk = attacker.attack + (attacker.judgeBonus || 0) + (attacker.permAtkBonus || 0);
+  // Shadowpriest curse: −50% attack permanently on cursed attackers
+  if ((attacker.curseAtkMul ?? 1) !== 1) baseAtk = Math.max(0, baseAtk * (attacker.curseAtkMul ?? 1));
   // Assassin: +4 damage against enemies below 50% HP
   if (attacker.type === 'assassin' && defender.hp < defender.maxHp * 0.5) {
     baseAtk += 4;
@@ -1091,6 +1108,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
 
   // Rider horn buff: +50% damage while hornBuff active
   if ((attacker.hornBuff || 0) > 0) dmg *= 1.5;
+  // Obelisk buff: +30% damage while obeliskBuff active
+  if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.3;
 
   return Math.floor(dmg);
 }
@@ -1402,7 +1421,7 @@ export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[]
   }
   // Lamb: heal all allies +30% maxHp
   if (deadUnit.type === 'lamb') {
-    const allies = allUnits.filter(u => u.team === deadUnit.team && u.hp > 0 && !u.dead && u.id !== deadUnit.id);
+    const allies = allUnits.filter(u => u.team === deadUnit.team && u.hp > 0 && !u.dead && u.id !== deadUnit.id && !u.unhealable);
     for (const a of allies) {
       const heal = Math.round(a.maxHp * 0.30);
       a.hp = Math.min(a.maxHp, a.hp + heal);
@@ -1477,9 +1496,12 @@ export function isImmuneToFire(unit: Unit, grid: Cell[][]): boolean {
 /** Effective cooldown considering terrain bonuses (ranger forest=1, mountaineer hill=2). */
 export function effectiveCooldown(unit: Unit, grid: Cell[][]): number {
   const t = grid[unit.row]?.[unit.col]?.terrain;
-  if (unit.type === 'ranger' && t === 'forest') return 1;
-  if (unit.type === 'mountaineer' && t === 'hill') return 2;
-  return unit.maxCooldown;
+  let cd = unit.maxCooldown;
+  if (unit.type === 'ranger' && t === 'forest') cd = 1;
+  else if (unit.type === 'mountaineer' && t === 'hill') cd = 2;
+  // Obelisk buff: cap cooldown at 1
+  if ((unit.obeliskBuff || 0) > 0) cd = Math.min(cd, 1);
+  return cd;
 }
 
 export type SeekerResult = 'normal' | 'on_terrain' | 'moved' | 'wait';
@@ -1549,6 +1571,7 @@ export function handleTerrainSeeker(unit: Unit, grid: Cell[][], _allUnits: Unit[
 export function tickTerrainHeals(allUnits: Unit[], grid: Cell[][], logs: string[]): void {
   for (const u of allUnits) {
     if (u.hp <= 0 || (u as any).dead) continue;
+    if (u.unhealable) continue;
     if (u.type === 'waterwalker' && grid[u.row]?.[u.col]?.terrain === 'water' && u.hp < u.maxHp) {
       const heal = Math.min(3, u.maxHp - u.hp);
       if (heal > 0) {
@@ -2426,3 +2449,210 @@ export function applyChainAttack(
 }
 
 
+
+// =================== v3 NEW UNIT TICKS ===================
+
+/** Bomber: every 3 ticks, place a bomb on its current cell (fuse=2, 3x3 AoE, 35 dmg).
+ *  Every 12 ticks, rain bombs on all enemies (fuse=1). */
+export function tickBomberActions(
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  logs: string[],
+): void {
+  const bombers = allUnits.filter(u => u.type === 'bomber' && u.hp > 0 && !u.dead);
+  for (const b of bombers) {
+    // Place timer
+    if (b.bombPlaceTimer === undefined) b.bombPlaceTimer = 3;
+    b.bombPlaceTimer -= 1;
+    if (b.bombPlaceTimer <= 0) {
+      b.bombPlaceTimer = 3;
+      const cell = grid[b.row]?.[b.col];
+      if (cell && !cell.bomb) {
+        cell.bomb = { fuse: 2, dmg: 35, ownerTeam: b.team };
+        logs.push(`💣 Sprengmeister legt eine Bombe`);
+      }
+    }
+    // Special timer
+    if (b.bombSpecialTimer === undefined) b.bombSpecialTimer = 12;
+    b.bombSpecialTimer -= 1;
+    if (b.bombSpecialTimer <= 0) {
+      b.bombSpecialTimer = 12;
+      const enemies = allUnits.filter(u => u.team !== b.team && u.hp > 0 && !u.dead);
+      let count = 0;
+      for (const e of enemies) {
+        const cell = grid[e.row]?.[e.col];
+        if (!cell) continue;
+        cell.bomb = { fuse: 1, dmg: 35, ownerTeam: b.team };
+        count++;
+        events.push({
+          type: 'spawn',
+          attackerId: b.id, attackerRow: b.row, attackerCol: b.col, attackerEmoji: '💣', attackerType: 'bomber',
+          targetId: e.id, targetRow: e.row, targetCol: e.col,
+          damage: 0, isStrong: false, isWeak: false, isRanged: true,
+        });
+      }
+      if (count > 0) logs.push(`💥 Bombenhagel auf ${count} Gegner!`);
+    }
+  }
+}
+
+/** Bomb fuse tick: decrement each armed bomb. When fuse reaches 0, explode 3x3.
+ *  Allies of the bomb's owner are immune. */
+export function tickBombFuses(
+  grid: Cell[][],
+  allUnits: Unit[],
+  events: BattleEvent[],
+  logs: string[],
+): void {
+  const toExplode: { row: number; col: number; dmg: number; ownerTeam: Team }[] = [];
+  for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+    const cell = grid[r][c];
+    if (!cell.bomb) continue;
+    cell.bomb.fuse -= 1;
+    if (cell.bomb.fuse <= 0) {
+      toExplode.push({ row: r, col: c, dmg: cell.bomb.dmg, ownerTeam: cell.bomb.ownerTeam });
+      cell.bomb = null;
+    }
+  }
+  for (const ex of toExplode) {
+    const aoeCells: { row: number; col: number }[] = [];
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      const r = ex.row + dr, c = ex.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      aoeCells.push({ row: r, col: c });
+      const u = grid[r][c].unit;
+      if (!u || u.hp <= 0 || u.dead) continue;
+      if (u.team === ex.ownerTeam) continue;
+      u.hp = Math.max(0, u.hp - ex.dmg);
+      logs.push(`💥 Bombe → ${UNIT_DEFS[u.type].emoji} ${ex.dmg}${u.hp <= 0 ? ' ☠️' : ''}`);
+      if (u.hp <= 0) (u as any).dead = true;
+    }
+    events.push({
+      type: 'mirrorExplode', // re-use AoE flash type
+      attackerId: `bomb-${ex.row}-${ex.col}`,
+      attackerRow: ex.row, attackerCol: ex.col,
+      attackerEmoji: '💥', attackerType: 'bomber',
+      targetId: `bomb-${ex.row}-${ex.col}`,
+      targetRow: ex.row, targetCol: ex.col,
+      damage: ex.dmg, isStrong: false, isWeak: false, isRanged: false,
+      isAoe: true, aoeCells,
+    });
+  }
+}
+
+/** Obelisk aura: continuous plus-buff to adjacent allies. Every 3 ticks: beam for 2 ticks
+ *  extends buff to all cells along 4 cardinal rays to the edge of the board. */
+export function tickObeliskAura(
+  allUnits: Unit[],
+  grid: Cell[][],
+  events: BattleEvent[],
+  _logs: string[],
+): void {
+  // Clear transient aura marks
+  for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+    grid[r][c].obeliskAura = 0;
+    grid[r][c].obeliskAuraTeam = undefined;
+  }
+  const obelisks = allUnits.filter(u => u.type === 'obelisk' && u.hp > 0 && !u.dead);
+  for (const ob of obelisks) {
+    // Plus aura (always on)
+    const plus: [number, number][] = [[0,0],[-1,0],[1,0],[0,-1],[0,1]];
+    for (const [dr, dc] of plus) {
+      const r = ob.row + dr, c = ob.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      grid[r][c].obeliskAura = Math.max(grid[r][c].obeliskAura || 0, 1);
+      grid[r][c].obeliskAuraTeam = ob.team;
+      const u = grid[r][c].unit;
+      if (u && u.team === ob.team && u.hp > 0 && !u.dead && u.id !== ob.id) {
+        u.obeliskBuff = 3;
+      }
+    }
+    // Beam timer
+    if (ob.obeliskBeamTimer === undefined) ob.obeliskBeamTimer = 3;
+    if ((ob.obeliskBeamLeft || 0) <= 0) {
+      ob.obeliskBeamTimer -= 1;
+      if (ob.obeliskBeamTimer <= 0) {
+        ob.obeliskBeamTimer = 3;
+        ob.obeliskBeamLeft = 2;
+      }
+    }
+    if ((ob.obeliskBeamLeft || 0) > 0) {
+      ob.obeliskBeamLeft! -= 1;
+      const beamCells: { row: number; col: number }[] = [];
+      const dirs: [number, number][] = [[-1,0],[1,0],[0,-1],[0,1]];
+      for (const [dr, dc] of dirs) {
+        let r = ob.row + dr, c = ob.col + dc;
+        while (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+          beamCells.push({ row: r, col: c });
+          grid[r][c].obeliskAura = 2;
+          grid[r][c].obeliskAuraTeam = ob.team;
+          const u = grid[r][c].unit;
+          if (u && u.team === ob.team && u.hp > 0 && !u.dead) u.obeliskBuff = 3;
+          r += dr; c += dc;
+        }
+      }
+      events.push({
+        type: 'riderHorn', // re-use as a glow flash
+        attackerId: ob.id, attackerRow: ob.row, attackerCol: ob.col,
+        attackerEmoji: '🗿', attackerType: 'obelisk',
+        targetId: ob.id, targetRow: ob.row, targetCol: ob.col,
+        damage: 0, isStrong: false, isWeak: false, isRanged: false,
+        innerCells: beamCells,
+      });
+    }
+  }
+  // Decay buffs on units no longer in aura
+  for (const u of allUnits) {
+    if ((u.obeliskBuff || 0) > 0) u.obeliskBuff = (u.obeliskBuff || 0) - 1;
+  }
+}
+
+/** Apply a curse stack from the shadowpriest. At 3 stacks, trigger the curse burst. */
+export function applyShadowpriestCurse(
+  attacker: Unit, target: Unit, logs: string[], events?: BattleEvent[],
+): void {
+  if (attacker.type !== 'shadowpriest') return;
+  if (target.hp <= 0 || target.dead) return;
+  if (target.cursed) return; // already cursed, no more stacks needed
+  target.curseStacks = (target.curseStacks || 0) + 1;
+  if (target.curseStacks >= 3) {
+    target.cursed = true;
+    const burst = Math.round(target.hp * 0.30);
+    target.hp = Math.max(0, target.hp - burst);
+    target.unhealable = true;
+    target.curseAtkMul = 0.5;
+    logs.push(`🕯️ Fluch ausgelöst! → ${UNIT_DEFS[target.type].emoji} −${burst} ❤️ (unheilbar, −50% Angriff)`);
+    if (target.hp <= 0) (target as any).dead = true;
+    if (events) {
+      events.push({
+        type: 'freeze', // re-use a small flash type
+        attackerId: attacker.id, attackerRow: attacker.row, attackerCol: attacker.col,
+        attackerEmoji: '🕯️', attackerType: 'shadowpriest',
+        targetId: target.id, targetRow: target.row, targetCol: target.col,
+        damage: burst, isStrong: false, isWeak: false, isRanged: true,
+      });
+    }
+  }
+}
+
+/** Shadowpriest soul harvest: every 8 ticks, +5 perm ATK and cooldown→2 per cursed enemy. */
+export function tickShadowpriestHarvest(
+  allUnits: Unit[],
+  _grid: Cell[][],
+  logs: string[],
+): void {
+  const priests = allUnits.filter(u => u.type === 'shadowpriest' && u.hp > 0 && !u.dead);
+  for (const p of priests) {
+    if (p.soulHarvestTimer === undefined) p.soulHarvestTimer = 8;
+    p.soulHarvestTimer -= 1;
+    if (p.soulHarvestTimer > 0) continue;
+    p.soulHarvestTimer = 8;
+    const cursedEnemies = allUnits.filter(u => u.team !== p.team && u.cursed && u.hp > 0 && !u.dead).length;
+    if (cursedEnemies > 0) {
+      p.permAtkBonus = (p.permAtkBonus || 0) + 5 * cursedEnemies;
+      p.maxCooldown = Math.max(1, Math.min(p.maxCooldown, 2));
+      logs.push(`🕯️ Seelenraub: +${5 * cursedEnemies} Angriff (${cursedEnemies} verflucht)`);
+    }
+  }
+}

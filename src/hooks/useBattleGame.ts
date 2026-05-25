@@ -9,6 +9,7 @@ import {
   applyPostAttackEffects, applyDeathEffects, applyMirrorReflect, processLavaTick, processGhostTick, shouldSkipMove,
   spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
+  tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest, applyShadowpriestCurse,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
@@ -616,6 +617,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       tickDragonSpin(allUnits, newGrid, events, logs);
       // === Terrain regen: waterwalker heals on water ===
       tickTerrainHeals(allUnits, newGrid, logs);
+      // === v3: Obelisk aura/beam (refresh buffs each tick) ===
+      tickObeliskAura(allUnits, newGrid, events, logs);
+      // === v3: Bomber places bombs / hails on enemies ===
+      tickBomberActions(allUnits, newGrid, events, logs);
+      // === v3: Bomb fuses count down and detonate ===
+      tickBombFuses(newGrid, allUnits, events, logs);
+      // === v3: Shadowpriest soul harvest ===
+      tickShadowpriestHarvest(allUnits, newGrid, logs);
 
 
 
@@ -674,7 +683,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         // Healer: heal allies first, attack only if no one to heal
         if (unit.type === 'healer') {
           const allies = allUnits.filter(u => u.team === unit.team && u.id !== unit.id && u.hp > 0 && !u.dead);
-          const healable = allies.filter(a => a.hp < a.maxHp);
+          const healable = allies.filter(a => a.hp < a.maxHp && !a.unhealable);
 
           if (healable.length > 0 && unit.cooldown <= 0) {
             // Try to heal someone in range
@@ -785,6 +794,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           unit.cooldown = effectiveCooldown(unit, newGrid);
           // Track last attacked target (used by targeting logic: lock-on for warrior/stormrunner/archer, switch for rider/assassin/frost/mage)
           unit.lastAttackedId = target.id;
+
+          // Shadowpriest: stack curse on target (3 stacks → 30% HP burst + −50% ATK + unhealable)
+          if (unit.type === 'shadowpriest' && target.hp > 0) {
+            applyShadowpriestCurse(unit, target, logs, events);
+          }
 
           // Frost: 50% chance to freeze target for 3 ticks at 50% damage (skip immune)
           let didFreeze = false;
