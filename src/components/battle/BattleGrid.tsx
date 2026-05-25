@@ -29,6 +29,8 @@ interface BattleGridProps {
   matchId?: number;
   /** Per-cell aura overlay map: "r-c" -> 'buff' | 'nerf' (shown around placed units). */
   auraOverlay?: Map<string, 'buff' | 'nerf'>;
+  /** Per-unit-type aura zones (used for drag-preview and placement-pulse overlays). */
+  auraZones?: import('@/lib/auraData').AuraZoneMap;
   /** Cells belonging to the currently selected formation (shown highlighted during combat). */
   selectedFormationCells?: Set<string>;
 }
