@@ -663,7 +663,6 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const hpPercent = unit && !unit.dead ? (unit.hp / unit.maxHp) * 100 : 0;
           const isLow = unit && !unit.dead ? unit.hp / unit.maxHp < 0.3 : false;
           const isFlashing = flashCells.has(`${cell.row}-${cell.col}`);
-          const isMoveFlashing = moveFlashCells.has(`${cell.row}-${cell.col}`);
           const isShaking = shakeCells.has(`${cell.row}-${cell.col}`);
           const isDead = unit?.dead;
           const isFrozen = unit ? (unit.frozen ?? 0) > 0 : false;
@@ -677,8 +676,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const hasTerrain = terrain !== 'none' && TERRAIN_DEFS[terrain];
           const isImpact = impactCell === cellKey;
           const isDragOrigin = dragOriginKey === cellKey;
-          const showDragAttack = !isDragOrigin && dragBlinkMode === 'attack' && dragAttackCells.has(cellKey);
-          const showDragMove   = !isDragOrigin && dragBlinkMode === 'move'   && dragMoveCells.has(cellKey);
+          const dragAuraKind = !isDragOrigin ? dragAuraCells.get(cellKey) : undefined;
+          const pulseKind = placementPulse.get(cellKey);
+
 
           // Slide offset
           const offset = unit && !isDead ? slideOffsets.get(unit.id) : null;
