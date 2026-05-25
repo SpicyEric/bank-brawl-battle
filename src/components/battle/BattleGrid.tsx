@@ -145,16 +145,25 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     prevSacrifice.current = !!sacrificeFlash;
   }, [sacrificeFlash]);
 
-  // Battle entry animation: when phase transitions into 'battle', briefly slide
-  // all units in from off-grid (player from bottom, enemy from top).
-  const [battleEntry, setBattleEntry] = useState(false);
+  // Battle entry animation: when phase transitions into 'battle', units march
+  // in row by row from off-grid. The whole formation has a uniform row-offset
+  // that ticks down from 4 → 0 (1 row per step). Player marches up from below,
+  // enemy marches down from above. Units off-screen are hidden via opacity.
+  const ENTRY_STEPS = 4;
+  const ENTRY_STEP_MS = 260;
+  const [entryStep, setEntryStep] = useState(0); // 0 = no entry / final position
   const prevPhaseForEntry = useRef(phase);
   useEffect(() => {
     if (prevPhaseForEntry.current !== 'battle' && phase === 'battle') {
-      setBattleEntry(true);
-      const t = setTimeout(() => setBattleEntry(false), 850);
+      setEntryStep(ENTRY_STEPS);
+      let step = ENTRY_STEPS;
+      const iv = setInterval(() => {
+        step -= 1;
+        setEntryStep(step);
+        if (step <= 0) clearInterval(iv);
+      }, ENTRY_STEP_MS);
       prevPhaseForEntry.current = phase;
-      return () => clearTimeout(t);
+      return () => clearInterval(iv);
     }
     prevPhaseForEntry.current = phase;
   }, [phase]);
