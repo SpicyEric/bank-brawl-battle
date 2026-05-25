@@ -51,6 +51,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const placeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playerUnitsRef = useRef(playerUnits);
   useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
+  const enemyUnitsRef = useRef(enemyUnits);
+  useEffect(() => { enemyUnitsRef.current = enemyUnits; }, [enemyUnits]);
   // Track if AI drip-placement already kicked off for this match
   const aiDripStartedRef = useRef(false);
   const aiDripTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -210,7 +212,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     if (phase !== 'place_player') return;
     if (!PLAYER_ROWS.includes(row)) return;
     if (playerUnits.length >= playerMaxUnits) return;
-    if (grid[row][col].unit) return;
+    if (grid[row][col].unit?.team === 'player') return;
     if (grid[row][col].terrain === 'water') return;
 
     let type: UnitType | null = null;
@@ -280,15 +282,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     const allUnits = [...pUnits, ...enemies];
     setBondsForPlacement(allUnits);
 
-    setPlayerUnits(pUnits);
-    setEnemyUnits(enemies);
+    // Battle takes place on an invisible 8×24 lane:
+    // enemy field = rows 0-7, visible middle = rows 8-15, player field = rows 16-23.
+    const battlePlayers = pUnits.map(u => ({ ...u, row: u.row + 16, startRow: u.row + 16, laneCol: u.col }));
+    const battleEnemies = enemies.map(u => ({ ...u, startRow: u.row, laneCol: u.col }));
+    setPlayerUnits(battlePlayers);
+    setEnemyUnits(battleEnemies);
 
-    setGrid(prev => {
-      const newGrid = prev.map(r => r.map(c => ({ ...c, unit: null as Unit | null })));
-      for (const u of pUnits) newGrid[u.row][u.col].unit = u;
-      for (const e of enemies) newGrid[e.row][e.col].unit = e;
-      return newGrid;
-    });
+    setGrid(createEmptyGrid());
 
     // Skip place_enemy phase, go directly into battle
     startBattleRef.current?.();
