@@ -7,7 +7,7 @@ import { UnitPicker } from '@/components/battle/UnitPicker';
 import { BattleLog } from '@/components/battle/BattleLog';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 import { useMusic } from '@/hooks/useMusic';
-import { POINTS_TO_WIN, ROUNDS_TO_WIN, UnitType, ROUND_TIME_LIMIT, OVERTIME_THRESHOLD, ColorGroup } from '@/lib/battleGame';
+import { ROUNDS_TO_WIN, UnitType, ROUND_TIME_LIMIT, ColorGroup } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
 import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, sfxFocusFire, sfxSacrifice, sfxShieldWall, setSfxMuted } from '@/lib/sfx';
 import { computeAuraOverlay } from '@/lib/auraData';
