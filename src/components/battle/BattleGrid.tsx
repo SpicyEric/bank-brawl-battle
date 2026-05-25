@@ -652,8 +652,17 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
 
 
   const cellSize = 100 / GRID_SIZE;
-  // When flipped, visual row position is inverted for overlay effects
-  const visualRow = (r: number) => flipped ? (GRID_SIZE - 1 - r) : r;
+  const isBattleWorld = phase === 'battle' && grid.length > GRID_SIZE;
+  const visibleStartRow = isBattleWorld ? GRID_SIZE : 0;
+  const visibleEndRow = visibleStartRow + GRID_SIZE;
+  const visibleGrid = isBattleWorld ? grid.slice(visibleStartRow, visibleEndRow) : grid;
+  const toVisibleRow = (r: number) => r - visibleStartRow;
+  const isVisibleRow = (r: number) => r >= visibleStartRow && r < visibleEndRow;
+  // When flipped, visual row position is inverted for overlay effects within the visible 8x8 window.
+  const visualRow = (r: number) => {
+    const localRow = toVisibleRow(r);
+    return flipped ? (GRID_SIZE - 1 - localRow) : localRow;
+  };
 
   // Track grid pixel width for sprite-sheet animations (need px sizes for CSS steps())
   const gridRef = useRef<HTMLDivElement | null>(null);
@@ -675,7 +684,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     <div ref={gridRef} className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto relative">
 
       <div className="grid grid-cols-8 gap-[2px] w-full h-full bg-border rounded-xl overflow-hidden border border-border">
-         {(flipped ? [...grid].reverse().flat() : grid.flat()).map((cell) => {
+         {(flipped ? [...visibleGrid].reverse().flat() : visibleGrid.flat()).map((cell) => {
           const isPlayerZone = isPlacing; // full grid is buildable during placement
           const isEnemyZone = false;
           const unit = cell.unit;
@@ -713,7 +722,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             ? { transform: `translate(${offset.dc * 100}%, ${offset.dr * 100}%)` }
             : undefined;
 
-          const vRow = flipped ? (GRID_SIZE - 1 - cell.row) : cell.row;
+          const vRow = visualRow(cell.row);
           const cellBgStyle = {
             backgroundImage: `url(${battlefieldBg})`,
             backgroundSize: `${GRID_SIZE * 100}% ${GRID_SIZE * 100}%`,
@@ -815,7 +824,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                 // Row-by-row marching entry: uniform offset that ticks down.
                 // Player marches up from below: visual offset = +entryStep rows.
                 // Enemy marches down from above: visual offset = -entryStep rows.
-                const entryDr = entryStep > 0
+                const entryDr = entryStep > 0 && !isBattleWorld
                   ? (unit.team === 'player' ? entryStep : -entryStep)
                   : 0;
                 const visualDr = (flipped ? -entryDr : entryDr);
@@ -938,7 +947,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }, { row: -1, col: -1 }, { row: -1, col: 1 }, { row: 1, col: -1 }, { row: 1, col: 1 }]) {
                       const r = cell.row + offset.row;
                       const c = cell.col + offset.col;
-                      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+                      if (isVisibleRow(r) && c >= 0 && c < GRID_SIZE) {
                         const neighbor = grid[r]?.[c];
                         if (neighbor?.unit && neighbor.unit.type === 'tank' && neighbor.unit.team === unit.team && neighbor.unit.hp > 0 && !neighbor.unit.dead && neighbor.unit.id !== unit.id) {
                           return <span className="absolute top-0 right-0.5 text-[7px] opacity-70 select-none">🛡️</span>;
@@ -958,13 +967,13 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       {/* Shield bond connections – visible during placement AND combat */}
       {(isPlacing || phase === 'place_enemy' || phase === 'battle') && (() => {
         const bonds: { tankRow: number; tankCol: number; unitRow: number; unitCol: number; team: 'player' | 'enemy' }[] = [];
-        const tanks = grid.flat().filter(c => c.unit && !c.unit.dead && c.unit.type === 'tank');
+        const tanks = grid.flat().filter(c => isVisibleRow(c.row) && c.unit && !c.unit.dead && c.unit.type === 'tank');
         for (const tankCell of tanks) {
           const tank = tankCell.unit!;
           for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }, { row: -1, col: -1 }, { row: -1, col: 1 }, { row: 1, col: -1 }, { row: 1, col: 1 }]) {
             const r = tankCell.row + offset.row;
             const c = tankCell.col + offset.col;
-            if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+            if (isVisibleRow(r) && c >= 0 && c < GRID_SIZE) {
               const neighbor = grid[r][c];
               if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === tank.team && neighbor.unit.id !== tank.id) {
                 if (hideEnemyUnits && isPlacing && tank.team === 'enemy') continue;
