@@ -221,6 +221,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     if (playerUnits.length >= playerMaxUnits) return;
     if (grid[row][col].unit?.team === 'player') return;
     if (grid[row][col].terrain === 'water') return;
+    // Enemy units conceptually live on their own 8x8 field. They may share
+    // the same visible cell during placement, but the player can always
+    // build on top — the enemy stays tracked in enemyUnits state and ends
+    // up on its own lane row (0-7) once the battle starts.
 
     let type: UnitType | null = null;
     let color: ColorGroup | undefined;
@@ -251,7 +255,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   }, [phase, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, playerMaxUnits, playerBannedUnits, playerBannedSlots, placedSlots]);
 
 
-  // Remove placed unit
+  // Remove placed unit (and restore any hidden enemy that was on the same cell)
   const removeUnit = useCallback((unitId: string) => {
     if (phase !== 'place_player') return;
     setPlayerUnits(prev => {
@@ -259,7 +263,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       if (!unit) return prev;
       setGrid(g => {
         const next = g.map(r => r.map(c => ({ ...c })));
-        next[unit.row][unit.col].unit = null;
+        const hiddenEnemy = enemyUnitsRef.current.find(e => e.row === unit.row && e.col === unit.col);
+        next[unit.row][unit.col].unit = hiddenEnemy ?? null;
         return next;
       });
       return prev.filter(u => u.id !== unitId);
