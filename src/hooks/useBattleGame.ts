@@ -12,6 +12,7 @@ import {
   tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest, applyShadowpriestCurse,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
+import { findFormations, applyFormationMove, findFormationContaining } from '@/lib/formations';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 import { matchRecorder } from '@/lib/matchRecorder';
 
