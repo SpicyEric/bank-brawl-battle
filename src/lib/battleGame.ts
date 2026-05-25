@@ -68,6 +68,18 @@ export interface Unit {
   isPhantom?: boolean; // doppelganger phantom flag (kept true for life of phantom for visuals)
   doppelSpawned?: boolean; // original doppelganger has already spawned its phantom
   phantomId?: string; // link from original doppelganger → spawned phantom (original idles until phantom dies)
+  // v3:
+  bombPlaceTimer?: number; // bomber: ticks until next bomb placement (every 3)
+  bombSpecialTimer?: number; // bomber: ticks until next bomb hail (every 12)
+  obeliskBeamTimer?: number; // obelisk: ticks until next beam burst (every 3)
+  obeliskBeamLeft?: number; // obelisk: ticks remaining the beam is active (2 ticks)
+  obeliskBuff?: number; // recipient: ticks of +30% dmg & cooldown soft-cap 1
+  curseStacks?: number; // shadowpriest target: number of curse stacks (0..3)
+  cursed?: boolean; // shadowpriest target: triple-curse triggered
+  unhealable?: boolean; // shadowpriest curse: cannot be healed
+  curseAtkMul?: number; // shadowpriest curse: damage multiplier (0.5)
+  soulHarvestTimer?: number; // shadowpriest: ticks until next harvest (every 8)
+  permAtkBonus?: number; // shadowpriest: permanent ATK bonus from harvests
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
