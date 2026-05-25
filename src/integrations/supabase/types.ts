@@ -20,9 +20,13 @@ export type Database = {
           id: string
           player1_id: string | null
           player1_ready: boolean | null
+          player1_roster: Json | null
+          player1_roster_ready: boolean
           player1_units: Json | null
           player2_id: string | null
           player2_ready: boolean | null
+          player2_roster: Json | null
+          player2_roster_ready: boolean
           player2_units: Json | null
           room_code: string
           status: string
@@ -34,9 +38,13 @@ export type Database = {
           id?: string
           player1_id?: string | null
           player1_ready?: boolean | null
+          player1_roster?: Json | null
+          player1_roster_ready?: boolean
           player1_units?: Json | null
           player2_id?: string | null
           player2_ready?: boolean | null
+          player2_roster?: Json | null
+          player2_roster_ready?: boolean
           player2_units?: Json | null
           room_code: string
           status?: string
@@ -48,9 +56,13 @@ export type Database = {
           id?: string
           player1_id?: string | null
           player1_ready?: boolean | null
+          player1_roster?: Json | null
+          player1_roster_ready?: boolean
           player1_units?: Json | null
           player2_id?: string | null
           player2_ready?: boolean | null
+          player2_roster?: Json | null
+          player2_roster_ready?: boolean
           player2_units?: Json | null
           room_code?: string
           status?: string
