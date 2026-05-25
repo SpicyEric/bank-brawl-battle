@@ -562,6 +562,84 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         return true;
       }).sort((a, b) => a.maxCooldown - b.maxCooldown);
 
+      // === FORMATION_MODE (SP-only rewrite, Step 3+4) ============================
+      // Individual movement AIs (lock-on, kiting, terrain seekers, dash, flying,
+      // special tick patterns) are skipped here. Each unit auto-attacks the
+      // lowest-HP adjacent enemy (Chebyshev 1) when its cooldown is ready.
+      // calcDamage() preserves color RPS + crit/variance. Player formations move
+      // manually via moveFormation(unitId, dr, dc); enemy formations shuffle one
+      // cell toward the nearest player unit each tick.
+      const FORMATION_MODE = true;
+      if (FORMATION_MODE) {
+        // 1) Auto-attack range 1
+        for (const unit of acting) {
+          if (unit.hp <= 0 || unit.dead) continue;
+          unit.cooldown = Math.max(0, unit.cooldown - 1);
+          if (unit.cooldown > 0) continue;
+          let best: Unit | null = null;
+          for (const other of allUnits) {
+            if (other === unit || other.team === unit.team) continue;
+            if (other.hp <= 0 || other.dead) continue;
+            const adr = Math.abs(other.row - unit.row);
+            const adc = Math.abs(other.col - unit.col);
+            if (adr <= 1 && adc <= 1 && (adr + adc) > 0) {
+              if (!best || other.hp < best.hp) best = other;
+            }
+          }
+          if (!best) continue;
+          let dmg = calcDamage(unit, best, newGrid);
+          if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
+          else {
+            dmg = Math.round(dmg * enemyDmgMod);
+            if (best.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
+          }
+          best.hp = Math.max(0, best.hp - dmg);
+          unit.cooldown = unit.maxCooldown;
+          events.push({
+            type: best.hp <= 0 ? 'kill' : 'hit',
+            attackerId: unit.id,
+            attackerRow: unit.row,
+            attackerCol: unit.col,
+            attackerEmoji: UNIT_DEFS[unit.type].emoji,
+            attackerType: unit.type,
+            targetId: best.id,
+            targetRow: best.row,
+            targetCol: best.col,
+            damage: dmg,
+            isStrong: false, isWeak: false,
+            isRanged: false,
+          });
+          if (best.hp <= 0) (best as any).dead = true;
+        }
+        // 2) Enemy formation move toward nearest player
+        const enemyFormations = findFormations(allUnits, 'enemy');
+        const playersAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
+        for (const grp of enemyFormations) {
+          if (grp.length === 0 || playersAlive.length === 0) continue;
+          let target: Unit | null = null;
+          let bestDist = Infinity;
+          for (const e of grp) for (const p of playersAlive) {
+            const d = Math.abs(p.row - e.row) + Math.abs(p.col - e.col);
+            if (d < bestDist) { bestDist = d; target = p; }
+          }
+          if (!target) continue;
+          let cr = 0, cc = 0;
+          for (const e of grp) { cr += e.row; cc += e.col; }
+          cr /= grp.length; cc /= grp.length;
+          const ddr = Math.sign(target.row - cr);
+          const ddc = Math.sign(target.col - cc);
+          const tries: Array<[number, number]> = [];
+          if (ddr !== 0 && ddc !== 0) tries.push([ddr, ddc]);
+          if (ddr !== 0) tries.push([ddr, 0]);
+          if (ddc !== 0) tries.push([0, ddc]);
+          for (const [mdr, mdc] of tries) {
+            if (applyFormationMove(grp, mdr, mdc, newGrid)) break;
+          }
+        }
+      } else {
+
+
+
       // === Burn DoT processing (Brandstifter / Arsonist) ===
       for (const u of allUnits) {
         if (!u.burning || u.burning.length === 0 || u.hp <= 0) continue;
