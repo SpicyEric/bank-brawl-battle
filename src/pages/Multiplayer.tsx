@@ -23,7 +23,7 @@ const Multiplayer = () => {
   const navigateToGame = useCallback((role: PlayerRole, nextRoomId: string) => {
     if (hasNavigatedRef.current) return;
     hasNavigatedRef.current = true;
-    navigate(`/game?mode=multi&room=${nextRoomId}&role=${role}`);
+    navigate(`/roster?mode=multi&room=${nextRoomId}&role=${role}`);
   }, [navigate]);
 
   const resetLobby = useCallback(() => {
