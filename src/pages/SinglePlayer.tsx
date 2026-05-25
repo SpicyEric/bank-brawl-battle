@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMusic } from '@/hooks/useMusic';
-import { ArrowLeft, Swords, BookOpen, Trophy, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Swords, BookOpen, Trophy, ChevronRight, FileBarChart2, Loader2 } from 'lucide-react';
 import menuBg from '@/assets/menu-bg.png';
+import { fetchAllMatches } from '@/lib/matchRecorder';
+import { generateMatchesPdf, downloadBlob } from '@/lib/matchPdf';
+import { toast } from 'sonner';
 
 export type Difficulty = 1 | 2 | 3 | 4 | 5;
 
