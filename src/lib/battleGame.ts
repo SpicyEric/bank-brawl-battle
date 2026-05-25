@@ -1067,7 +1067,9 @@ function hasAdjacentFriendlyTank(defender: Unit, grid: Cell[][]): boolean {
 // Calculate damage with counter system + terrain bonuses + shield aura
 export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): number {
   
-  let baseAtk = attacker.attack + (attacker.judgeBonus || 0);
+  let baseAtk = attacker.attack + (attacker.judgeBonus || 0) + (attacker.permAtkBonus || 0);
+  // Shadowpriest curse: −50% attack permanently on cursed attackers
+  if ((attacker.curseAtkMul ?? 1) !== 1) baseAtk = Math.max(0, baseAtk * (attacker.curseAtkMul ?? 1));
   // Assassin: +4 damage against enemies below 50% HP
   if (attacker.type === 'assassin' && defender.hp < defender.maxHp * 0.5) {
     baseAtk += 4;
