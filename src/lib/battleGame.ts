@@ -1844,6 +1844,19 @@ export function tickMagnetPull(
         t.row = cur.r; t.col = cur.c;
         grid[cur.r][cur.c].unit = t;
         pushedIds.push(t.id);
+        // Bonus pull damage: 15 to each pulled enemy
+        const pullDmg = Math.min(15, t.hp);
+        t.hp = Math.max(0, t.hp - 15);
+        const killed = t.hp <= 0;
+        if (killed) (t as any).dead = true;
+        events.push({
+          type: killed ? 'kill' : 'hit',
+          attackerId: m.id, attackerRow: m.row, attackerCol: m.col,
+          attackerEmoji: '🧲', attackerType: 'magnetiker',
+          targetId: t.id, targetRow: t.row, targetCol: t.col,
+          damage: pullDmg, isStrong: false, isWeak: false, isRanged: true,
+        });
+        logs.push(`🧲 Magnetzug → ${UNIT_DEFS[t.type].emoji} 15${killed ? ' ☠️' : ''}`);
       }
     }
 
