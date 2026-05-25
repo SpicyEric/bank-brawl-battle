@@ -1403,14 +1403,16 @@ export function processLavaTick(grid: Cell[][], logs: string[]): void {
     if (!cell.lavaTicks) continue;
     const u = cell.unit;
     if (u && u.hp > 0 && !u.dead && u.team !== cell.lavaOwnerTeam && !isImmuneToFire(u, grid)) {
-      u.hp = Math.max(0, u.hp - 8);
-      logs.push(`🌋 Lava → ${UNIT_DEFS[u.type].emoji} 8${u.hp <= 0 ? ' ☠️' : ''}`);
+      const dmg = cell.lavaDmg ?? 8;
+      u.hp = Math.max(0, u.hp - dmg);
+      logs.push(`🌋 Lava → ${UNIT_DEFS[u.type].emoji} ${dmg}${u.hp <= 0 ? ' ☠️' : ''}`);
       if (u.hp <= 0) (u as any).dead = true;
     }
     cell.lavaTicks -= 1;
     if (cell.lavaTicks <= 0) {
       cell.lavaTicks = undefined;
       cell.lavaOwnerTeam = undefined;
+      cell.lavaDmg = undefined;
     }
   }
 }
