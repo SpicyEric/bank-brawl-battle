@@ -967,7 +967,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       {/* Shield bond connections – visible during placement AND combat */}
       {(isPlacing || phase === 'place_enemy' || phase === 'battle') && (() => {
         const bonds: { tankRow: number; tankCol: number; unitRow: number; unitCol: number; team: 'player' | 'enemy' }[] = [];
-        const tanks = grid.flat().filter(c => c.unit && !c.unit.dead && c.unit.type === 'tank');
+        const tanks = grid.flat().filter(c => isVisibleRow(c.row) && c.unit && !c.unit.dead && c.unit.type === 'tank');
         for (const tankCell of tanks) {
           const tank = tankCell.unit!;
           for (const offset of [{ row: -1, col: 0 }, { row: 1, col: 0 }, { row: 0, col: -1 }, { row: 0, col: 1 }, { row: -1, col: -1 }, { row: -1, col: 1 }, { row: 1, col: -1 }, { row: 1, col: 1 }]) {
