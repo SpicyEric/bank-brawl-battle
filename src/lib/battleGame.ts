@@ -1469,7 +1469,7 @@ export function processLavaTick(grid: Cell[][], logs: string[]): void {
     if (!cell.lavaTicks) continue;
     const u = cell.unit;
     if (u && u.hp > 0 && !u.dead && u.team !== cell.lavaOwnerTeam && !isImmuneToFire(u, grid)) {
-      const dmg = cell.lavaDmg ?? 8;
+      const dmg = cell.lavaDmg ?? 6;
       u.hp = Math.max(0, u.hp - dmg);
       logs.push(`🌋 Lava → ${UNIT_DEFS[u.type].emoji} ${dmg}${u.hp <= 0 ? ' ☠️' : ''}`);
       if (u.hp <= 0) (u as any).dead = true;
@@ -2516,9 +2516,9 @@ export function tickBomberActions(
 ): void {
   const bombers = allUnits.filter(u => u.type === 'bomber' && u.hp > 0 && !u.dead);
   for (const b of bombers) {
-    // Place timer (every 4 ticks; obelisk-buffed bombers halve to every 2 ticks)
+    // Place timer (every 5 ticks; obelisk-buffed bombers halve to every 3 ticks)
     const buffed = (b.obeliskBuff || 0) > 0;
-    const placeReset = buffed ? 2 : 4;
+    const placeReset = buffed ? 3 : 5;
     if (b.bombPlaceTimer === undefined) b.bombPlaceTimer = placeReset;
     b.bombPlaceTimer -= 1;
     if (b.bombPlaceTimer <= 0) {
