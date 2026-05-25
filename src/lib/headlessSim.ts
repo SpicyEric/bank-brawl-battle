@@ -508,8 +508,24 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
   const t0 = performance.now();
   const yieldEvery = opts.yieldEvery ?? 50;
 
+  const monoSweep = opts.monoSweep ?? true;
+  const rSize = opts.rosterSize ?? 9;
+  const n = opts.teamSize ?? 5;
+  // Build the mono-sweep queue: one mono-vs-random battle per unit type at the start.
+  const monoQueue: UnitType[] = monoSweep ? [...UNIT_TYPES] : [];
+
   for (let i = 0; i < battlesTotal; i++) {
-    const { p1, p2 } = buildTeams(opts);
+    let p1: UnitType[]; let p2: UnitType[];
+    if (monoQueue.length > 0 && (opts.mode ?? 'random') === 'random') {
+      const t = monoQueue.shift()!;
+      // Alternate which side runs mono so both 'player' and 'enemy' sample positions get hit.
+      const enemyRoster = pickFromRoster(drawRoster(rSize), n);
+      if (i % 2 === 0) { p1 = Array.from({ length: n }, () => t); p2 = enemyRoster; }
+      else { p1 = enemyRoster; p2 = Array.from({ length: n }, () => t); }
+    } else {
+      const built = buildTeams(opts);
+      p1 = built.p1; p2 = built.p2;
+    }
     let result: BattleResult;
     try {
       result = simulateOneBattle(p1, p2);
