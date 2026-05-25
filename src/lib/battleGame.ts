@@ -99,6 +99,9 @@ export interface Cell {
   lavaTicks?: number; // vulkanit lava: ticks remaining
   lavaOwnerTeam?: Team; // immune team
   lavaDmg?: number; // per-tick damage (default 8)
+  bomb?: { fuse: number; dmg: number; ownerTeam: Team } | null; // bomber: armed bomb on cell
+  obeliskAura?: number; // visual aura intensity 0=none, 1=plus, 2=beam (set transiently per tick)
+  obeliskAuraTeam?: Team; // team whose obelisk is buffing this cell
 }
 
 // Movement patterns: relative offsets the unit can move to per turn
