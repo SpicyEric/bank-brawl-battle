@@ -635,7 +635,14 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   return (
     <div ref={gridRef} className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto relative">
 
-      <div className="grid grid-cols-8 gap-[2px] w-full h-full bg-border rounded-xl overflow-hidden border border-border">
+      <div
+        className="grid grid-cols-8 gap-[2px] w-full h-full bg-border rounded-xl overflow-hidden border border-border"
+        style={{
+          backgroundImage: `url(${battlefieldBg})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+        }}
+      >
          {(flipped ? [...grid].reverse().flat() : grid.flat()).map((cell) => {
           const isPlayerZone = flipped ? cell.row < 3 : PLAYER_ROWS.includes(cell.row);
           const isEnemyZone = flipped ? PLAYER_ROWS.includes(cell.row) : cell.row < 3;
