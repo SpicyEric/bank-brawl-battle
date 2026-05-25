@@ -12,11 +12,13 @@ import {
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { updateRoom, ensureAnonymousSession } from '@/lib/multiplayer';
+import { matchRecorder } from '@/lib/matchRecorder';
 
 interface MultiplayerConfig {
   roomId: string;
   role: 'player1' | 'player2';
   roster?: UnitType[];
+  opponentRoster?: UnitType[];
 }
 
 // Slot color layout matches UnitRoster: slots 0-2 red, 3-5 green, 6-8 blue
