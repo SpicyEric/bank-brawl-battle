@@ -32,4 +32,6 @@ export interface BattleEvent {
   spinDirIdx?: number;
   /** Dragon fire-spin: order of this beam within the current tick (0..N-1). */
   spinBeamOrder?: number;
+  /** Dragon fire-spin: true on the very first beam of a fresh spin (only once per spin). */
+  spinStart?: boolean;
 }

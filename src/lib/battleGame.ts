@@ -2027,6 +2027,7 @@ function fireDragonBeam(
   events: BattleEvent[],
   logs: string[],
   beamOrder: number = 0,
+  spinStart: boolean = false,
 ): void {
   const { dr, dc } = DRAGON_SPIN_DIRS[dirIdx];
   const cells: { row: number; col: number }[] = [];
@@ -2065,6 +2066,7 @@ function fireDragonBeam(
     spinCells: cells,
     spinDirIdx: dirIdx,
     spinBeamOrder: beamOrder,
+    spinStart,
   });
 
   if (hits > 0) {
@@ -2078,7 +2080,7 @@ export function tickDragonSpin(
   events: BattleEvent[],
   logs: string[],
 ): void {
-  const BEAMS_PER_TICK = 4; // 8 directions over 2 ticks = whip swing
+  const BEAMS_PER_TICK = 8; // fire all 8 directions in a single tick → all targets ignite simultaneously
   const dragons = allUnits.filter(u => u.type === 'dragon' && u.hp > 0 && !u.dead);
   for (const d of dragons) {
     // Continuing an active spin: fire BEAMS_PER_TICK beams this tick.
@@ -2117,13 +2119,15 @@ export function tickDragonSpin(
     }
     d.spinClockwise = Math.random() < 0.5;
     d.spinDirIdx = startIdx;
-    d.spinTicksLeft = 2;
+    d.spinTicksLeft = 1; // entire spin completes in this single tick
     logs.push(`🐉 ${d.team === 'player' ? '👤' : '💀'} Drache schwingt Feuerpeitsche!`);
 
     // Fire first batch of BEAMS_PER_TICK beams immediately this tick.
+    // Mark the very first beam with spinStart so the frontend can spawn the
+    // one-shot custom effect animation exactly once per full spin.
     for (let i = 0; i < BEAMS_PER_TICK; i++) {
       const idx = d.spinDirIdx ?? 0;
-      fireDragonBeam(d, idx, allUnits, grid, events, logs, i);
+      fireDragonBeam(d, idx, allUnits, grid, events, logs, i, i === 0);
       d.spinDirIdx = ((idx + (d.spinClockwise ? 1 : -1)) + 8) % 8;
     }
     d.spinTicksLeft -= 1;

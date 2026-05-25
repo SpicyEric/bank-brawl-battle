@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType, TERRAIN_DEFS } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { UnitGlyph } from '@/components/UnitGlyph';
-import { getAttackIcon, iconUrl } from '@/lib/unitIcons';
+import { getAttackIcon, iconUrl, getAnimation, getAnimationEntry, loadAnimationManifest } from '@/lib/unitIcons';
+import { EffectAnimationPreview } from '@/components/EffectAnimationPreview';
 
 interface BattleGridProps {
   grid: Cell[][];
@@ -65,6 +66,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const hornCounter = useRef(0);
   const [dragonSpinFlames, setDragonSpinFlames] = useState<DragonSpinFlame[]>([]);
   const dragonSpinCounter = useRef(0);
+  const [dragonAnims, setDragonAnims] = useState<{ id: string; row: number; col: number; file: string }[]>([]);
+  const dragonAnimCounter = useRef(0);
   const popupCounter = useRef(0);
   const projCounter = useRef(0);
   const dragonFireCounter = useRef(0);
@@ -546,8 +549,36 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
 
     // --- Dragon fire-spin: per-tick 3-cell beam, cells ignite one after another ---
+    // If a custom effect animation is assigned to the dragon, replace the rotating
+    // per-cell flames with ONE big one-shot animation centered on the dragon.
+    const dragonAnimFile = getAnimation('dragon');
+    const dragonAnimEntry = getAnimationEntry(dragonAnimFile);
     for (const evt of events) {
       if (evt.type !== 'dragonSpin') continue;
+
+      if (dragonAnimEntry) {
+        // Spawn one big one-shot animation ONLY on the very first beam of a fresh spin.
+        if (evt.spinStart) {
+          dragonAnimCounter.current += 1;
+          const anim = {
+            id: `dragonAnim-${dragonAnimCounter.current}`,
+            row: evt.attackerRow,
+            col: evt.attackerCol,
+            file: dragonAnimEntry.f,
+          };
+          const baseDelay = delayFor(evt.attackerId);
+          setTimeout(() => {
+            setDragonAnims(prev => [...prev, anim]);
+            setTimeout(() => {
+              setDragonAnims(prev => prev.filter(a => a.id !== anim.id));
+            }, 1400);
+          }, baseDelay);
+        }
+        // Skip per-cell sequential flame rendering when custom anim is used.
+        continue;
+      }
+
+      // Fallback: original per-cell rotating flames
       const cells = evt.spinCells || [];
       const beamOrder = evt.spinBeamOrder ?? 0;
       const BEAM_GAP = 70; // ms between consecutive beams
@@ -593,8 +624,25 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   // When flipped, visual row position is inverted for overlay effects
   const visualRow = (r: number) => flipped ? (GRID_SIZE - 1 - r) : r;
 
+  // Track grid pixel width for sprite-sheet animations (need px sizes for CSS steps())
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [gridPx, setGridPx] = useState(0);
+  useEffect(() => {
+    loadAnimationManifest();
+    const el = gridRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const e of entries) setGridPx(e.contentRect.width);
+    });
+    ro.observe(el);
+    setGridPx(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, []);
+  const cellPx = gridPx / GRID_SIZE;
+
   return (
-    <div className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto relative">
+    <div ref={gridRef} className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto relative">
+
       <div className="grid grid-cols-8 gap-[2px] w-full h-full bg-border rounded-xl overflow-hidden border border-border">
          {(flipped ? [...grid].reverse().flat() : grid.flat()).map((cell) => {
           const isPlayerZone = flipped ? cell.row < 3 : PLAYER_ROWS.includes(cell.row);
@@ -1194,6 +1242,35 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           >🔥</div>
         </div>
       ))}
+
+      {/* Dragon special: custom one-shot effect animation centered on dragon (covers ~7×7 cells) */}
+      {dragonAnims.map(a => {
+        const entry = getAnimationEntry(a.file);
+        if (!entry || cellPx <= 0) return null;
+        const SPAN = 7; // cells across (3 cell radius + dragon cell)
+        const sizePx = Math.round(cellPx * SPAN);
+        // Center on dragon cell. Cell center = (col + 0.5) * cellPx, then offset by sizePx/2.
+        const centerX = (a.col + 0.5) * cellPx;
+        const centerY = (visualRow(a.row) + 0.5) * cellPx;
+        return (
+          <div
+            key={a.id}
+            style={{
+              position: 'absolute',
+              left: centerX - sizePx / 2,
+              top: centerY - sizePx / 2,
+              width: sizePx,
+              height: sizePx,
+              pointerEvents: 'none',
+              zIndex: 9,
+              mixBlendMode: 'screen',
+            }}
+          >
+            <EffectAnimationPreview entry={entry} size={sizePx} row={0} fps={Math.max(10, entry.c)} loop={false} />
+          </div>
+        );
+      })}
     </div>
   );
 }
+
