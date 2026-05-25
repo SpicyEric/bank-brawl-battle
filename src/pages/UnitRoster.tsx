@@ -8,7 +8,7 @@ import { UnitGlyph } from '@/components/UnitGlyph';
 // Slot layout: row 0 = red (slots 0-2), row 1 = green (slots 3-5), row 2 = blue (slots 6-8)
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
 const ROSTER_SIZE = 9;
-const LONG_PRESS_MS = 400;
+const LONG_PRESS_MS = 800;
 
 const COLOR_RING: Record<ColorGroup, string> = {
   red: 'border-unit-red/40 bg-unit-red/15',
