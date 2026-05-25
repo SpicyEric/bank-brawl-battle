@@ -3,7 +3,7 @@ import {
   Unit, UnitType, Cell, Phase, ColorGroup,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateAIPlacement, getMaxUnits, generateTerrain, setBondsForPlacement, moveTankFormation,
-  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, ROUNDS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
   applyPostAttackEffects, applyDeathEffects, applyMirrorReflect, processLavaTick, processGhostTick, shouldSkipMove,
@@ -111,25 +111,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const [drawOfferPending, setDrawOfferPending] = useState(false);
   const [gameDraw, setGameDraw] = useState(false);
 
-  // Overtime win check: need 2-point lead once both are at OVERTIME_THRESHOLD+
-  const checkGameOver = useCallback((pScore: number, eScore: number, otCount: number): { over: boolean; won: boolean; draw: boolean } => {
-    const bothAtThreshold = pScore >= OVERTIME_THRESHOLD && eScore >= OVERTIME_THRESHOLD;
-
-    if (bothAtThreshold) {
-      // Forced draw after MAX_OVERTIMES
-      if (otCount >= MAX_OVERTIMES) {
-        return { over: true, won: false, draw: true };
-      }
-      // Need 2-point lead
-      if (Math.abs(pScore - eScore) >= 2) {
-        return { over: true, won: pScore > eScore, draw: false };
-      }
-      return { over: false, won: false, draw: false };
-    }
-
-    // Normal win
-    if (pScore >= POINTS_TO_WIN) return { over: true, won: true, draw: false };
-    if (eScore >= POINTS_TO_WIN) return { over: true, won: false, draw: false };
+  // Round-based win check: first to ROUNDS_TO_WIN round wins wins the match
+  const checkGameOver = useCallback((pScore: number, eScore: number): { over: boolean; won: boolean; draw: boolean } => {
+    if (pScore >= ROUNDS_TO_WIN) return { over: true, won: true, draw: false };
+    if (eScore >= ROUNDS_TO_WIN) return { over: true, won: false, draw: false };
     return { over: false, won: false, draw: false };
   }, []);
 
@@ -409,25 +394,6 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     }
   }, [phase]);
 
-  // === Eliminations-Win: force game-over after the single round ============
-  // The existing battleTick sets phase to round_won / round_lost / round_draw
-  // and increments score by 1. In the new single-match flow we instantly
-  // promote that to a final game-over by maxing the score.
-  useEffect(() => {
-    if (phase === 'round_won' && playerScoreRef.current < POINTS_TO_WIN) {
-      playerScoreRef.current = POINTS_TO_WIN;
-      setPlayerScore(POINTS_TO_WIN);
-    } else if (phase === 'round_lost' && enemyScoreRef.current < POINTS_TO_WIN) {
-      enemyScoreRef.current = POINTS_TO_WIN;
-      setEnemyScore(POINTS_TO_WIN);
-    } else if (phase === 'round_draw') {
-      // Eliminations-Draw: beide max → game_draw via checkGameOver
-      playerScoreRef.current = POINTS_TO_WIN;
-      enemyScoreRef.current = POINTS_TO_WIN;
-      setPlayerScore(POINTS_TO_WIN);
-      setEnemyScore(POINTS_TO_WIN);
-    }
-  }, [phase]);
 
 
   // Activate morale boost
@@ -1254,7 +1220,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         const newPS = playerScoreRef.current + 1;
         playerScoreRef.current = newPS;
         setPlayerScore(newPS);
-        const result = checkGameOver(newPS, enemyScoreRef.current, overtimeCount);
+        const result = checkGameOver(newPS, enemyScoreRef.current);
         if (result.draw) {
           setGameDraw(true);
           setPhase('game_draw');
@@ -1265,7 +1231,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         const newES = enemyScoreRef.current + 1;
         enemyScoreRef.current = newES;
         setEnemyScore(newES);
-        const result = checkGameOver(playerScoreRef.current, newES, overtimeCount);
+        const result = checkGameOver(playerScoreRef.current, newES);
         if (result.draw) {
           setGameDraw(true);
           setPhase('game_draw');
@@ -1317,7 +1283,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const newPS = playerScoreRef.current + 1;
       playerScoreRef.current = newPS;
       setPlayerScore(newPS);
-      const result = checkGameOver(newPS, enemyScoreRef.current, overtimeCount);
+      const result = checkGameOver(newPS, enemyScoreRef.current);
       if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
       else setPhase('round_won');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Du hast mehr Einheiten übrig!', ...prev]);
@@ -1325,7 +1291,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const newES = enemyScoreRef.current + 1;
       enemyScoreRef.current = newES;
       setEnemyScore(newES);
-      const result = checkGameOver(playerScoreRef.current, newES, overtimeCount);
+      const result = checkGameOver(playerScoreRef.current, newES);
       if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
       else setPhase('round_lost');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Der Gegner hat mehr Einheiten!', ...prev]);
@@ -1336,19 +1302,19 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       enemyScoreRef.current = newES;
       setPlayerScore(newPS);
       setEnemyScore(newES);
-      const result = checkGameOver(newPS, newES, overtimeCount);
+      const result = checkGameOver(newPS, newES);
       if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
       else setPhase('round_draw');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Gleichstand – beide erhalten einen Punkt!', ...prev]);
     }
   }, [battleTimer, phase, playerUnits, enemyUnits]);
 
-  const gameOverResult = checkGameOver(playerScore, enemyScore, overtimeCount);
+  const gameOverResult = checkGameOver(playerScore, enemyScore);
   const gameOver = gameOverResult.over;
   const gameWon = gameOverResult.won;
 
-  // Check if we're in overtime
-  const inOvertime = playerScore >= OVERTIME_THRESHOLD && enemyScore >= OVERTIME_THRESHOLD;
+  // Overtime no longer used in singleplayer round-based mode
+  const inOvertime = false;
 
   // Accept draw offer (singleplayer: player decides alone)
   const acceptDraw = useCallback(() => {
@@ -1395,18 +1361,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       return next;
     });
 
-    // Track overtime
-    if (inOvertime) {
-      const newOT = overtimeCount + 1;
-      setOvertimeCount(newOT);
-      if (newOT >= AUTO_OVERTIMES && !gameOver) {
-        setDrawOfferPending(true);
-        return;
-      }
-    }
-    setDrawOfferPending(false);
     startNextRound();
-  }, [playerStarts, inOvertime, overtimeCount, gameOver, playerUnits, enemyUnits, playerBannedUnits, enemyBannedUnits]);
+  }, [playerStarts, playerUnits, enemyUnits, playerBannedUnits, enemyBannedUnits]);
 
   const startNextRound = useCallback(() => {
     const newStarts = !playerStarts;
@@ -1568,8 +1524,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     shieldWallUsed, shieldWallActive, activateShieldWall,
     waitingForOpponent: false,
     aiMoraleActive,
-    inOvertime, overtimeCount, drawOfferPending,
-    acceptDraw, continueOvertime,
+    inOvertime: false,
+    overtimeCount: 0,
+    drawOfferPending: false,
+    acceptDraw: () => {},
+    continueOvertime: () => {},
     // Fatigue system
     playerBannedUnits,
     playerBannedSlots,

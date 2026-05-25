@@ -7,7 +7,7 @@ import { UnitPicker } from '@/components/battle/UnitPicker';
 import { BattleLog } from '@/components/battle/BattleLog';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 import { useMusic } from '@/hooks/useMusic';
-import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT, OVERTIME_THRESHOLD, ColorGroup } from '@/lib/battleGame';
+import { ROUNDS_TO_WIN, UnitType, ROUND_TIME_LIMIT, ColorGroup } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
 import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, sfxFocusFire, sfxSacrifice, sfxShieldWall, setSfxMuted } from '@/lib/sfx';
 import { computeAuraOverlay } from '@/lib/auraData';
@@ -251,18 +251,18 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
       <div className="mx-3 mt-2 mb-1.5 py-1.5 px-3 rounded-lg bg-card border border-border flex items-center justify-between">
         <div className="flex items-center gap-2">
           <p className="text-base font-bold font-mono text-success leading-none">{game.playerScore}</p>
-          <ScoreDots score={game.playerScore} max={POINTS_TO_WIN} color="success" />
+          <ScoreDots score={game.playerScore} max={ROUNDS_TO_WIN} color="success" />
         </div>
         <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">
-          {game.inOvertime ? (
-            <span className="text-warning">⚡ Verlängerung {game.overtimeCount}</span>
+          {game.roundNumber > 1 && !game.gameOver ? (
+            <span className="text-foreground font-bold">Runde {game.roundNumber}</span>
           ) : (
-            <>Runde <span className="text-foreground font-bold">{game.roundNumber}</span></>
+            <span>Runden</span>
           )}
           {isMultiplayer && <span className="ml-1 text-primary">⚡</span>}
         </p>
         <div className="flex items-center gap-2">
-          <ScoreDots score={game.enemyScore} max={POINTS_TO_WIN} color="danger" />
+          <ScoreDots score={game.enemyScore} max={ROUNDS_TO_WIN} color="danger" />
           <p className="text-base font-bold font-mono text-danger leading-none">{game.enemyScore}</p>
         </div>
         <DropdownMenu>
@@ -648,13 +648,12 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
         {(game.phase === 'round_won' || game.phase === 'round_lost' || game.phase === 'round_draw') && (
           <div className="text-center space-y-4 py-4">
             <p className="text-sm text-muted-foreground">
-              Stand: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>
-              {game.inOvertime && <span className="text-warning text-xs ml-2">(2 Punkte Vorsprung nötig)</span>}
+              Runden: <span className="text-success font-bold">{game.playerScore}</span> : <span className="text-danger font-bold">{game.enemyScore}</span>
             </p>
             {game.gameOver ? (
               <div className="space-y-3">
                 <p className="text-xl font-bold text-foreground">
-                  {game.gameWon ? '🎉 SPIEL GEWONNEN!' : '😢 SPIEL VERLOREN!'}
+                  {game.gameWon ? '🎉 MATCH GEWONNEN!' : '😢 MATCH VERLOREN!'}
                 </p>
                 <button
                   onClick={() => navigate('/')}
@@ -672,7 +671,12 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-sm text-muted-foreground">Match-Ende wird berechnet...</p>
+                <button
+                  onClick={game.nextRound}
+                  className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
+                >
+                  ⚔️ Nächste Runde
+                </button>
               </div>
             )}
           </div>

@@ -528,6 +528,7 @@ export const GRID_SIZE = 8;
 export const PLAYER_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
 export const ENEMY_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
 export const POINTS_TO_WIN = 8;
+export const ROUNDS_TO_WIN = 3; // singleplayer: best-of-5, first to 3 round wins
 export const OVERTIME_THRESHOLD = 7; // at this score, 2-point lead required
 export const AUTO_OVERTIMES = 3; // first 3 overtimes are automatic
 export const MAX_OVERTIMES = 5; // after 5th overtime → forced draw
