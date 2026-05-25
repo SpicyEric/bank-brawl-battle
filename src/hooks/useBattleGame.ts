@@ -394,25 +394,6 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     }
   }, [phase]);
 
-  // === Eliminations-Win: force game-over after the single round ============
-  // The existing battleTick sets phase to round_won / round_lost / round_draw
-  // and increments score by 1. In the new single-match flow we instantly
-  // promote that to a final game-over by maxing the score.
-  useEffect(() => {
-    if (phase === 'round_won' && playerScoreRef.current < POINTS_TO_WIN) {
-      playerScoreRef.current = POINTS_TO_WIN;
-      setPlayerScore(POINTS_TO_WIN);
-    } else if (phase === 'round_lost' && enemyScoreRef.current < POINTS_TO_WIN) {
-      enemyScoreRef.current = POINTS_TO_WIN;
-      setEnemyScore(POINTS_TO_WIN);
-    } else if (phase === 'round_draw') {
-      // Eliminations-Draw: beide max → game_draw via checkGameOver
-      playerScoreRef.current = POINTS_TO_WIN;
-      enemyScoreRef.current = POINTS_TO_WIN;
-      setPlayerScore(POINTS_TO_WIN);
-      setEnemyScore(POINTS_TO_WIN);
-    }
-  }, [phase]);
 
 
   // Activate morale boost
