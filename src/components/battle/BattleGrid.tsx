@@ -553,14 +553,12 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     // per-cell flames with ONE big one-shot animation centered on the dragon.
     const dragonAnimFile = getAnimation('dragon');
     const dragonAnimEntry = getAnimationEntry(dragonAnimFile);
-    const animSpawnedFor = new Set<string>(); // one big anim per attacker per tick
     for (const evt of events) {
       if (evt.type !== 'dragonSpin') continue;
 
       if (dragonAnimEntry) {
-        // Spawn one big animation centered on the dragon, once per tick batch.
-        if (!animSpawnedFor.has(evt.attackerId)) {
-          animSpawnedFor.add(evt.attackerId);
+        // Spawn one big one-shot animation ONLY on the very first beam of a fresh spin.
+        if (evt.spinStart) {
           dragonAnimCounter.current += 1;
           const anim = {
             id: `dragonAnim-${dragonAnimCounter.current}`,
@@ -571,10 +569,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const baseDelay = delayFor(evt.attackerId);
           setTimeout(() => {
             setDragonAnims(prev => [...prev, anim]);
-            // Auto-remove after one full play (cols / fps). Use ~1100ms safe upper bound.
             setTimeout(() => {
               setDragonAnims(prev => prev.filter(a => a.id !== anim.id));
-            }, 1200);
+            }, 1400);
           }, baseDelay);
         }
         // Skip per-cell sequential flame rendering when custom anim is used.
