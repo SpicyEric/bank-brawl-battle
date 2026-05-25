@@ -227,8 +227,8 @@ export function snapshotUnitsForRound(
 ): { team: 'player1' | 'player2'; type: UnitType; color?: ColorGroup; row: number; col: number; hp: number }[] {
   void grid;
   const out: { team: 'player1' | 'player2'; type: UnitType; color?: ColorGroup; row: number; col: number; hp: number }[] = [];
-  for (const u of player1Units) out.push({ team: 'player1', type: u.type, color: u.colorGroup, row: u.row, col: u.col, hp: u.hp });
-  for (const u of player2Units) out.push({ team: 'player2', type: u.type, color: u.colorGroup, row: u.row, col: u.col, hp: u.hp });
+  for (const u of player1Units) out.push({ team: 'player1', type: u.type, color: u.color as ColorGroup | undefined, row: u.row, col: u.col, hp: u.hp });
+  for (const u of player2Units) out.push({ team: 'player2', type: u.type, color: u.color as ColorGroup | undefined, row: u.row, col: u.col, hp: u.hp });
   return out;
 }
 
