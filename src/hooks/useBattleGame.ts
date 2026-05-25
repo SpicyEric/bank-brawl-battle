@@ -18,6 +18,7 @@ import { matchRecorder } from '@/lib/matchRecorder';
 
 // Roster slots: 0..2 = red, 3..5 = green, 6..8 = blue
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
+const FORMATION_MODE = true;
 
 export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const hasRoster = !!(roster && roster.length === 9);
@@ -437,19 +438,21 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         if (shieldWallTicksLeft.current <= 0) {
           setShieldWallActive(false);
         }
-        // Retreat: move all player units toward their base rows (5,6,7) as fast as possible
-        const playerAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
-        for (const unit of playerAlive) {
-          // Move toward closest base row (maximize row number)
-          if (unit.row < 5) {
-            // Move as far south as possible (up to 2 steps for speed)
-            for (let step = 2; step >= 1; step--) {
-              const targetRow = Math.min(7, unit.row + step);
-              if (targetRow <= 7 && !newGrid[targetRow][unit.col].unit && newGrid[targetRow][unit.col].terrain !== 'water') {
-                newGrid[unit.row][unit.col].unit = null;
-                unit.row = targetRow;
-                newGrid[unit.row][unit.col].unit = unit;
-                break;
+        if (!FORMATION_MODE) {
+          // Retreat: move all player units toward their base rows (5,6,7) as fast as possible
+          const playerAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
+          for (const unit of playerAlive) {
+            // Move toward closest base row (maximize row number)
+            if (unit.row < 5) {
+              // Move as far south as possible (up to 2 steps for speed)
+              for (let step = 2; step >= 1; step--) {
+                const targetRow = Math.min(7, unit.row + step);
+                if (targetRow <= 7 && !newGrid[targetRow][unit.col].unit && newGrid[targetRow][unit.col].terrain !== 'water') {
+                  newGrid[unit.row][unit.col].unit = null;
+                  unit.row = targetRow;
+                  newGrid[unit.row][unit.col].unit = unit;
+                  break;
+                }
               }
             }
           }
