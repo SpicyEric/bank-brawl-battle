@@ -148,9 +148,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const [impactCell, setImpactCell] = useState<string | null>(null);
   useEffect(() => {
     if (!lastPlaced) return;
-    const cells = auraZones
-      ? (async () => import('@/lib/auraData').then(m => m.auraCellsAround(lastPlaced.type, lastPlaced.row, lastPlaced.col, auraZones)))()
-      : null;
+
     // Compute synchronously (auraZones already a plain map)
     const sync = auraZones
       ? (() => {
