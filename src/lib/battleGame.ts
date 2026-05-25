@@ -82,6 +82,11 @@ export interface Unit {
   curseAtkMul?: number; // shadowpriest curse: damage multiplier (0.5)
   soulHarvestTimer?: number; // shadowpriest: ticks until next harvest (every 8)
   permAtkBonus?: number; // shadowpriest: permanent ATK bonus from harvests
+  // Lane discipline (column-based placement matters): unit prefers to advance in its spawn column
+  // until an enemy enters its attack pattern. Set at spawn from `col`.
+  laneCol?: number;
+  laneBroken?: boolean; // once true, unit drops lane discipline for the rest of combat
+  laneStuckTicks?: number; // ticks in a row where no forward-in-lane move was possible
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -627,9 +632,50 @@ export function createUnit(type: UnitType, team: Team, row: number, col: number,
     startRow: row,
     color: color ?? UNIT_COLOR_GROUPS[type],
     slotIndex,
+    laneCol: col,
+    laneBroken: false,
+    laneStuckTicks: 0,
   };
   // All special cooldown timers start at 0 (initialized lazily on first tick).
   return unit;
+}
+
+// ── Lane discipline ─────────────────────────────────────────────────────────
+// Units placed in a column try to advance straight up/down that column until
+// an enemy enters their attack pattern. Special-behavior units skip lane mode.
+const LANE_EXEMPT_TYPES = new Set<UnitType>([
+  'dragon', 'waterwalker', 'shadowblade', 'obelisk', 'bomber',
+  'mountaineer', 'ranger', 'vulkanit',
+  'healer', 'lamb',
+  'cloner', 'doppelganger',
+]);
+
+function laneToleranceFor(type: UnitType): number {
+  // Hard overrides for units whose movePattern doesn't include any orthogonal step
+  if (type === 'assassin') return 2;
+  const def = UNIT_DEFS[type];
+  let minSide = Infinity;
+  for (const m of def.movePattern) {
+    if (m.row === 0 && m.col === 0) continue;
+    // forward-progressing move
+    const sideways = Math.abs(m.col);
+    if (sideways < minSide) minSide = sideways;
+  }
+  if (!isFinite(minSide)) return 0;
+  return Math.max(0, minSide);
+}
+
+function isLaneActive(unit: Unit): boolean {
+  if (unit.laneBroken) return false;
+  if (unit.laneCol == null) return false;
+  if (LANE_EXEMPT_TYPES.has(unit.type)) return false;
+  if (unit.isClone || unit.isPhantom) return false;
+  if (UNIT_DEFS[unit.type].movePattern.length === 0) return false;
+  return true;
+}
+
+function forwardSign(team: Team): number {
+  return team === 'player' ? -1 : 1; // player moves toward lower rows
 }
 
 // Effective color for RPS damage (per-instance, falls back to type default for legacy/AI units)
@@ -744,6 +790,23 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     if (otherEnemies.length > 0) {
       otherEnemies.sort((a, b) => distance(unit, a) - distance(unit, b));
       return otherEnemies[0];
+    }
+  }
+
+  // Lane discipline: while in lane mode, prefer enemies inside the unit's lane corridor.
+  if (isLaneActive(unit)) {
+    const tol = laneToleranceFor(unit.type);
+    const laneEnemies = enemies.filter(e => Math.abs(e.col - unit.laneCol!) <= tol);
+    if (laneEnemies.length > 0) {
+      const fwd = forwardSign(unit.team);
+      laneEnemies.sort((a, b) => {
+        // Prefer the most-forward lane enemy (closest to our front along row axis)
+        const aFront = fwd * (a.row - unit.row);
+        const bFront = fwd * (b.row - unit.row);
+        if (aFront !== bFront) return aFront - bFront;
+        return distance(unit, a) - distance(unit, b);
+      });
+      return laneEnemies[0];
     }
   }
 
@@ -877,6 +940,34 @@ function _selectBestMove(unit: Unit, target: Unit, possibleMoves: Position[], gr
   }
 
   const isStuck = (unit.stuckTurns || 0) >= 3;
+
+  // Lane discipline: before generic pathing, try to advance straight in the spawn column.
+  // Skip if we already have a move that reaches an attack position (handled below).
+  if (isLaneActive(unit) && !isStuck) {
+    const tol = laneToleranceFor(unit.type);
+    const fwd = forwardSign(unit.team);
+    const reachesAttack = possibleMoves.some(p => couldAttackFrom(p, unit.type, target));
+    if (!reachesAttack) {
+      const laneMoves = possibleMoves.filter(p =>
+        Math.abs(p.col - unit.laneCol!) <= tol &&
+        Math.sign(p.row - unit.row) === fwd
+      );
+      if (laneMoves.length > 0) {
+        laneMoves.sort((a, b) => {
+          const sideA = Math.abs(a.col - unit.laneCol!);
+          const sideB = Math.abs(b.col - unit.laneCol!);
+          if (sideA !== sideB) return sideA - sideB;
+          // then prefer most-forward
+          return fwd * (a.row - b.row) * -1;
+        });
+        unit.laneStuckTicks = 0;
+        return laneMoves[0];
+      }
+      unit.laneStuckTicks = (unit.laneStuckTicks ?? 0) + 1;
+      if (unit.laneStuckTicks >= 4) unit.laneBroken = true;
+    }
+  }
+
 
   const attackMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
   if (attackMoves.length > 0) {
