@@ -1469,7 +1469,7 @@ export function leaveArsonistTrail(grid: Cell[][], unit: Unit): void {
   if (unit.type !== 'arsonist') return;
   const cell = grid[unit.row]?.[unit.col];
   if (!cell || cell.terrain === 'water') return;
-  cell.lavaTicks = 3;
+  cell.lavaTicks = 6;
   cell.lavaOwnerTeam = unit.team;
 }
 
