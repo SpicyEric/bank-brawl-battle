@@ -29,6 +29,7 @@ const App = () => (
           <Route path="/roster" element={<UnitRoster />} />
           <Route path="/multiplayer" element={<Multiplayer />} />
           <Route path="/admin" element={<AdminIcons />} />
+          <Route path="/simulator" element={<Simulator />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
