@@ -1658,7 +1658,8 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
   ];
   for (const c of cloners) {
     if ((c.clonesSpawnedTotal ?? 0) >= 3) continue; // lifetime limit reached
-    if (c.cloneTimer === undefined || c.cloneTimer <= 0) c.cloneTimer = 6;
+    // First call: timer undefined → spawn immediately (this tick). Subsequent spawns every 6 ticks.
+    if (c.cloneTimer === undefined) c.cloneTimer = 1;
     c.cloneTimer -= 1;
     if (c.cloneTimer > 0) continue;
     let didSpawn = false;
@@ -1671,8 +1672,8 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
         ...c,
         id: crypto.randomUUID(),
         row: r, col,
-        hp: 6,
-        maxHp: 6,
+        hp: 12,
+        maxHp: 12,
         attack: 6,
         isClone: true,
         parentClonerId: c.id,
