@@ -549,8 +549,39 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
 
     // --- Dragon fire-spin: per-tick 3-cell beam, cells ignite one after another ---
+    // If a custom effect animation is assigned to the dragon, replace the rotating
+    // per-cell flames with ONE big one-shot animation centered on the dragon.
+    const dragonAnimFile = getAnimation('dragon');
+    const dragonAnimEntry = getAnimationEntry(dragonAnimFile);
+    const animSpawnedFor = new Set<string>(); // one big anim per attacker per tick
     for (const evt of events) {
       if (evt.type !== 'dragonSpin') continue;
+
+      if (dragonAnimEntry) {
+        // Spawn one big animation centered on the dragon, once per tick batch.
+        if (!animSpawnedFor.has(evt.attackerId)) {
+          animSpawnedFor.add(evt.attackerId);
+          dragonAnimCounter.current += 1;
+          const anim = {
+            id: `dragonAnim-${dragonAnimCounter.current}`,
+            row: evt.attackerRow,
+            col: evt.attackerCol,
+            file: dragonAnimEntry.f,
+          };
+          const baseDelay = delayFor(evt.attackerId);
+          setTimeout(() => {
+            setDragonAnims(prev => [...prev, anim]);
+            // Auto-remove after one full play (cols / fps). Use ~1100ms safe upper bound.
+            setTimeout(() => {
+              setDragonAnims(prev => prev.filter(a => a.id !== anim.id));
+            }, 1200);
+          }, baseDelay);
+        }
+        // Skip per-cell sequential flame rendering when custom anim is used.
+        continue;
+      }
+
+      // Fallback: original per-cell rotating flames
       const cells = evt.spinCells || [];
       const beamOrder = evt.spinBeamOrder ?? 0;
       const BEAM_GAP = 70; // ms between consecutive beams
