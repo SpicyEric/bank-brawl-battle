@@ -285,8 +285,8 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   mage: {
     label: 'Magier',
     emoji: '🔮',
-    hp: 85,
-    attack: 25,
+    hp: 75,
+    attack: 22,
     cooldown: 2,
     description: 'Versteckt sich hinter Verbündeten. Greift diagonal 1-3 Felder an. Alle 7 Ticks: Impulswelle stößt alle Feinde im 7×7-Umkreis nach außen.',
     movePattern: ALL_ADJACENT,
@@ -413,14 +413,14 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   mountaineer: {
-    label: 'Bergkrieger', emoji: '🪨', hp: 130, attack: 26, cooldown: 3,
+    label: 'Bergkrieger', emoji: '🪨', hp: 130, attack: 26, cooldown: 2,
     description: 'Strebt zwanghaft auf den nächsten Hügel und belagert ihn. Auf Hügel: Cooldown 2, immun gegen Einfrieren und Feuerschaden. Wechselt nach 4 Idle-Ticks zu einem neuen Hügel.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
   cloner: {
-    label: 'Kloner', emoji: '🧬', hp: 90, attack: 12, cooldown: 2,
+    label: 'Kloner', emoji: '🧬', hp: 90, attack: 16, cooldown: 2,
     description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt ersten Klon sofort, danach alle 6 Ticks (max. 3 Klone). Klone: 12 HP, 6 ATK.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
@@ -452,7 +452,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   doppelganger: {
-    label: 'Doppelgänger', emoji: '👥', hp: 85, attack: 17, cooldown: 2,
+    label: 'Doppelgänger', emoji: '👥', hp: 85, attack: 19, cooldown: 2,
     description: 'Spawnt zu Rundenstart ein lila leuchtendes Phantom (80 HP, 5 Dmg, 5 Ticks unverwundbar) irgendwo in den 3 Gegnerlinien. Original kämpft normal weiter.',
     movePattern: DIAGONAL,
     attackPattern: DIAGONAL,
@@ -474,7 +474,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   chaindancer: {
-    label: 'Kettentänzer', emoji: '🪢', hp: 75, attack: 22, cooldown: 3,
+    label: 'Kettentänzer', emoji: '🪢', hp: 75, attack: 22, cooldown: 2,
     description: 'Kettenangriff: Schaden springt diagonal durch bis zu 3 Feinde (jeweils 70% Schaden). Diagonale Bewegung bis 2 Felder.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
@@ -482,7 +482,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   // ===== NEW UNITS v3 =====
   bomber: {
-    label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 0, cooldown: 4,
+    label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 0, cooldown: 5,
     description: 'Bewegt sich in alle 8 Richtungen (1 Feld). Greift nicht direkt an. Alle 4 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (30 Dmg, 3×3). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
     movePattern: ALL_ADJACENT,
     attackPattern: [], // never attacks directly
