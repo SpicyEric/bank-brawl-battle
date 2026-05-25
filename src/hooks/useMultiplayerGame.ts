@@ -798,6 +798,37 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       const logs: string[] = [];
       const events: BattleEvent[] = [];
+
+      // === Burn DoT (Arsonist) ===
+      for (const u of allUnits) {
+        if (!u.burning || u.burning.length === 0 || u.hp <= 0) continue;
+        if (isImmuneToFire(u, newGrid)) { u.burning = []; continue; }
+        let totalBurn = 0;
+        u.burning = u.burning.filter(b => { totalBurn += b.dmg; b.turns -= 1; return b.turns > 0; });
+        if (totalBurn > 0) {
+          u.hp = Math.max(0, u.hp - totalBurn);
+          logs.push(`🔥 ${UNIT_DEFS[u.type].emoji} brennt: -${totalBurn} ❤️${u.hp <= 0 ? ' ☠️' : ''}`);
+          if (u.hp <= 0) (u as any).dead = true;
+        }
+      }
+      // === Bleed DoT (Vampir) ===
+      for (const u of allUnits) {
+        if (!u.bleeding || u.bleeding.length === 0 || u.hp <= 0 || u.dead) continue;
+        const tick = u.bleeding.shift()!;
+        if (tick > 0) {
+          u.hp = Math.max(0, u.hp - tick);
+          logs.push(`🩸 ${UNIT_DEFS[u.type].emoji} blutet: -${tick} ❤️${u.hp <= 0 ? ' ☠️' : ''}`);
+          if (u.hp <= 0) (u as any).dead = true;
+        }
+        if (u.bleeding.length === 0) u.bleeding = undefined;
+      }
+
+      // Lava field DoT (Vulkanit)
+      processLavaTick(newGrid, logs);
+      // Banshee ghost tick
+      processGhostTick(allUnits, newGrid, logs);
+      // Doppelganger phantom timers
+      tickPhantomTimers(allUnits, newGrid, logs);
       // Cloner: spawn clones every 6 ticks (max 3 lifetime)
       tickClonerSpawns(allUnits, newGrid, logs);
       // Mage impulse: every 7 ticks push enemies in 7x7 outward
@@ -813,6 +844,14 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       tickDragonSpin(allUnits, newGrid, events, logs);
       // Terrain regen: waterwalker heals on water
       tickTerrainHeals(allUnits, newGrid, logs);
+      // Obelisk aura/beam (refresh buffs each tick)
+      tickObeliskAura(allUnits, newGrid, events, logs);
+      // Bomber places bombs / hails on enemies
+      tickBomberActions(allUnits, newGrid, events, logs);
+      // Bomb fuses count down and detonate
+      tickBombFuses(newGrid, allUnits, events, logs);
+      // Shadowpriest soul harvest
+      tickShadowpriestHarvest(allUnits, newGrid, logs);
       const currentTurn = turnCount;
       const acting = allUnits.filter(u => {
         if (u.hp <= 0) return false;
