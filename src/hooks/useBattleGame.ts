@@ -339,6 +339,78 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     aiSacrificeUsed.current = false;
   }, []);
 
+  // Wire startBattle into the forward-ref so confirmPlacement can call it
+  useEffect(() => { startBattleRef.current = startBattle; }, [startBattle]);
+
+  // === AI drip-placement (Eliminations-Modus) ===========================
+  // When entering placement, AI spawns its 9 units randomly across the upper
+  // half over the first 10s. Player sees them appear live and has the rest
+  // of the 30s to react & adjust.
+  useEffect(() => {
+    if (phase !== 'place_player') return;
+    if (aiDripStartedRef.current) return;
+    if (enemyUnits.length > 0) return; // already filled (e.g. tutorial pre-fill)
+    aiDripStartedRef.current = true;
+
+    // Plan placements once (random pass: difficulty 1 path → pure random)
+    const planned = generateAIPlacement([], enemyMaxUnits, grid, 1, enemyBannedUnits);
+    const count = planned.length;
+    if (count === 0) return;
+    const totalDripMs = 10000; // place all within first 10 seconds
+    const stepMs = Math.max(150, Math.floor(totalDripMs / count));
+
+    planned.forEach((p, idx) => {
+      const t = setTimeout(() => {
+        setEnemyUnits(prev => {
+          if (prev.find(u => u.row === p.row && u.col === p.col)) return prev;
+          const u = createUnit(p.type, 'enemy', p.row, p.col);
+          setGrid(g => {
+            if (g[p.row]?.[p.col]?.unit) return g; // occupied (terrain or race)
+            const next = g.map(r => r.map(c => ({ ...c })));
+            next[p.row][p.col] = { ...next[p.row][p.col], unit: u };
+            return next;
+          });
+          return [...prev, u];
+        });
+      }, idx * stepMs);
+      aiDripTimeoutsRef.current.push(t);
+    });
+
+    return () => {
+      // Don't cancel on every render; only on phase exit which is handled below.
+    };
+  }, [phase, enemyMaxUnits, enemyBannedUnits, difficulty]);
+
+  // Reset AI-drip flag when leaving placement (so a new match drips again)
+  useEffect(() => {
+    if (phase !== 'place_player') {
+      // Clear any pending drips
+      for (const t of aiDripTimeoutsRef.current) clearTimeout(t);
+      aiDripTimeoutsRef.current = [];
+    }
+  }, [phase]);
+
+  // === Eliminations-Win: force game-over after the single round ============
+  // The existing battleTick sets phase to round_won / round_lost / round_draw
+  // and increments score by 1. In the new single-match flow we instantly
+  // promote that to a final game-over by maxing the score.
+  useEffect(() => {
+    if (phase === 'round_won' && playerScoreRef.current < POINTS_TO_WIN) {
+      playerScoreRef.current = POINTS_TO_WIN;
+      setPlayerScore(POINTS_TO_WIN);
+    } else if (phase === 'round_lost' && enemyScoreRef.current < POINTS_TO_WIN) {
+      enemyScoreRef.current = POINTS_TO_WIN;
+      setEnemyScore(POINTS_TO_WIN);
+    } else if (phase === 'round_draw') {
+      // Eliminations-Draw: beide max → game_draw via checkGameOver
+      playerScoreRef.current = POINTS_TO_WIN;
+      enemyScoreRef.current = POINTS_TO_WIN;
+      setPlayerScore(POINTS_TO_WIN);
+      setEnemyScore(POINTS_TO_WIN);
+    }
+  }, [phase]);
+
+
   // Activate morale boost
   const activateMoraleBoost = useCallback(() => {
     if (moraleBoostUsed || phase !== 'battle') return;
