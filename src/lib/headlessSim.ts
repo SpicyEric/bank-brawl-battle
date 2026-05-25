@@ -108,28 +108,44 @@ function getOpenCells(rows: number[], grid: Cell[][]): { row: number; col: numbe
 export type TeamMode = 'random' | 'pure' | 'roster';
 
 export interface SimOptions {
-  teamSize?: number;          // units per side per battle (default 5)
-  mode?: TeamMode;            // how to assemble teams (default 'random')
-  rosterP1?: UnitType[];      // for 'roster' mode
+  teamSize?: number;          // units actually placed on the board (default 5)
+  rosterSize?: number;        // roster pool per side, drawn WITH replacement (default 9)
+  mode?: TeamMode;
+  rosterP1?: UnitType[];
   rosterP2?: UnitType[];
-  pureType?: UnitType;        // for 'pure' mode (one side); other side is random
-  /** Called periodically with progress 0..1 */
+  pureType?: UnitType;
+  /** Guarantee at least one mono-vs-random battle per unit type at the start. */
+  monoSweep?: boolean;
   onProgress?: (done: number, total: number) => void;
-  /** Yield to UI every N battles */
   yieldEvery?: number;
 }
 
-// Build one team of `n` units of the requested mode.
+// Draw a roster WITH replacement → matches the in-game picker where the
+// same unit can be chosen multiple times (e.g. 3 archers in a 9-slot roster).
+function drawRoster(n: number): UnitType[] {
+  const out: UnitType[] = [];
+  for (let i = 0; i < n; i++) out.push(UNIT_TYPES[Math.floor(Math.random() * UNIT_TYPES.length)]);
+  return out;
+}
+
+// Pick `k` of the roster slots (without re-using a slot), so duplicates in the
+// roster naturally propagate to the placed team.
+function pickFromRoster(roster: UnitType[], k: number): UnitType[] {
+  const idx = shuffle(roster.map((_, i) => i)).slice(0, Math.min(k, roster.length));
+  return idx.map(i => roster[i]);
+}
+
 function buildTeams(opts: SimOptions): { p1: UnitType[]; p2: UnitType[] } {
   const n = opts.teamSize ?? 5;
+  const rSize = opts.rosterSize ?? 9;
   const mode = opts.mode ?? 'random';
   if (mode === 'pure' && opts.pureType) {
-    return { p1: Array.from({ length: n }, () => opts.pureType!), p2: pickN(UNIT_TYPES, n) };
+    return { p1: Array.from({ length: n }, () => opts.pureType!), p2: pickFromRoster(drawRoster(rSize), n) };
   }
   if (mode === 'roster' && opts.rosterP1 && opts.rosterP2) {
-    return { p1: pickN(opts.rosterP1, n), p2: pickN(opts.rosterP2, n) };
+    return { p1: pickFromRoster(opts.rosterP1, n), p2: pickFromRoster(opts.rosterP2, n) };
   }
-  return { p1: pickN(UNIT_TYPES, n), p2: pickN(UNIT_TYPES, n) };
+  return { p1: pickFromRoster(drawRoster(rSize), n), p2: pickFromRoster(drawRoster(rSize), n) };
 }
 
 interface BattleResult {
