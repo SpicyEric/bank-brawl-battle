@@ -1592,7 +1592,8 @@ export function processGhostTick(_units: Unit[], grid: Cell[][], logs: string[])
     u.reviveIn -= 1;
     if (u.reviveIn <= 0) {
       u.reviveIn = undefined;
-      u.hp = 40;
+      u.hp = 70;
+      u.maxHp = 70;
       u.attack = 10;
       (u as any).dead = false;
       u.bansheeRevived = true;
