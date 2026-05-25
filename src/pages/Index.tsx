@@ -98,6 +98,33 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
   const [matchId, setMatchId] = useState(0);
   const prevGameOver = useRef(game.gameOver);
 
+  // Aura zones (loaded once from DB), recomputed overlay each render based on placed units
+  const [auraZones, setAuraZones] = useState<import('@/lib/auraData').AuraZoneMap>({});
+  useEffect(() => {
+    let cancelled = false;
+    import('@/lib/auraData').then(m => m.loadAuraData()).then(({ zones }) => {
+      if (!cancelled) setAuraZones(zones);
+    });
+    return () => { cancelled = true; };
+  }, []);
+  const auraOverlay = useMemo(() => {
+    if (game.phase !== 'place_player' && game.phase !== 'battle') return undefined;
+    const all = [...(game.playerUnits ?? []), ...(game.enemyUnits ?? [])];
+    return computeAuraOverlay(all, auraZones);
+  }, [game.playerUnits, game.enemyUnits, game.phase, auraZones]);
+
+  // Formation selection (combat-phase: tap own unit → select formation → tap adjacent cell → move)
+  const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null);
+  const selectedFormationCells = useMemo(() => {
+    if (!selectedFormationId || game.phase !== 'battle') return undefined;
+    const all = [...(game.playerUnits ?? []), ...(game.enemyUnits ?? [])];
+    const grp = findFormationContaining(all, selectedFormationId);
+    if (!grp) return undefined;
+    return new Set(grp.map(u => `${u.row}-${u.col}`));
+  }, [selectedFormationId, game.playerUnits, game.enemyUnits, game.phase]);
+  useEffect(() => { if (game.phase !== 'battle') setSelectedFormationId(null); }, [game.phase]);
+
+
   // New match = transition out of gameOver back into placement (resetGame), or mount of multiplayer
   useEffect(() => {
     if (prevGameOver.current && !game.gameOver) {
