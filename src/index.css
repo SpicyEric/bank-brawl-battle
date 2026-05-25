@@ -752,3 +752,46 @@
   /* outer ring is slightly cooler/softer to read as the trailing wave */
   filter: brightness(0.95) saturate(1.05);
 }
+
+/* === v3 unit overlays === */
+
+/* Bomb pulse on cell (gentle yellow → red as it counts down) */
+@keyframes bomb-pulse-anim {
+  0%, 100% { filter: drop-shadow(0 0 4px hsl(45 100% 55% / 0.7)) drop-shadow(0 0 8px hsl(15 95% 55% / 0.55)); transform: scale(1); }
+  50%      { filter: drop-shadow(0 0 8px hsl(15 100% 55% / 0.95)) drop-shadow(0 0 14px hsl(0 95% 50% / 0.8)); transform: scale(1.08); }
+}
+.cell-bomb-pulse { animation: bomb-pulse-anim 0.65s ease-in-out infinite; }
+
+/* Obelisk plus aura – soft white/gold pulse */
+@keyframes obelisk-aura-anim {
+  0%, 100% { background: radial-gradient(circle, hsl(50 95% 75% / 0.22), hsl(50 95% 70% / 0.08) 70%, transparent); box-shadow: inset 0 0 10px hsl(50 95% 80% / 0.35); }
+  50%      { background: radial-gradient(circle, hsl(50 100% 80% / 0.38), hsl(50 95% 70% / 0.14) 70%, transparent); box-shadow: inset 0 0 14px hsl(50 100% 85% / 0.55); }
+}
+.cell-obelisk-aura { animation: obelisk-aura-anim 1.6s ease-in-out infinite; }
+
+/* Obelisk beam – stronger glow during the 2-tick beam burst */
+@keyframes obelisk-beam-anim {
+  0%, 100% { background: linear-gradient(135deg, hsl(50 100% 75% / 0.45), hsl(40 100% 60% / 0.30)); box-shadow: inset 0 0 16px hsl(50 100% 80% / 0.85), 0 0 10px hsl(45 100% 65% / 0.6); }
+  50%      { background: linear-gradient(135deg, hsl(50 100% 85% / 0.65), hsl(40 100% 65% / 0.45)); box-shadow: inset 0 0 22px hsl(50 100% 90% / 1), 0 0 14px hsl(45 100% 70% / 0.85); }
+}
+.cell-obelisk-beam { animation: obelisk-beam-anim 0.5s ease-in-out infinite; }
+
+/* Obelisk buff on units – subtle golden halo */
+.cell-obelisk-buff {
+  background: radial-gradient(circle, hsl(50 100% 75% / 0.20), transparent 70%);
+  box-shadow: inset 0 0 8px hsl(50 100% 80% / 0.50), 0 0 6px hsl(50 100% 65% / 0.40);
+}
+
+/* Curse stacks 1–2: dim purple ring */
+@keyframes curse-pulse {
+  0%, 100% { background: radial-gradient(circle, hsl(280 70% 35% / 0.30), transparent 75%); box-shadow: inset 0 0 8px hsl(280 80% 45% / 0.5); }
+  50%      { background: radial-gradient(circle, hsl(280 80% 40% / 0.45), transparent 75%); box-shadow: inset 0 0 12px hsl(280 90% 55% / 0.7); }
+}
+.cell-cursed { animation: curse-pulse 1.4s ease-in-out infinite; }
+
+/* Curse triggered (3 stacks) – intense violet aura */
+@keyframes curse-pulse-strong {
+  0%, 100% { background: radial-gradient(circle, hsl(285 90% 40% / 0.55), hsl(270 80% 30% / 0.25) 70%, transparent); box-shadow: inset 0 0 14px hsl(285 95% 55% / 0.9), 0 0 8px hsl(280 90% 45% / 0.6); }
+  50%      { background: radial-gradient(circle, hsl(285 100% 50% / 0.75), hsl(270 90% 35% / 0.35) 70%, transparent); box-shadow: inset 0 0 20px hsl(290 100% 65% / 1), 0 0 12px hsl(285 95% 50% / 0.85); }
+}
+.cell-cursed-3 { animation: curse-pulse-strong 0.9s ease-in-out infinite; }
