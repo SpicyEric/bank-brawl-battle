@@ -39,14 +39,16 @@ function getDeterministicFirstPlacer(roomId: string, roundNumber: number): 1 | 2
 }
 
 export function useMultiplayerGame(config: MultiplayerConfig) {
-  const { roomId, role } = config;
+  const { roomId, role, roster } = config;
+  const hasRoster = !!(roster && roster.length === 9);
   const isHost = role === 'player1';
   const myRows = isHost ? PLAYER_ROWS : ENEMY_ROWS;
   const myTeam = isHost ? 'player' as const : 'enemy' as const;
 
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
-  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>('warrior');
+  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(hasRoster ? roster![0] : 'warrior');
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(hasRoster ? 0 : null);
   const [playerUnits, setPlayerUnits] = useState<Unit[]>([]);
   const [enemyUnits, setEnemyUnits] = useState<Unit[]>([]);
   const [turnCount, setTurnCount] = useState(0);
