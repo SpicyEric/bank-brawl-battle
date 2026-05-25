@@ -1400,7 +1400,7 @@ function _applyAuraClustering(
       const [ar, ac] = key.split(',').map(Number);
       for (const [dr, dc] of ADJ) {
         const r = ar + dr, c = ac + dc;
-        if (r < 0 || r > 2 || c < 0 || c >= GRID_SIZE) continue;
+        if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
         const k2 = `${r},${c}`;
         if (usedCells.has(k2)) continue;
         if (currentGrid && currentGrid[r]?.[c]?.terrain === 'water') continue;
@@ -1444,7 +1444,7 @@ function _applyTankBondFormation(
       for (const offset of adjacentOffsets) {
         const r = tank.row + offset.row;
         const c = tank.col + offset.col;
-        if (r < 0 || r > 2 || c < 0 || c >= GRID_SIZE) continue; // enemy rows 0-2
+        if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
         const key = `${r},${c}`;
         if (usedCells.has(key) && !(r === unit.row && c === unit.col)) continue;
         if (currentGrid && currentGrid[r]?.[c]?.terrain === 'water') continue;
