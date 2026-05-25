@@ -323,7 +323,9 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               const canPlace = roster
                 ? (game.selectedSlot !== null && !game.placedSlots?.includes(game.selectedSlot) && !game.playerBannedSlots?.includes(game.selectedSlot))
                 : !!game.selectedUnit;
-              if (canPlace && !game.grid[row][col].unit && game.grid[row][col].terrain !== 'water') {
+              const existing = game.grid[row][col].unit;
+              const cellBlocked = (existing && existing.team === 'player') || game.grid[row][col].terrain === 'water';
+              if (canPlace && !cellBlocked) {
                 const type = roster && game.selectedSlot !== null ? roster[game.selectedSlot] : game.selectedUnit;
                 game.placeUnit(row, col);
                 sfxPlace();
