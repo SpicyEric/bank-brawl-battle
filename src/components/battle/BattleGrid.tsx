@@ -709,7 +709,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {isImpact && <div className="placement-impact" />}
               {/* Terrain emoji (show when no unit or unit is dead) */}
               {hasTerrain && (!unit || isDead) && (
-                <span className="text-[10px] opacity-50 select-none">{terrain === 'forest' && battlefield.id === 'desert' ? '🌵' : TERRAIN_DEFS[terrain].emoji}</span>
+                <span className="text-base select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{terrain === 'forest' && battlefield.id === 'desert' ? '🌵' : TERRAIN_DEFS[terrain].emoji}</span>
               )}
               {isDead && (
                 <span className="text-sm opacity-40 select-none">💀</span>
