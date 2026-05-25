@@ -941,6 +941,34 @@ function _selectBestMove(unit: Unit, target: Unit, possibleMoves: Position[], gr
 
   const isStuck = (unit.stuckTurns || 0) >= 3;
 
+  // Lane discipline: before generic pathing, try to advance straight in the spawn column.
+  // Skip if we already have a move that reaches an attack position (handled below).
+  if (isLaneActive(unit) && !isStuck) {
+    const tol = laneToleranceFor(unit.type);
+    const fwd = forwardSign(unit.team);
+    const reachesAttack = possibleMoves.some(p => couldAttackFrom(p, unit.type, target));
+    if (!reachesAttack) {
+      const laneMoves = possibleMoves.filter(p =>
+        Math.abs(p.col - unit.laneCol!) <= tol &&
+        Math.sign(p.row - unit.row) === fwd
+      );
+      if (laneMoves.length > 0) {
+        laneMoves.sort((a, b) => {
+          const sideA = Math.abs(a.col - unit.laneCol!);
+          const sideB = Math.abs(b.col - unit.laneCol!);
+          if (sideA !== sideB) return sideA - sideB;
+          // then prefer most-forward
+          return fwd * (a.row - b.row) * -1;
+        });
+        unit.laneStuckTicks = 0;
+        return laneMoves[0];
+      }
+      unit.laneStuckTicks = (unit.laneStuckTicks ?? 0) + 1;
+      if (unit.laneStuckTicks >= 4) unit.laneBroken = true;
+    }
+  }
+
+
   const attackMoves = possibleMoves.filter(pos => couldAttackFrom(pos, unit.type, target));
   if (attackMoves.length > 0) {
     if (!isStuck) {
