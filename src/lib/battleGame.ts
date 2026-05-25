@@ -463,9 +463,32 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
   },
+  // ===== NEW UNITS v3 =====
+  bomber: {
+    label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 0, cooldown: 3,
+    description: 'Bewegt sich in alle 8 Richtungen (1 Feld). Greift nicht direkt an. Alle 3 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (35 Dmg, 3×3). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
+    movePattern: ALL_ADJACENT,
+    attackPattern: [], // never attacks directly
+    strongVs: [], weakVs: [],
+  },
+  obelisk: {
+    label: 'Obelisk', emoji: '🗿', hp: 150, attack: 0, cooldown: 0,
+    description: 'Steht still. Adjacent (Plus) Verbündete dauerhaft gebufft: +30% Schaden & Cooldown 1. Alle 3 Ticks für 2 Ticks: Strahl in 4 Richtungen über das ganze Feld – buff alle getroffenen Verbündeten.',
+    movePattern: [],
+    attackPattern: [],
+    strongVs: [], weakVs: [],
+  },
+  shadowpriest: {
+    label: 'Schattenpriester', emoji: '🕯️', hp: 80, attack: 10, cooldown: 3,
+    description: 'Bewegt sich diagonal (1 Feld), greift orthogonal bis 2 Felder an. Jeder Treffer legt einen Fluch-Stack. Bei 3 Stacks: Ziel verliert sofort 30% HP, dauerhaft −50% Schaden & nicht mehr heilbar. Alle 8 Ticks: +5 ATK pro verfluchtem Gegner (Cooldown senkt sich auf 2).',
+    movePattern: DIAGONAL,
+    attackPattern: [
+      ...ORTHOGONAL,
+      { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
+    ],
+    strongVs: [], weakVs: [],
+  },
 };
-
-// Auto-populate strongVs/weakVs for ALL units based on color group (RPS).
 {
   const colorMembers: Record<ColorGroup, UnitType[]> = { red: [], green: [], blue: [] };
   (Object.keys(UNIT_COLOR_GROUPS) as UnitType[]).forEach(t => colorMembers[UNIT_COLOR_GROUPS[t]].push(t));
