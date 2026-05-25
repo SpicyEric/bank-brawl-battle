@@ -2484,12 +2484,13 @@ export function tickBomberActions(
     // Place timer
     if (b.bombPlaceTimer === undefined) b.bombPlaceTimer = 3;
     b.bombPlaceTimer -= 1;
-    if (b.bombPlaceTimer <= 0) {
-      b.bombPlaceTimer = 3;
+    const buffed = (b.obeliskBuff || 0) > 0;
+    if (b.bombPlaceTimer <= 0 || buffed) {
+      if (!buffed) b.bombPlaceTimer = 3;
       const cell = grid[b.row]?.[b.col];
       if (cell && !cell.bomb) {
         cell.bomb = { fuse: 2, dmg: 35, ownerTeam: b.team };
-        logs.push(`💣 Sprengmeister legt eine Bombe`);
+        logs.push(`💣 Sprengmeister legt eine Bombe${buffed ? ' (Obelisk-Buff)' : ''}`);
       }
     }
     // Special timer
