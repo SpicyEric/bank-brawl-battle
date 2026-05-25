@@ -617,6 +617,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       tickDragonSpin(allUnits, newGrid, events, logs);
       // === Terrain regen: waterwalker heals on water ===
       tickTerrainHeals(allUnits, newGrid, logs);
+      // === v3: Obelisk aura/beam (refresh buffs each tick) ===
+      tickObeliskAura(allUnits, newGrid, events, logs);
+      // === v3: Bomber places bombs / hails on enemies ===
+      tickBomberActions(allUnits, newGrid, events, logs);
+      // === v3: Bomb fuses count down and detonate ===
+      tickBombFuses(newGrid, allUnits, events, logs);
+      // === v3: Shadowpriest soul harvest ===
+      tickShadowpriestHarvest(allUnits, newGrid, logs);
 
 
 
