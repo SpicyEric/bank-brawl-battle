@@ -795,6 +795,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           // Track last attacked target (used by targeting logic: lock-on for warrior/stormrunner/archer, switch for rider/assassin/frost/mage)
           unit.lastAttackedId = target.id;
 
+          // Shadowpriest: stack curse on target (3 stacks → 30% HP burst + −50% ATK + unhealable)
+          if (unit.type === 'shadowpriest' && target.hp > 0) {
+            applyShadowpriestCurse(unit, target, logs, events);
+          }
+
           // Frost: 50% chance to freeze target for 3 ticks at 50% damage (skip immune)
           let didFreeze = false;
           if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(target, newGrid)) {
