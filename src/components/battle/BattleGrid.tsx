@@ -143,64 +143,73 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     prevSacrifice.current = !!sacrificeFlash;
   }, [sacrificeFlash]);
 
-  // Flash effect for attack + move pattern on placement (impact)
-  const [moveFlashCells, setMoveFlashCells] = useState<Set<string>>(new Set());
+  // Brief one-shot aura pulse after placing a unit (replaces old attack/move flash)
+  const [placementPulse, setPlacementPulse] = useState<Map<string, 'buff' | 'nerf'>>(new Map());
   const [impactCell, setImpactCell] = useState<string | null>(null);
   useEffect(() => {
     if (!lastPlaced) return;
-    const def = UNIT_DEFS[lastPlaced.type];
-    const atk = new Set<string>();
-    const mv = new Set<string>();
-    for (const p of def.attackPattern) {
-      const r = lastPlaced.row + p.row;
-      const c = lastPlaced.col + p.col;
-      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) atk.add(`${r}-${c}`);
-    }
-    for (const p of def.movePattern) {
-      const r = lastPlaced.row + p.row;
-      const c = lastPlaced.col + p.col;
-      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) mv.add(`${r}-${c}`);
-    }
-    setFlashCells(atk);
-    setMoveFlashCells(mv);
+    const cells = auraZones
+      ? (async () => import('@/lib/auraData').then(m => m.auraCellsAround(lastPlaced.type, lastPlaced.row, lastPlaced.col, auraZones)))()
+      : null;
+    // Compute synchronously (auraZones already a plain map)
+    const sync = auraZones
+      ? (() => {
+          const out = new Map<string, 'buff' | 'nerf'>();
+          const z = auraZones[lastPlaced.type];
+          if (!z) return out;
+          const DELTA: Record<string, [number, number]> = {
+            'top-left': [-1,-1], 'top': [-1,0], 'top-right': [-1,1],
+            'left': [0,-1], 'right': [0,1],
+            'bottom-left': [1,-1], 'bottom': [1,0], 'bottom-right': [1,1],
+          };
+          for (const pos of Object.keys(DELTA)) {
+            const kind = (z as any)[pos];
+            if (!kind) continue;
+            const [dr, dc] = DELTA[pos];
+            const r = lastPlaced.row + dr;
+            const c = lastPlaced.col + dc;
+            if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+            out.set(`${r}-${c}`, kind);
+          }
+          return out;
+        })()
+      : new Map<string, 'buff' | 'nerf'>();
+    setPlacementPulse(sync);
     setImpactCell(`${lastPlaced.row}-${lastPlaced.col}`);
     if (flashTimer.current) clearTimeout(flashTimer.current);
     flashTimer.current = setTimeout(() => {
-      setFlashCells(new Set());
-      setMoveFlashCells(new Set());
+      setPlacementPulse(new Map());
       setImpactCell(null);
     }, 750);
-  }, [lastPlaced]);
+    void cells;
+  }, [lastPlaced, auraZones]);
 
-  // Alternating attack/move blink while dragging a unit over a cell
-  const [dragBlinkMode, setDragBlinkMode] = useState<'attack' | 'move'>('attack');
-  useEffect(() => {
-    if (!dragPreview) { setDragBlinkMode('attack'); return; }
-    setDragBlinkMode('attack');
-    const id = setInterval(() => {
-      setDragBlinkMode(m => (m === 'attack' ? 'move' : 'attack'));
-    }, 450);
-    return () => clearInterval(id);
-  }, [dragPreview]);
-
-  // Compute drag preview cells (attack vs move pattern around the hovered cell)
-  let dragAttackCells = new Set<string>();
-  let dragMoveCells = new Set<string>();
+  // Compute drag preview aura cells (shown while a unit is being dragged over a cell)
+  let dragAuraCells = new Map<string, 'buff' | 'nerf'>();
   let dragOriginKey: string | null = null;
-  if (dragPreview) {
-    const def = UNIT_DEFS[dragPreview.type];
+  if (dragPreview && auraZones) {
     dragOriginKey = `${dragPreview.row}-${dragPreview.col}`;
-    for (const p of def.attackPattern) {
-      const r = dragPreview.row + p.row;
-      const c = dragPreview.col + p.col;
-      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) dragAttackCells.add(`${r}-${c}`);
+    const z = auraZones[dragPreview.type];
+    if (z) {
+      const DELTA: Record<string, [number, number]> = {
+        'top-left': [-1,-1], 'top': [-1,0], 'top-right': [-1,1],
+        'left': [0,-1], 'right': [0,1],
+        'bottom-left': [1,-1], 'bottom': [1,0], 'bottom-right': [1,1],
+      };
+      for (const pos of Object.keys(DELTA)) {
+        const kind = (z as any)[pos];
+        if (!kind) continue;
+        const [dr, dc] = DELTA[pos];
+        const r = dragPreview.row + dr;
+        const c = dragPreview.col + dc;
+        if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+        dragAuraCells.set(`${r}-${c}`, kind);
+      }
     }
-    for (const p of def.movePattern) {
-      const r = dragPreview.row + p.row;
-      const c = dragPreview.col + p.col;
-      if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) dragMoveCells.add(`${r}-${c}`);
-    }
+  } else if (dragPreview) {
+    dragOriginKey = `${dragPreview.row}-${dragPreview.col}`;
   }
+
 
   // Detect unit movements
   useEffect(() => {
