@@ -247,9 +247,7 @@ function simulateOneBattle(p1Types: UnitType[], p2Types: UnitType[]): BattleResu
     for (const unit of acting) {
       if (unit.hp <= 0) continue;
       if (unit.type === 'dragon' && (unit.spinTicksLeft ?? 0) > 0) continue;
-      if (unit.type === 'doppelganger' && !unit.isPhantom && unit.phantomId) {
-        if (allUnits.some(u => u.id === unit.phantomId && !u.dead && u.hp > 0)) continue;
-      }
+      // Doppelganger original: stays active (no idle gate).
       if (unit.webbed && unit.webbed > 0) { unit.webbed -= 1; continue; }
 
       const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
@@ -270,7 +268,18 @@ function simulateOneBattle(p1Types: UnitType[], p2Types: UnitType[]): BattleResu
 
       // Shadowblade custom teleport-strike
       if (unit.type === 'shadowblade' && !isFrozenNow) {
-        handleShadowbladeTick(unit, allUnits, grid, events, logs, (_atk, _tgt, dmg) => dmg);
+        handleShadowbladeTick(unit, allUnits, grid, events, logs, (atk, tgt, dmg) => {
+          const applied = Math.min(dmg, tgt.hp);
+          if (applied > 0) {
+            ensureStats(atk.id).damageDealt += applied;
+            ensureStats(tgt.id).damageTaken += applied;
+            if (tgt.hp - applied <= 0) {
+              ensureStats(tgt.id).died = true;
+              ensureStats(atk.id).kills += 1;
+            }
+          }
+          return dmg;
+        });
         continue;
       }
 
@@ -373,7 +382,7 @@ function simulateOneBattle(p1Types: UnitType[], p2Types: UnitType[]): BattleResu
 
         // Lightning chain
         if (unit.type === 'lightning') {
-          const hopMults = [0.5, 0.4, 0.3, 0.2, 0.1];
+          const hopMults = [0.3, 0.2, 0.15, 0.1, 0.05];
           const hit = new Set<string>([target.id]);
           let current = { row: target.row, col: target.col };
           for (const mult of hopMults) {

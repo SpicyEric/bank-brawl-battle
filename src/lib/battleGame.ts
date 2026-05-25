@@ -35,7 +35,8 @@ export interface Unit {
   activationTurn?: number; // turn number when this unit becomes active (staggered rows)
   startRow?: number; // the row the unit was originally placed on
   lastAttackedId?: string; // last enemy attacked (rider uses this for target-switching)
-  seekerIdleTicks?: number; // ticks since last damage dealt (terrain seekers: abandon seek after 10)
+  seekerIdleTicks?: number; // ticks since last damage dealt (terrain seekers: hop to new tile after 4)
+  visitedTerrainCells?: string[]; // terrain seeker: list of "r,c" cells already occupied (avoid revisiting)
   bondedToTankId?: string; // if placed adjacent to a tank, bonded for rigid formation
   bondBroken?: boolean; // once bond breaks (blocked move), unit moves freely
   movedWithTank?: boolean; // set to true when unit already moved this tick via tank formation
@@ -241,10 +242,10 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   archer: {
     label: 'Bogenschütze',
     emoji: '🏹',
-    hp: 65,
+    hp: 55,
     attack: 18,
     cooldown: 2,
-    description: 'Bewegt sich in alle Richtungen (1 Feld). Greift orthogonal bis 3 Felder an. Alle 4 Ticks: 8-Pfeil-Salve in alle Richtungen (orthogonal + diagonal) mit unendlicher Reichweite – jeder Pfeil trifft den ersten Gegner auf seiner Linie.',
+    description: 'Bewegt sich in alle Richtungen (1 Feld). Greift orthogonal bis 3 Felder an. Alle 7 Ticks: 8-Pfeil-Salve in alle Richtungen (orthogonal + diagonal) mit unendlicher Reichweite – jeder Pfeil trifft den ersten Gegner auf seiner Linie.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
@@ -367,8 +368,8 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   lightning: {
-    label: 'Blitzmagier', emoji: '🌩️', hp: 75, attack: 18, cooldown: 2,
-    description: 'Kettenblitz: springt vom Ziel zu Feinden im Radius 2 weiter (50/40/30/20/10% Schaden).',
+    label: 'Blitzmagier', emoji: '🌩️', hp: 70, attack: 18, cooldown: 2,
+    description: 'Kettenblitz: springt vom Ziel zu Feinden im Radius 2 weiter (30/20/15/10/5% Schaden).',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
@@ -405,29 +406,29 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   ranger: {
-    label: 'Waldläufer', emoji: '🪵', hp: 70, attack: 14, cooldown: 2,
-    description: 'Strebt zwanghaft ins nächste Waldfeld und verteidigt es. Auf Wald: 19 ATK, Cooldown 1. Ohne Waldfeld kämpft er normal.',
+    label: 'Waldläufer', emoji: '🪵', hp: 70, attack: 19, cooldown: 2,
+    description: 'Strebt zwanghaft ins nächste Waldfeld und verteidigt es. Auf Wald: 24 ATK, Cooldown 1. Wechselt nach 4 Idle-Ticks zu einem neuen Waldfeld.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   mountaineer: {
-    label: 'Bergkrieger', emoji: '🪨', hp: 130, attack: 21, cooldown: 3,
-    description: 'Strebt zwanghaft auf den nächsten Hügel und belagert ihn. Auf Hügel: Cooldown 2, immun gegen Einfrieren und Feuerschaden. Ohne Hügel kämpft er normal.',
+    label: 'Bergkrieger', emoji: '🪨', hp: 130, attack: 26, cooldown: 3,
+    description: 'Strebt zwanghaft auf den nächsten Hügel und belagert ihn. Auf Hügel: Cooldown 2, immun gegen Einfrieren und Feuerschaden. Wechselt nach 4 Idle-Ticks zu einem neuen Hügel.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
   cloner: {
     label: 'Kloner', emoji: '🧬', hp: 90, attack: 12, cooldown: 2,
-    description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt alle 6 Ticks einen Klon (max. 3 Klone insgesamt). Klone: 6 HP, 6 ATK, stürmen auf Feinde zu.',
+    description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt ersten Klon sofort, danach alle 6 Ticks (max. 3 Klone). Klone: 12 HP, 6 ATK.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
   magnetiker: {
     label: 'Magnetiker', emoji: '🧲', hp: 80, attack: 12, cooldown: 2,
-    description: 'Alle 4 Ticks: zieht alle Feinde im 7×7-Umkreis maximal nah an sich heran (bis auf 1 Feld).',
+    description: 'Alle 4 Ticks: zieht alle Feinde im 7×7-Umkreis maximal nah heran (bis auf 1 Feld) und fügt jedem gezogenen Gegner sofort 15 Damage zu.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
@@ -444,21 +445,21 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   waterwalker: {
-    label: 'Wasserwandler', emoji: '🌊', hp: 85, attack: 19, cooldown: 2,
-    description: 'Strebt zwanghaft in den nächsten Tümpel. Auf Wasser: -30% erlittener Schaden, regeneriert +3 HP pro Tick. Ohne Wasserfeld kämpft er normal.',
+    label: 'Wasserwandler', emoji: '🌊', hp: 85, attack: 24, cooldown: 2,
+    description: 'Strebt zwanghaft in den nächsten Tümpel. Auf Wasser: -30% erlittener Schaden, regeneriert +3 HP pro Tick. Wechselt nach 4 Idle-Ticks zu einem neuen Wasserfeld.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   doppelganger: {
     label: 'Doppelgänger', emoji: '👥', hp: 85, attack: 17, cooldown: 2,
-    description: 'Spawnt zu Rundenstart ein lila leuchtendes Phantom (20 HP, 5 Dmg, 5 Ticks unverwundbar) irgendwo in den 3 Gegnerlinien. Original bleibt still, bis das Phantom stirbt.',
+    description: 'Spawnt zu Rundenstart ein lila leuchtendes Phantom (80 HP, 5 Dmg, 5 Ticks unverwundbar) irgendwo in den 3 Gegnerlinien. Original kämpft normal weiter.',
     movePattern: DIAGONAL,
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
   },
   sniper: {
-    label: 'Scharfschütze', emoji: '🎯', hp: 50, attack: 35, cooldown: 3,
+    label: 'Scharfschütze', emoji: '🎯', hp: 40, attack: 25, cooldown: 4,
     description: 'Bewegt sich nie. Greift immer die Einheit mit niedrigstem HP auf dem ganzen Feld an. Hoher Schaden.',
     movePattern: [],
     attackPattern: (() => {
@@ -481,22 +482,22 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   // ===== NEW UNITS v3 =====
   bomber: {
-    label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 0, cooldown: 3,
-    description: 'Bewegt sich in alle 8 Richtungen (1 Feld). Greift nicht direkt an. Alle 3 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (35 Dmg, 3×3). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
+    label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 0, cooldown: 4,
+    description: 'Bewegt sich in alle 8 Richtungen (1 Feld). Greift nicht direkt an. Alle 4 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (30 Dmg, 3×3). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
     movePattern: ALL_ADJACENT,
     attackPattern: [], // never attacks directly
     strongVs: [], weakVs: [],
   },
   obelisk: {
     label: 'Obelisk', emoji: '🗿', hp: 150, attack: 0, cooldown: 0,
-    description: 'Steht still. Adjacent (Plus) Verbündete dauerhaft gebufft: +30% Schaden & Cooldown 1. Alle 3 Ticks für 2 Ticks: Strahl in 4 Richtungen über das ganze Feld – buff alle getroffenen Verbündeten.',
+    description: 'Steht still. Adjacent (Plus) Verbündete dauerhaft gebufft: +50% Schaden & Cooldown halbiert (min 1). Alle 3 Ticks für 2 Ticks: Strahl in 4 Richtungen über das ganze Feld.',
     movePattern: [],
     attackPattern: [],
     strongVs: [], weakVs: [],
   },
   shadowpriest: {
     label: 'Schattenpriester', emoji: '🕯️', hp: 80, attack: 10, cooldown: 3,
-    description: 'Bewegt sich diagonal (1 Feld), greift orthogonal bis 2 Felder an. Jeder Treffer legt einen Fluch-Stack. Bei 3 Stacks: Ziel verliert sofort 30% HP, dauerhaft −50% Schaden & nicht mehr heilbar. Alle 8 Ticks: +5 ATK pro verfluchtem Gegner (Cooldown senkt sich auf 2).',
+    description: 'Bewegt sich diagonal (1 Feld), greift orthogonal bis 2 Felder an. Jeder Treffer legt einen Fluch-Stack. Bei 2 Stacks: Ziel verliert sofort 30 HP, dauerhaft −60% Schaden & nicht mehr heilbar. Alle 7 Ticks: +5 ATK pro verfluchtem Gegner (permanent).',
     movePattern: DIAGONAL,
     attackPattern: [
       ...ORTHOGONAL,
@@ -555,7 +556,7 @@ export function generateTerrain(grid: Cell[][]): Cell[][] {
   const newGrid = grid.map(r => r.map(c => ({ ...c, terrain: 'none' as TerrainType })));
   const terrainTypes: TerrainType[] = ['forest', 'hill', 'water'];
   // Place 4-7 terrain tiles in the middle area (rows 2-5)
-  const middleCount = 4 + Math.floor(Math.random() * 4);
+  const middleCount = 6 + Math.floor(Math.random() * 4);
   const used = new Set<string>();
 
   for (let i = 0; i < middleCount; i++) {
@@ -578,7 +579,7 @@ export function generateTerrain(grid: Cell[][]): Cell[][] {
   }
 
   // Occasionally place 1-3 terrain tiles on player-side rows (5-7 and 0-2)
-  const sideCount = Math.floor(Math.random() * 4); // 0-3 tiles
+  const sideCount = 1 + Math.floor(Math.random() * 4); // 1-4 tiles
   const sideRows = [0, 1, 5, 6, 7]; // row 2 already covered by middle
   for (let i = 0; i < sideCount; i++) {
     let row: number, col: number;
@@ -1116,8 +1117,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // Forest bonus: defender in forest takes -20% damage
   if (defenderTerrain === 'forest') dmg *= 0.8;
 
-  // Ranger: on a forest tile, effective ATK is 19 (base 14) → scale damage accordingly
-  if (attacker.type === 'ranger' && attackerTerrain === 'forest') dmg *= (19 / 14);
+  // Ranger: on a forest tile, effective ATK is 24 (base 19) → scale damage accordingly
+  if (attacker.type === 'ranger' && attackerTerrain === 'forest') dmg *= (24 / 19);
 
   // Waterwalker: -30% incoming damage on water
   if (defender.type === 'waterwalker' && defenderTerrain === 'water') dmg *= 0.7;
@@ -1518,8 +1519,8 @@ export function effectiveCooldown(unit: Unit, grid: Cell[][]): number {
   let cd = unit.maxCooldown;
   if (unit.type === 'ranger' && t === 'forest') cd = 1;
   else if (unit.type === 'mountaineer' && t === 'hill') cd = 2;
-  // Obelisk buff: cooldown drops to 0 (attack every tick) while buffed
-  if ((unit.obeliskBuff || 0) > 0) cd = 0;
+  // Obelisk buff: halve cooldown (rounded up), minimum 1
+  if ((unit.obeliskBuff || 0) > 0) cd = Math.max(1, Math.ceil(cd / 2));
   return cd;
 }
 
@@ -1536,9 +1537,7 @@ export function handleTerrainSeeker(unit: Unit, grid: Cell[][], _allUnits: Unit[
   const terrain = getSeekTerrain(unit.type);
   if (!terrain) return 'normal';
 
-  // Anti-stall: if no damage dealt for 10 ticks, abandon seek behavior and fight normally
   unit.seekerIdleTicks = (unit.seekerIdleTicks || 0) + 1;
-  if (unit.seekerIdleTicks >= 10) return 'normal';
 
   // Collect all matching tiles
   const tiles: { row: number; col: number; occupiedByOther: boolean }[] = [];
@@ -1549,24 +1548,38 @@ export function handleTerrainSeeker(unit: Unit, grid: Cell[][], _allUnits: Unit[
   }
   if (tiles.length === 0) return 'normal';
 
-  // Already standing on matching terrain → defend in place
-  if (grid[unit.row][unit.col].terrain === terrain) return 'on_terrain';
+  const curKey = `${unit.row},${unit.col}`;
+  const onMatchingTerrain = grid[unit.row][unit.col].terrain === terrain;
 
-  // Pick nearest free tile
-  const free = tiles.filter(t => !t.occupiedByOther);
-  if (free.length === 0) return 'wait';
-  free.sort((a, b) => distance(unit, a) - distance(unit, b));
-  const goal = free[0];
+  // Standing on matching terrain
+  if (onMatchingTerrain) {
+    if (!unit.visitedTerrainCells) unit.visitedTerrainCells = [];
+    if (!unit.visitedTerrainCells.includes(curKey)) unit.visitedTerrainCells.push(curKey);
+    // After 4 idle ticks without dealing damage, hop to a different terrain tile
+    if (unit.seekerIdleTicks >= 4) {
+      // unchanged: caller will treat as 'normal' if we can't find a new tile
+    } else {
+      return 'on_terrain';
+    }
+  }
+
+  // Pick a free tile we haven't visited yet (or any free tile if all visited)
+  const visited = new Set(unit.visitedTerrainCells || []);
+  const free = tiles.filter(t => !t.occupiedByOther && `${t.row},${t.col}` !== curKey);
+  if (free.length === 0) return onMatchingTerrain ? 'on_terrain' : 'wait';
+  const unvisited = free.filter(t => !visited.has(`${t.row},${t.col}`));
+  const pool = unvisited.length > 0 ? unvisited : free;
+  pool.sort((a, b) => distance(unit, a) - distance(unit, b));
+  const goal = pool[0];
 
   const possibleMoves = getMoveCells(unit, grid);
-  if (possibleMoves.length === 0) return 'wait';
+  if (possibleMoves.length === 0) return onMatchingTerrain ? 'on_terrain' : 'wait';
 
   // Prefer a direct move that lands ON the goal tile
   const direct = possibleMoves.find(p => p.row === goal.row && p.col === goal.col);
   let newPos: Position | null = direct ?? null;
 
   if (!newPos) {
-    // Use BFS toward goal (fake target Unit-shape: only row/col matter)
     const fakeTarget = { row: goal.row, col: goal.col, id: '__seek__', team: unit.team } as Unit;
     const step = bfsFirstStep(unit, fakeTarget, grid);
     if (step) {
@@ -1574,19 +1587,22 @@ export function handleTerrainSeeker(unit: Unit, grid: Cell[][], _allUnits: Unit[
       if (valid) newPos = valid;
     }
     if (!newPos) {
-      // Fallback greedy: move that minimizes distance to goal
       const sorted = [...possibleMoves].sort((a, b) => distance(a, goal) - distance(b, goal));
       newPos = sorted[0];
     }
   }
 
-  if (!newPos || (newPos.row === unit.row && newPos.col === unit.col)) return 'wait';
+  if (!newPos || (newPos.row === unit.row && newPos.col === unit.col)) {
+    return onMatchingTerrain ? 'on_terrain' : 'wait';
+  }
 
   // Commit the move on the grid
   grid[unit.row][unit.col].unit = null;
   unit.row = newPos.row;
   unit.col = newPos.col;
   grid[unit.row][unit.col].unit = unit;
+  // Reset idle counter when we move (will re-accumulate if still no damage)
+  unit.seekerIdleTicks = 0;
   return 'moved';
 }
 
@@ -1658,7 +1674,8 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
   ];
   for (const c of cloners) {
     if ((c.clonesSpawnedTotal ?? 0) >= 3) continue; // lifetime limit reached
-    if (c.cloneTimer === undefined || c.cloneTimer <= 0) c.cloneTimer = 6;
+    // First call: timer undefined → spawn immediately (this tick). Subsequent spawns every 6 ticks.
+    if (c.cloneTimer === undefined) c.cloneTimer = 1;
     c.cloneTimer -= 1;
     if (c.cloneTimer > 0) continue;
     let didSpawn = false;
@@ -1671,8 +1688,8 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
         ...c,
         id: crypto.randomUUID(),
         row: r, col,
-        hp: 6,
-        maxHp: 6,
+        hp: 12,
+        maxHp: 12,
         attack: 6,
         isClone: true,
         parentClonerId: c.id,
@@ -1844,6 +1861,19 @@ export function tickMagnetPull(
         t.row = cur.r; t.col = cur.c;
         grid[cur.r][cur.c].unit = t;
         pushedIds.push(t.id);
+        // Bonus pull damage: 15 to each pulled enemy
+        const pullDmg = Math.min(15, t.hp);
+        t.hp = Math.max(0, t.hp - 15);
+        const killed = t.hp <= 0;
+        if (killed) (t as any).dead = true;
+        events.push({
+          type: killed ? 'kill' : 'hit',
+          attackerId: m.id, attackerRow: m.row, attackerCol: m.col,
+          attackerEmoji: '🧲', attackerType: 'magnetiker',
+          targetId: t.id, targetRow: t.row, targetCol: t.col,
+          damage: pullDmg, isStrong: false, isWeak: false, isRanged: true,
+        });
+        logs.push(`🧲 Magnetzug → ${UNIT_DEFS[t.type].emoji} 15${killed ? ' ☠️' : ''}`);
       }
     }
 
@@ -1998,10 +2028,10 @@ export function tickArcherVolley(
   ];
   const archers = allUnits.filter(u => u.type === 'archer' && u.hp > 0 && !u.dead);
   for (const a of archers) {
-    if (a.volleyTimer === undefined || a.volleyTimer <= 0) a.volleyTimer = 4;
+    if (a.volleyTimer === undefined || a.volleyTimer <= 0) a.volleyTimer = 7;
     a.volleyTimer -= 1;
     if (a.volleyTimer > 0) continue;
-    a.volleyTimer = 4;
+    a.volleyTimer = 7;
 
     let hitCount = 0;
     for (const { dr, dc } of dirs) {
@@ -2396,7 +2426,7 @@ export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs
       ...orig,
       id: crypto.randomUUID(),
       row: pick.r, col: pick.c,
-      hp: 20, maxHp: 20,
+      hp: 80, maxHp: 80,
       attack: 5,
       cooldown: 0, maxCooldown: 2,
       isPhantom: true,
@@ -2414,7 +2444,7 @@ export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs
     grid[pick.r][pick.c].unit = phantom;
     spawned.push(phantom);
     orig.phantomId = phantom.id;
-    logs.push(`👥 Doppelgänger spawnt Phantom (20 HP, 5 Ticks unverwundbar)`);
+    logs.push(`👥 Doppelgänger spawnt Phantom (80 HP, 5 Ticks unverwundbar)`);
   }
   allUnits.push(...spawned);
   return spawned;
@@ -2486,15 +2516,16 @@ export function tickBomberActions(
 ): void {
   const bombers = allUnits.filter(u => u.type === 'bomber' && u.hp > 0 && !u.dead);
   for (const b of bombers) {
-    // Place timer
-    if (b.bombPlaceTimer === undefined) b.bombPlaceTimer = 3;
-    b.bombPlaceTimer -= 1;
+    // Place timer (every 4 ticks; obelisk-buffed bombers halve to every 2 ticks)
     const buffed = (b.obeliskBuff || 0) > 0;
-    if (b.bombPlaceTimer <= 0 || buffed) {
-      if (!buffed) b.bombPlaceTimer = 3;
+    const placeReset = buffed ? 2 : 4;
+    if (b.bombPlaceTimer === undefined) b.bombPlaceTimer = placeReset;
+    b.bombPlaceTimer -= 1;
+    if (b.bombPlaceTimer <= 0) {
+      b.bombPlaceTimer = placeReset;
       const cell = grid[b.row]?.[b.col];
       if (cell && !cell.bomb) {
-        cell.bomb = { fuse: 2, dmg: 35, ownerTeam: b.team };
+        cell.bomb = { fuse: 2, dmg: 30, ownerTeam: b.team };
         logs.push(`💣 Sprengmeister legt eine Bombe${buffed ? ' (Obelisk-Buff)' : ''}`);
       }
     }
@@ -2508,7 +2539,7 @@ export function tickBomberActions(
       for (const e of enemies) {
         const cell = grid[e.row]?.[e.col];
         if (!cell) continue;
-        cell.bomb = { fuse: 1, dmg: 35, ownerTeam: b.team };
+        cell.bomb = { fuse: 1, dmg: 30, ownerTeam: b.team };
         count++;
         events.push({
           type: 'spawn',
@@ -2653,13 +2684,13 @@ export function applyShadowpriestCurse(
   if (target.hp <= 0 || target.dead) return;
   if (target.cursed) return; // already cursed, no more stacks needed
   target.curseStacks = (target.curseStacks || 0) + 1;
-  if (target.curseStacks >= 3) {
+  if (target.curseStacks >= 2) {
     target.cursed = true;
-    const burst = Math.round(target.hp * 0.30);
+    const burst = Math.min(target.hp, 30);
     target.hp = Math.max(0, target.hp - burst);
     target.unhealable = true;
-    target.curseAtkMul = 0.5;
-    logs.push(`🕯️ Fluch ausgelöst! → ${UNIT_DEFS[target.type].emoji} −${burst} ❤️ (unheilbar, −50% Angriff)`);
+    target.curseAtkMul = 0.4;
+    logs.push(`🕯️ Fluch ausgelöst! → ${UNIT_DEFS[target.type].emoji} −${burst} ❤️ (unheilbar, −60% Angriff)`);
     if (target.hp <= 0) (target as any).dead = true;
     if (events) {
       events.push({
@@ -2673,7 +2704,7 @@ export function applyShadowpriestCurse(
   }
 }
 
-/** Shadowpriest soul harvest: every 8 ticks, +5 perm ATK and cooldown→2 per cursed enemy. */
+/** Shadowpriest soul harvest: every 7 ticks, +5 perm ATK per cursed enemy. */
 export function tickShadowpriestHarvest(
   allUnits: Unit[],
   _grid: Cell[][],
@@ -2681,14 +2712,13 @@ export function tickShadowpriestHarvest(
 ): void {
   const priests = allUnits.filter(u => u.type === 'shadowpriest' && u.hp > 0 && !u.dead);
   for (const p of priests) {
-    if (p.soulHarvestTimer === undefined) p.soulHarvestTimer = 8;
+    if (p.soulHarvestTimer === undefined) p.soulHarvestTimer = 7;
     p.soulHarvestTimer -= 1;
     if (p.soulHarvestTimer > 0) continue;
-    p.soulHarvestTimer = 8;
+    p.soulHarvestTimer = 7;
     const cursedEnemies = allUnits.filter(u => u.team !== p.team && u.cursed && u.hp > 0 && !u.dead).length;
     if (cursedEnemies > 0) {
       p.permAtkBonus = (p.permAtkBonus || 0) + 5 * cursedEnemies;
-      p.maxCooldown = Math.max(1, Math.min(p.maxCooldown, 2));
       logs.push(`🕯️ Seelenraub: +${5 * cursedEnemies} Angriff (${cursedEnemies} verflucht)`);
     }
   }
