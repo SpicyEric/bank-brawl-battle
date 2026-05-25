@@ -84,6 +84,22 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const prevFocus = useRef(false);
   const prevSacrifice = useRef(false);
 
+  // Random battlefield background per round (re-rolls on each new placement phase)
+  const BATTLEFIELDS = useMemo(() => [battlefieldGrass, battlefieldDesert], []);
+  const [battlefieldBg, setBattlefieldBg] = useState<string>(() => BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+  const prevPhaseRef = useRef<Phase>(phase);
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    const isNewRoundStart =
+      (phase === 'place_player' || phase === 'place_enemy') &&
+      (prev === 'round_won' || prev === 'round_lost' || prev === 'round_draw' || prev === 'battle');
+    if (isNewRoundStart) {
+      setBattlefieldBg(BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+    }
+    prevPhaseRef.current = phase;
+  }, [phase, BATTLEFIELDS]);
+
+
   // War cry flash animation (own or opponent)
   useEffect(() => {
     if (moraleBoostActive === 'buff' && prevMorale.current !== 'buff') {
