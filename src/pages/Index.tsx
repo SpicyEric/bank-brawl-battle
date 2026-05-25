@@ -439,7 +439,8 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                   ? (roster ? (flipped ? row < 4 : [4, 5, 6, 7].includes(row)) : [4, 5, 6, 7].includes(row))
                   : true;
                 const targetCell = game.grid[row]?.[col];
-                if (!isPlayerRow || !targetCell || targetCell.unit || targetCell.terrain === 'water') {
+                const blocked = !targetCell || targetCell.terrain === 'water' || (targetCell.unit && targetCell.unit.team === 'player');
+                if (!isPlayerRow || blocked) {
                   setDragPreview(null);
                   return;
                 }
@@ -449,7 +450,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 setDragPreview(null);
                 if (!roster) return;
                 const cell = game.grid[row]?.[col];
-                if (!cell || cell.unit || cell.terrain === 'water') return;
+                if (!cell || cell.terrain === 'water' || (cell.unit && cell.unit.team === 'player')) return;
                 if (isMultiplayer) {
                   const playerRows = flipped ? [0, 1, 2, 3] : [4, 5, 6, 7];
                   if (!playerRows.includes(row)) return;
