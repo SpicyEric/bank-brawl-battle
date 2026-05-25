@@ -1132,7 +1132,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setEnemyUnits([]);
     setBattleLog([]);
     setTurnCount(0);
-    setSelectedUnit(UNIT_TYPES.find(t => !playerBannedUnits.includes(t)) || 'warrior');
+    setSelectedUnit(hasRoster ? roster![0] : (UNIT_TYPES.find(t => !playerBannedUnits.includes(t)) || 'warrior'));
+    if (hasRoster) setSelectedSlot(0);
     setGrid(newGrid);
     setPhase('place_player');
     setBattleTimer(ROUND_TIME_LIMIT);
