@@ -790,6 +790,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
           }
           target.hp = Math.max(0, target.hp - dmg);
+          // Reset terrain-seeker idle counter on successful damage
+          if (dmg > 0 && (unit.type === 'ranger' || unit.type === 'mountaineer' || unit.type === 'waterwalker')) {
+            unit.seekerIdleTicks = 0;
+          }
           // Cooldown reset honors terrain bonuses (ranger=1 on forest, mountaineer=2 on hill)
           unit.cooldown = effectiveCooldown(unit, newGrid);
           // Track last attacked target (used by targeting logic: lock-on for warrior/stormrunner/archer, switch for rider/assassin/frost/mage)
