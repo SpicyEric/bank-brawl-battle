@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMusic } from '@/hooks/useMusic';
-import { ArrowLeft, Swords, BookOpen, Trophy, ChevronRight, FileBarChart2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Swords, BookOpen, Trophy, ChevronRight, FileBarChart2, Loader2, Zap } from 'lucide-react';
 import menuBg from '@/assets/menu-bg.png';
 import { fetchAllMatches } from '@/lib/matchRecorder';
 import { generateMatchesPdf, downloadBlob } from '@/lib/matchPdf';
@@ -121,6 +121,19 @@ const SinglePlayer = () => {
                 <div className="text-left flex-1">
                   <span className="block">Auswertung</span>
                   <span className="text-xs font-normal text-muted-foreground">Alle Matches als PDF herunterladen</span>
+                </div>
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </button>
+
+              {/* Simulator */}
+              <button
+                onClick={() => navigate('/simulator')}
+                className="w-full py-4 px-4 rounded-xl bg-secondary text-secondary-foreground font-bold text-base hover:bg-accent active:scale-[0.97] transition-all flex items-center gap-3"
+              >
+                <Zap size={20} className="text-warning shrink-0" />
+                <div className="text-left flex-1">
+                  <span className="block">Simulator</span>
+                  <span className="text-xs font-normal text-muted-foreground">Tausende Matches durchrechnen für Balance</span>
                 </div>
                 <ChevronRight size={16} className="text-muted-foreground" />
               </button>
