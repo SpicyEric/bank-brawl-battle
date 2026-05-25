@@ -392,6 +392,25 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 </span>
               </div>
             )}
+            {!isMultiplayer && (
+              <button
+                onPointerDown={(e) => { e.preventDefault(); startSpy(); }}
+                onPointerUp={stopSpy}
+                onPointerLeave={stopSpy}
+                onPointerCancel={stopSpy}
+                onContextMenu={(e) => e.preventDefault()}
+                disabled={spyUsed && !spying}
+                className={`w-full py-2.5 rounded-xl font-semibold text-xs transition-all select-none touch-none active:scale-[0.98] ${
+                  spying
+                    ? 'bg-primary text-primary-foreground shadow-[0_0_14px_hsl(var(--primary)/0.6)] animate-pulse'
+                    : spyUsed
+                    ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
+                    : 'bg-card border border-primary/50 text-primary hover:bg-primary/10'
+                }`}
+              >
+                {spying ? '👁️ SPIONIERE… (loslassen)' : spyUsed ? '👁️ Spionage verbraucht' : '👁️ Gegner spionieren (halten, max. 3s, einmalig)'}
+              </button>
+            )}
             <UnitPicker
               selected={game.selectedUnit}
               onSelect={game.setSelectedUnit}
