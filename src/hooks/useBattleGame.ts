@@ -1421,6 +1421,33 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     matchRecorder.endMatch(winner, { player1: playerScore, player2: enemyScore });
   }, [gameOver, gameWon, gameDraw, playerScore, enemyScore]);
 
+  // Formation movement (player drag during combat / placement)
+  const moveFormation = useCallback((unitId: string, dr: number, dc: number) => {
+    if (dr === 0 && dc === 0) return false;
+    if (Math.abs(dr) > 1 || Math.abs(dc) > 1) return false;
+    let success = false;
+    setGrid(prevGrid => {
+      const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
+      const all: Unit[] = [];
+      for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) all.push(cell.unit);
+      const formation = findFormationContaining(all, unitId);
+      if (!formation || formation.length === 0) return prevGrid;
+      // Only allow moving own (player) formations from here
+      if (formation[0].team !== 'player') return prevGrid;
+      if (!applyFormationMove(formation, dr, dc, newGrid)) return prevGrid;
+      success = true;
+      // Sync playerUnits state (positions changed)
+      setPlayerUnits(prev => prev.map(u => {
+        const moved = formation.find(f => f.id === u.id);
+        return moved ? { ...u, row: moved.row, col: moved.col } : u;
+      }));
+      return newGrid;
+    });
+    return success;
+  }, []);
+
+
+
   return {
     grid, phase, selectedUnit, setSelectedUnit,
     selectedSlot, setSelectedSlot,
