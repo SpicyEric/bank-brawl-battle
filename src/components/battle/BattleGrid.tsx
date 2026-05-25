@@ -935,6 +935,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
               const neighbor = grid[r][c];
               if (neighbor.unit && !neighbor.unit.dead && neighbor.unit.team === tank.team && neighbor.unit.id !== tank.id) {
+                if (hideEnemyUnits && isPlacing && tank.team === 'enemy') continue;
                 bonds.push({ tankRow: tankCell.row, tankCol: tankCell.col, unitRow: r, unitCol: c, team: tank.team });
               }
             }
