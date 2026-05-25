@@ -1313,14 +1313,15 @@ export function applyPostAttackEffects(
   // Magnetiker pull is no longer per-attack — handled by tickMagnetPull every 4 ticks.
 
 
-  // Vulkanit: spawn lava in a 5-tile PLUS pattern on the target (center + 4 orthogonal), 3 ticks
+  // Vulkanit: spawn lava in a 5-tile PLUS pattern on the target (center + 4 orthogonal), 8 ticks, 6 dmg/tick
   if (attacker.type === 'vulkanit') {
     const plus: [number, number][] = [[0,0],[-1,0],[1,0],[0,-1],[0,1]];
     for (const [dr, dc] of plus) {
       const r = target.row + dr, c = target.col + dc;
       if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
-      grid[r][c].lavaTicks = 3;
+      grid[r][c].lavaTicks = 8;
       grid[r][c].lavaOwnerTeam = attacker.team;
+      grid[r][c].lavaDmg = 6;
     }
   }
 }
