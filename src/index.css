@@ -563,6 +563,23 @@
   100% { background-color: hsl(152 80% 55% / 0); }
 }
 
+/* Aura pulse just after placing a unit — strong→soft over ~700ms */
+@keyframes placement-aura-pulse-anim {
+  0%   { opacity: 0.4; transform: scale(1); }
+  25%  { opacity: 1;   transform: scale(1.08); }
+  100% { opacity: 1;   transform: scale(1); }
+}
+.placement-aura-pulse {
+  animation: placement-aura-pulse-anim 0.7s ease-out;
+}
+@keyframes drag-aura-blink-anim {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+.drag-aura-blink {
+  animation: drag-aura-blink-anim 0.9s ease-in-out infinite;
+}
+
 @keyframes chain-flash-anim {
   0% { opacity: 0; }
   15% { opacity: 1; }
