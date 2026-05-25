@@ -354,7 +354,7 @@ function simulateOneBattle(p1Types: UnitType[], p2Types: UnitType[]): BattleResu
         ensureStats(unit.id).damageDealt += dealt;
         ensureStats(target.id).damageTaken += dealt;
 
-        if (dmg > 0 && (unit.type === 'ranger' || unit.type === 'mountaineer' || unit.type === 'waterwalker')) {
+        if (dmg > 0 && unit.type === 'waterwalker') {
           unit.seekerIdleTicks = 0;
         }
         unit.cooldown = effectiveCooldown(unit, grid);

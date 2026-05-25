@@ -5,8 +5,8 @@ export type UnitType =
   // New units (v2):
   | 'banshee' | 'magnetiker' | 'vulkanit' | 'mirror' | 'doppelganger'
   | 'spiderqueen' | 'judge' | 'waterwalker' | 'chaindancer' | 'shadowblade'
-  | 'lamb' | 'vampire' | 'icegolem' | 'stormrunner' | 'ranger'
-  | 'arsonist' | 'lightning' | 'mountaineer' | 'sniper' | 'cloner'
+  | 'lamb' | 'vampire' | 'icegolem' | 'stormrunner'
+  | 'arsonist' | 'lightning' | 'sniper' | 'cloner'
   // v3 additions:
   | 'bomber' | 'obelisk' | 'shadowpriest';
 export type Team = 'player' | 'enemy';
@@ -154,7 +154,7 @@ export const UNIT_COLOR_GROUPS: Record<UnitType, ColorGroup> = {
   banshee: 'red', vampire: 'red', vulkanit: 'red', shadowblade: 'red',
   stormrunner: 'red', arsonist: 'red', lightning: 'red',
   mirror: 'green', lamb: 'green', judge: 'green', icegolem: 'green',
-  ranger: 'green', mountaineer: 'green', cloner: 'green',
+  cloner: 'green',
   magnetiker: 'blue', spiderqueen: 'blue', waterwalker: 'blue',
   doppelganger: 'blue', sniper: 'blue', chaindancer: 'blue',
   // v3
@@ -410,20 +410,6 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
-  ranger: {
-    label: 'Waldläufer', emoji: '🪵', hp: 70, attack: 19, cooldown: 2,
-    description: 'Strebt zwanghaft ins nächste Waldfeld und verteidigt es. Auf Wald: 24 ATK, Cooldown 1. Wechselt nach 4 Idle-Ticks zu einem neuen Waldfeld.',
-    movePattern: ALL_ADJACENT,
-    attackPattern: ALL_ADJACENT,
-    strongVs: [], weakVs: [],
-  },
-  mountaineer: {
-    label: 'Bergkrieger', emoji: '🪨', hp: 130, attack: 26, cooldown: 2,
-    description: 'Strebt zwanghaft auf den nächsten Hügel und belagert ihn. Auf Hügel: Cooldown 1, immun gegen Einfrieren und Feuerschaden. Wechselt nach 4 Idle-Ticks zu einem neuen Hügel.',
-    movePattern: ORTHOGONAL,
-    attackPattern: ORTHOGONAL,
-    strongVs: [], weakVs: [],
-  },
   cloner: {
     label: 'Kloner', emoji: '🧬', hp: 90, attack: 16, cooldown: 2,
     description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt ersten Klon sofort, danach alle 6 Ticks (max. 3 Klone). Klone: 12 HP, 6 ATK.',
@@ -640,7 +626,7 @@ export function createUnit(type: UnitType, team: Team, row: number, col: number,
 // an enemy enters their attack pattern. Special-behavior units skip lane mode.
 const LANE_EXEMPT_TYPES = new Set<UnitType>([
   'dragon', 'waterwalker', 'shadowblade', 'obelisk', 'bomber',
-  'mountaineer', 'ranger', 'vulkanit',
+  'vulkanit',
   'healer', 'lamb',
   'cloner', 'doppelganger',
 ]);
@@ -1220,8 +1206,6 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // Forest bonus: defender in forest takes -20% damage
   if (defenderTerrain === 'forest') dmg *= 0.8;
 
-  // Ranger: on a forest tile, effective ATK is 24 (base 19) → scale damage accordingly
-  if (attacker.type === 'ranger' && attackerTerrain === 'forest') dmg *= (24 / 19);
 
   // Waterwalker: -30% incoming damage on water
   if (defender.type === 'waterwalker' && defenderTerrain === 'water') dmg *= 0.7;
@@ -1634,33 +1618,27 @@ export function leaveArsonistTrail(grid: Cell[][], unit: Unit): void {
   cell.lavaOwnerTeam = unit.team;
 }
 
-// ============= TERRAIN SEEKERS (ranger / mountaineer / waterwalker) =============
+// ============= TERRAIN SEEKERS (waterwalker) =============
 
 /** Returns the terrain a unit zealously seeks, or null if none. */
 export function getSeekTerrain(type: UnitType): TerrainType | null {
-  if (type === 'ranger') return 'forest';
-  if (type === 'mountaineer') return 'hill';
   if (type === 'waterwalker') return 'water';
   return null;
 }
 
-/** Mountaineer on hill is immune to freezing. */
-export function isImmuneToFreeze(unit: Unit, grid: Cell[][]): boolean {
-  return unit.type === 'mountaineer' && grid[unit.row]?.[unit.col]?.terrain === 'hill';
+/** No unit is currently immune to freezing. */
+export function isImmuneToFreeze(_unit: Unit, _grid: Cell[][]): boolean {
+  return false;
 }
 
-/** Mountaineer on hill is immune to fire / lava / burning DoT. */
-export function isImmuneToFire(unit: Unit, grid: Cell[][]): boolean {
-  return unit.type === 'mountaineer' && grid[unit.row]?.[unit.col]?.terrain === 'hill';
+/** No unit is currently immune to fire / lava / burning DoT. */
+export function isImmuneToFire(_unit: Unit, _grid: Cell[][]): boolean {
+  return false;
 }
 
-/** Effective cooldown considering terrain bonuses (ranger forest=1, mountaineer hill=1). */
-export function effectiveCooldown(unit: Unit, grid: Cell[][]): number {
-  const t = grid[unit.row]?.[unit.col]?.terrain;
+/** Effective cooldown (considers obelisk buff). */
+export function effectiveCooldown(unit: Unit, _grid: Cell[][]): number {
   let cd = unit.maxCooldown;
-  if (unit.type === 'ranger' && t === 'forest') cd = 1;
-  else if (unit.type === 'mountaineer' && t === 'hill') cd = 1;
-  // Obelisk buff: halve cooldown (rounded up), minimum 1
   if ((unit.obeliskBuff || 0) > 0) cd = Math.max(1, Math.ceil(cd / 2));
   return cd;
 }
