@@ -651,18 +651,24 @@ const LANE_EXEMPT_TYPES = new Set<UnitType>([
 ]);
 
 function laneToleranceFor(type: UnitType): number {
-  // Hard overrides for units whose movePattern doesn't include any orthogonal step
+  // Hard overrides: assassin uses a 5-column corridor so its diagonal jumps can advance.
   if (type === 'assassin') return 2;
   const def = UNIT_DEFS[type];
+  // Tolerance = smallest sideways step among moves that ALSO advance a row.
+  // Guarantees every mobile unit has at least one legal forward move inside its corridor.
   let minSide = Infinity;
   for (const m of def.movePattern) {
-    if (m.row === 0 && m.col === 0) continue;
-    // forward-progressing move
+    if (m.row === 0) continue; // pure sideways doesn't help advance the lane
     const sideways = Math.abs(m.col);
     if (sideways < minSide) minSide = sideways;
   }
   if (!isFinite(minSide)) return 0;
   return Math.max(0, minSide);
+}
+
+// Break a unit's lane discipline permanently for the rest of the combat phase.
+function breakLane(unit: Unit) {
+  unit.laneBroken = true;
 }
 
 function isLaneActive(unit: Unit): boolean {
