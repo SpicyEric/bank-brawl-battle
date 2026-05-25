@@ -492,23 +492,35 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
   const t0 = performance.now();
   const yieldEvery = opts.yieldEvery ?? 50;
 
-  const monoSweep = opts.monoSweep ?? true;
   const rSize = opts.rosterSize ?? 9;
   const n = opts.teamSize ?? 5;
-  // Build the mono-sweep queue: one mono-vs-random battle per unit type at the start.
-  const monoQueue: UnitType[] = monoSweep ? [...UNIT_TYPES] : [];
+  const mode = opts.mode ?? 'random';
+
+  // Build fixed per-simulation rosters of UNIQUE units (different for each player).
+  // These stay the same for ALL matches in this simulation run.
+  let rosterP1: UnitType[];
+  let rosterP2: UnitType[];
+  if (mode === 'roster' && opts.rosterP1 && opts.rosterP2) {
+    rosterP1 = [...opts.rosterP1];
+    rosterP2 = [...opts.rosterP2];
+  } else {
+    rosterP1 = drawUniqueRoster(rSize);
+    do { rosterP2 = drawUniqueRoster(rSize); }
+    while (UNIT_TYPES.length > rSize && rosterP1.every((u, i) => u === rosterP2[i]));
+  }
+  report.rosterP1 = [...rosterP1];
+  report.rosterP2 = [...rosterP2];
 
   for (let i = 0; i < battlesTotal; i++) {
     let p1: UnitType[]; let p2: UnitType[];
-    if (monoQueue.length > 0 && (opts.mode ?? 'random') === 'random') {
-      const t = monoQueue.shift()!;
-      // Alternate which side runs mono so both 'player' and 'enemy' sample positions get hit.
-      const enemyRoster = pickFromRoster(drawRoster(rSize), n);
-      if (i % 2 === 0) { p1 = Array.from({ length: n }, () => t); p2 = enemyRoster; }
-      else { p1 = enemyRoster; p2 = Array.from({ length: n }, () => t); }
+    if (mode === 'pure' && opts.pureType) {
+      p1 = Array.from({ length: n }, () => opts.pureType!);
+      p2 = pickWithReplacement(rosterP2, n);
     } else {
-      const built = buildTeams(opts);
-      p1 = built.p1; p2 = built.p2;
+      // Pick 5 (teamSize) WITH replacement from each player's fixed 9-unit roster.
+      // Duplicates → mono compositions naturally appear across many matches.
+      p1 = pickWithReplacement(rosterP1, n);
+      p2 = pickWithReplacement(rosterP2, n);
     }
     let result: BattleResult;
     try {
