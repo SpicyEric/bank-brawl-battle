@@ -35,7 +35,8 @@ export interface Unit {
   activationTurn?: number; // turn number when this unit becomes active (staggered rows)
   startRow?: number; // the row the unit was originally placed on
   lastAttackedId?: string; // last enemy attacked (rider uses this for target-switching)
-  seekerIdleTicks?: number; // ticks since last damage dealt (terrain seekers: abandon seek after 10)
+  seekerIdleTicks?: number; // ticks since last damage dealt (terrain seekers: hop to new tile after 4)
+  visitedTerrainCells?: string[]; // terrain seeker: list of "r,c" cells already occupied (avoid revisiting)
   bondedToTankId?: string; // if placed adjacent to a tank, bonded for rigid formation
   bondBroken?: boolean; // once bond breaks (blocked move), unit moves freely
   movedWithTank?: boolean; // set to true when unit already moved this tick via tank formation
