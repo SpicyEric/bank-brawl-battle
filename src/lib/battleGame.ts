@@ -1536,6 +1536,10 @@ export function handleTerrainSeeker(unit: Unit, grid: Cell[][], _allUnits: Unit[
   const terrain = getSeekTerrain(unit.type);
   if (!terrain) return 'normal';
 
+  // Anti-stall: if no damage dealt for 10 ticks, abandon seek behavior and fight normally
+  unit.seekerIdleTicks = (unit.seekerIdleTicks || 0) + 1;
+  if (unit.seekerIdleTicks >= 10) return 'normal';
+
   // Collect all matching tiles
   const tiles: { row: number; col: number; occupiedByOther: boolean }[] = [];
   for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
