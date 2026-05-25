@@ -108,6 +108,22 @@ const SinglePlayer = () => {
                 </div>
                 <ChevronRight size={16} className="text-muted-foreground" />
               </button>
+
+              {/* Auswertung */}
+              <button
+                onClick={handleExport}
+                disabled={downloading}
+                className="w-full py-4 px-4 rounded-xl bg-secondary text-secondary-foreground font-bold text-base hover:bg-accent active:scale-[0.97] transition-all flex items-center gap-3 disabled:opacity-60"
+              >
+                {downloading
+                  ? <Loader2 size={20} className="text-primary shrink-0 animate-spin" />
+                  : <FileBarChart2 size={20} className="text-primary shrink-0" />}
+                <div className="text-left flex-1">
+                  <span className="block">Auswertung</span>
+                  <span className="text-xs font-normal text-muted-foreground">Alle Matches als PDF herunterladen</span>
+                </div>
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </button>
             </div>
           </div>
         )}
