@@ -699,6 +699,30 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {cell.lavaTicks && cell.lavaTicks > 0 && (
                 <div className="absolute inset-0 z-0 pointer-events-none cell-lava" />
               )}
+              {/* Obelisk aura overlay */}
+              {cell.obeliskAura && cell.obeliskAura > 0 && (
+                <div
+                  className={`absolute inset-0 z-0 pointer-events-none rounded-sm ${cell.obeliskAura === 2 ? 'cell-obelisk-beam' : 'cell-obelisk-aura'}`}
+                />
+              )}
+              {/* Bomber bomb: render attack icon (or 💣) with fuse pulse */}
+              {cell.bomb && (() => {
+                const bombIcon = getAttackIcon('bomber');
+                return (
+                  <div className="absolute inset-0 z-[8] pointer-events-none flex items-center justify-center cell-bomb-pulse">
+                    {bombIcon ? (
+                      <img
+                        src={iconUrl(bombIcon)}
+                        alt="bomb"
+                        draggable={false}
+                        style={{ width: '70%', height: '70%', imageRendering: 'pixelated' }}
+                      />
+                    ) : (
+                      <span className="text-2xl drop-shadow-[0_2px_3px_rgba(0,0,0,0.7)]">💣</span>
+                    )}
+                  </div>
+                );
+              })()}
               {/* Drag preview overlays */}
               {showDragAttack && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-attack" />}
               {showDragMove && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-move" />}
