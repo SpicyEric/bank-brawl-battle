@@ -406,10 +406,10 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               placedSlots={game.placedSlots}
               onDragHover={(row, col, type) => {
                 if (row === null || col === null || !type) { setDragPreview(null); return; }
-                // Only show preview on valid placement zones (4-row half)
-                const isPlayerRow = roster
-                  ? (flipped ? row < 4 : [4, 5, 6, 7].includes(row))
-                  : [4, 5, 6, 7].includes(row);
+                // SP: full grid is buildable. MP: keep the 4-row half restriction.
+                const isPlayerRow = isMultiplayer
+                  ? (roster ? (flipped ? row < 4 : [4, 5, 6, 7].includes(row)) : [4, 5, 6, 7].includes(row))
+                  : true;
                 const targetCell = game.grid[row]?.[col];
                 if (!isPlayerRow || !targetCell || targetCell.unit || targetCell.terrain === 'water') {
                   setDragPreview(null);
@@ -422,8 +422,10 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 if (!roster) return;
                 const cell = game.grid[row]?.[col];
                 if (!cell || cell.unit || cell.terrain === 'water') return;
-                const playerRows = [4, 5, 6, 7];
-                if (!playerRows.includes(row)) return;
+                if (isMultiplayer) {
+                  const playerRows = flipped ? [0, 1, 2, 3] : [4, 5, 6, 7];
+                  if (!playerRows.includes(row)) return;
+                }
                 const type = roster[slotIdx];
                 game.setSelectedSlot(slotIdx);
                 game.placeUnit(row, col, slotIdx);
