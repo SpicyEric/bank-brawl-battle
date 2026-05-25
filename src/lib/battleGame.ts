@@ -793,6 +793,23 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     }
   }
 
+  // Lane discipline: while in lane mode, prefer enemies inside the unit's lane corridor.
+  if (isLaneActive(unit)) {
+    const tol = laneToleranceFor(unit.type);
+    const laneEnemies = enemies.filter(e => Math.abs(e.col - unit.laneCol!) <= tol);
+    if (laneEnemies.length > 0) {
+      const fwd = forwardSign(unit.team);
+      laneEnemies.sort((a, b) => {
+        // Prefer the most-forward lane enemy (closest to our front along row axis)
+        const aFront = fwd * (a.row - unit.row);
+        const bFront = fwd * (b.row - unit.row);
+        if (aFront !== bFront) return aFront - bFront;
+        return distance(unit, a) - distance(unit, b);
+      });
+      return laneEnemies[0];
+    }
+  }
+
   // Column-based targeting
   const sameColEnemies = enemies.filter(e => e.col === unit.col);
   const nearColEnemies = enemies.filter(e => Math.abs(e.col - unit.col) === 1);
