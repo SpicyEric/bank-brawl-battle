@@ -1126,8 +1126,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
 
   // Rider horn buff: +100% damage while hornBuff active
   if ((attacker.hornBuff || 0) > 0) dmg *= 2;
-  // Obelisk buff: +30% damage while obeliskBuff active
-  if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.3;
+  // Obelisk buff: +50% damage while obeliskBuff active
+  if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.5;
 
   return Math.floor(dmg);
 }
