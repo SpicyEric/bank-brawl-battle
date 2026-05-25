@@ -2080,7 +2080,7 @@ export function tickDragonSpin(
   events: BattleEvent[],
   logs: string[],
 ): void {
-  const BEAMS_PER_TICK = 4; // 8 directions over 2 ticks = whip swing
+  const BEAMS_PER_TICK = 8; // fire all 8 directions in a single tick → all targets ignite simultaneously
   const dragons = allUnits.filter(u => u.type === 'dragon' && u.hp > 0 && !u.dead);
   for (const d of dragons) {
     // Continuing an active spin: fire BEAMS_PER_TICK beams this tick.
@@ -2119,7 +2119,7 @@ export function tickDragonSpin(
     }
     d.spinClockwise = Math.random() < 0.5;
     d.spinDirIdx = startIdx;
-    d.spinTicksLeft = 2;
+    d.spinTicksLeft = 1; // entire spin completes in this single tick
     logs.push(`🐉 ${d.team === 'player' ? '👤' : '💀'} Drache schwingt Feuerpeitsche!`);
 
     // Fire first batch of BEAMS_PER_TICK beams immediately this tick.
