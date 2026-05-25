@@ -33,6 +33,8 @@ interface BattleGridProps {
   auraZones?: import('@/lib/auraData').AuraZoneMap;
   /** Cells belonging to the currently selected formation (shown highlighted during combat). */
   selectedFormationCells?: Set<string>;
+  /** Hide enemy units from view (used during full-grid placement; spy button temporarily reveals them). */
+  hideEnemyUnits?: boolean;
 }
 
 interface UnitPos { row: number; col: number }
@@ -49,7 +51,7 @@ interface RiderHornFlash { id: string; row: number; col: number; kind: 'inner' |
 interface DragonSpinFlame { id: string; row: number; col: number; delayMs: number }
 interface TeleportEffect { id: string; row: number; col: number; kind: 'out' | 'in' }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview, matchId, auraOverlay, auraZones, selectedFormationCells }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview, matchId, auraOverlay, auraZones, selectedFormationCells, hideEnemyUnits }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
