@@ -83,6 +83,7 @@ export async function initIconAssignments(): Promise<void> {
   cache.unit = loadLocal(STORAGE_KEY);
   cache.attack = loadLocal(ATTACK_KEY);
   cache.clone = loadLocal(CLONE_KEY);
+  cache.animation = loadLocal(ANIM_KEY);
   emit();
 
   loadingPromise = (async () => {
