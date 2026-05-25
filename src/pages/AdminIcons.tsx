@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import { UNIT_TYPES, UNIT_DEFS, type UnitType } from '@/lib/battleGame';
@@ -7,38 +7,61 @@ import {
   loadIconMap, saveIconMap,
   loadAttackIconMap, saveAttackIconMap,
   loadCloneIconMap, saveCloneIconMap,
-  type UnitIconMap,
+  loadAnimationMap, saveAnimationMap,
+  loadAnimationManifest, getAnimationManifest, getAnimationEntry,
+  type UnitIconMap, type AnimEntry,
 } from '@/lib/unitIcons';
+import { EffectAnimationPreview } from '@/components/EffectAnimationPreview';
 import { toast } from '@/hooks/use-toast';
 
-type Slot = 'unit' | 'attack' | 'clone';
+type Slot = 'unit' | 'attack' | 'clone' | 'animation';
 
 const AdminIcons = () => {
   const navigate = useNavigate();
   const [unitMap, setUnitMap] = useState<UnitIconMap>(() => ({ ...loadIconMap() }));
   const [attackMap, setAttackMap] = useState<UnitIconMap>(() => ({ ...loadAttackIconMap() }));
   const [cloneMap, setCloneMap] = useState<UnitIconMap>(() => ({ ...loadCloneIconMap() }));
+  const [animMap, setAnimMap] = useState<UnitIconMap>(() => ({ ...loadAnimationMap() }));
   const [selectedUnit, setSelectedUnit] = useState<UnitType>(UNIT_TYPES[0]);
   const [slot, setSlot] = useState<Slot>('unit');
   const [filter, setFilter] = useState('');
+  const [animManifest, setAnimManifest] = useState<AnimEntry[]>(() => getAnimationManifest());
+  const [previewRow, setPreviewRow] = useState(0);
 
-  const filtered = useMemo(() => {
+  useEffect(() => {
+    if (animManifest.length === 0) {
+      loadAnimationManifest().then(setAnimManifest);
+    }
+  }, [animManifest.length]);
+
+  const filteredIcons = useMemo(() => {
     if (!filter.trim()) return ALL_ICONS;
     return ALL_ICONS.filter(n => n.includes(filter.trim()));
   }, [filter]);
 
-  // Reset slot to 'unit' when switching away from cloner with clone slot active
+  const filteredAnims = useMemo(() => {
+    if (!filter.trim()) return animManifest;
+    return animManifest.filter(a => a.f.includes(filter.trim()));
+  }, [filter, animManifest]);
+
+  // Reset slot when switching away from cloner with clone slot active
   const effectiveSlot: Slot = slot === 'clone' && selectedUnit !== 'cloner' ? 'unit' : slot;
 
-  const currentMap = effectiveSlot === 'unit' ? unitMap : effectiveSlot === 'attack' ? attackMap : cloneMap;
+  const currentMap =
+    effectiveSlot === 'unit' ? unitMap :
+    effectiveSlot === 'attack' ? attackMap :
+    effectiveSlot === 'clone' ? cloneMap :
+    animMap;
+
   const setCurrentMap = (next: UnitIconMap) => {
     if (effectiveSlot === 'unit') { setUnitMap(next); saveIconMap(next); }
     else if (effectiveSlot === 'attack') { setAttackMap(next); saveAttackIconMap(next); }
-    else { setCloneMap(next); saveCloneIconMap(next); }
+    else if (effectiveSlot === 'clone') { setCloneMap(next); saveCloneIconMap(next); }
+    else { setAnimMap(next); saveAnimationMap(next); }
   };
 
-  const assign = (icon: string) => {
-    const next = { ...currentMap, [selectedUnit]: icon };
+  const assign = (file: string) => {
+    const next = { ...currentMap, [selectedUnit]: file };
     setCurrentMap(next);
   };
   const clear = () => {
@@ -47,9 +70,14 @@ const AdminIcons = () => {
     setCurrentMap(next);
   };
 
-  const slotLabel = effectiveSlot === 'unit' ? 'Einheit-Icon'
-    : effectiveSlot === 'attack' ? 'Angriffs-/Projektil-Icon'
-    : 'Klon-Icon';
+  const slotLabel =
+    effectiveSlot === 'unit' ? 'Einheit-Icon' :
+    effectiveSlot === 'attack' ? 'Angriffs-/Projektil-Icon' :
+    effectiveSlot === 'clone' ? 'Klon-Icon' :
+    'Effekt-Animation';
+
+  const currentAnimEntry = effectiveSlot === 'animation' ? getAnimationEntry(currentMap[selectedUnit]) : null;
+  const maxRows = currentAnimEntry?.r ?? 9;
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -58,7 +86,7 @@ const AdminIcons = () => {
         <h1 className="font-bold text-base flex-1">Admin · Icons zuweisen</h1>
         <button
           onClick={() => {
-            saveIconMap(unitMap); saveAttackIconMap(attackMap); saveCloneIconMap(cloneMap);
+            saveIconMap(unitMap); saveAttackIconMap(attackMap); saveCloneIconMap(cloneMap); saveAnimationMap(animMap);
             toast({ title: 'Gespeichert' });
           }}
           className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-sm font-semibold"
@@ -92,19 +120,22 @@ const AdminIcons = () => {
 
       {/* Slot tabs */}
       <div className="px-3 pt-3 border-b border-border">
-        <div className="flex gap-1.5">
-          {(['unit','attack', ...(selectedUnit === 'cloner' ? ['clone' as Slot] : [])] as Slot[]).map(s => {
-            const label = s === 'unit' ? 'Einheit' : s === 'attack' ? 'Angriff' : 'Klon';
+        <div className="flex gap-1.5 flex-wrap">
+          {(['unit','attack', ...(selectedUnit === 'cloner' ? ['clone' as Slot] : []), 'animation'] as Slot[]).map(s => {
+            const label = s === 'unit' ? 'Einheit' : s === 'attack' ? 'Angriff' : s === 'clone' ? 'Klon' : 'Animation';
             const active = effectiveSlot === s;
-            const map = s === 'unit' ? unitMap : s === 'attack' ? attackMap : cloneMap;
+            const map = s === 'unit' ? unitMap : s === 'attack' ? attackMap : s === 'clone' ? cloneMap : animMap;
             const ic = map[selectedUnit];
+            const animEntry = s === 'animation' ? getAnimationEntry(ic) : null;
             return (
               <button
                 key={s}
                 onClick={() => setSlot(s)}
-                className={`flex-1 px-2 py-2 rounded-lg border-2 text-xs font-semibold flex items-center justify-center gap-1.5 ${active ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
+                className={`flex-1 min-w-[70px] px-2 py-2 rounded-lg border-2 text-xs font-semibold flex items-center justify-center gap-1.5 ${active ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
               >
-                {ic
+                {s === 'animation' && animEntry
+                  ? <EffectAnimationPreview entry={animEntry} size={20} />
+                  : ic
                   ? <img src={iconUrl(ic)} alt="" className="w-4 h-4" style={{ imageRendering: 'pixelated' }} />
                   : <span className="text-sm opacity-60">·</span>}
                 {label}
@@ -116,13 +147,18 @@ const AdminIcons = () => {
           {effectiveSlot === 'attack' && 'Fliegt vom Angreifer zum Ziel (auch im Nahkampf).'}
           {effectiveSlot === 'unit' && 'Wird auf dem Spielfeld als Einheit angezeigt.'}
           {effectiveSlot === 'clone' && 'Aussehen der vom Kloner erzeugten Klone.'}
+          {effectiveSlot === 'animation' && 'Special-Effekt-Animation (Impuls, Treffer, Schuss, …). 64×64 Sprite-Sheet.'}
         </p>
       </div>
 
       {/* Selected slot detail */}
       <div className="px-3 py-2 border-b border-border flex items-center gap-3">
-        <div className="w-12 h-12 rounded-lg border-2 border-primary bg-primary/5 flex items-center justify-center">
-          {currentMap[selectedUnit]
+        <div className="w-12 h-12 rounded-lg border-2 border-primary bg-primary/5 flex items-center justify-center overflow-hidden">
+          {effectiveSlot === 'animation'
+            ? currentAnimEntry
+              ? <EffectAnimationPreview entry={currentAnimEntry} size={44} row={previewRow} />
+              : <span className="text-2xl">{UNIT_DEFS[selectedUnit].emoji}</span>
+            : currentMap[selectedUnit]
             ? <img src={iconUrl(currentMap[selectedUnit]!)} alt="" className="w-10 h-10" style={{ imageRendering: 'pixelated' }} />
             : <span className="text-2xl">{UNIT_DEFS[selectedUnit].emoji}</span>}
         </div>
@@ -135,41 +171,81 @@ const AdminIcons = () => {
         )}
       </div>
 
+      {/* Row picker for animations */}
+      {effectiveSlot === 'animation' && (
+        <div className="px-3 py-2 border-b border-border flex items-center gap-2">
+          <span className="text-[10px] text-muted-foreground uppercase">Zeile (Variante):</span>
+          <div className="flex gap-1 flex-wrap">
+            {Array.from({ length: maxRows }, (_, i) => (
+              <button
+                key={i}
+                onClick={() => setPreviewRow(i)}
+                className={`w-7 h-7 rounded text-[11px] font-mono border ${previewRow === i ? 'border-primary bg-primary/20' : 'border-border bg-card'}`}
+              >{i}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Search */}
       <div className="p-3 border-b border-border">
         <input
           value={filter}
           onChange={e => setFilter(e.target.value)}
-          placeholder="Suche (z. B. 042)"
+          placeholder={effectiveSlot === 'animation' ? 'Suche (z. B. 776)' : 'Suche (z. B. 042)'}
           className="w-full px-3 py-2 rounded-lg bg-card border border-border text-sm"
         />
       </div>
 
-      {/* Icon grid */}
+      {/* Grid: icons or animations */}
       <div className="flex-1 overflow-y-auto p-2">
-        <div className="grid grid-cols-8 gap-1">
-          {filtered.map(name => {
-            const isAssigned = currentMap[selectedUnit] === name;
-            return (
-              <button
-                key={name}
-                onClick={() => assign(name)}
-                title={name}
-                className={`aspect-square rounded-md border-2 flex items-center justify-center transition-all ${
-                  isAssigned ? 'border-primary bg-primary/20' : 'border-border bg-card hover:border-primary/50'
-                }`}
-              >
-                <img
-                  src={iconUrl(name)}
-                  alt={name}
-                  loading="lazy"
-                  className="w-full h-full object-contain p-0.5"
-                  style={{ imageRendering: 'pixelated' }}
-                />
-              </button>
-            );
-          })}
-        </div>
+        {effectiveSlot === 'animation' ? (
+          <div className="grid grid-cols-5 gap-2">
+            {filteredAnims.map(entry => {
+              const isAssigned = currentMap[selectedUnit] === entry.f;
+              return (
+                <button
+                  key={entry.f}
+                  onClick={() => assign(entry.f)}
+                  title={`${entry.f} (${entry.c}×${entry.r})`}
+                  className={`aspect-square rounded-md border-2 flex flex-col items-center justify-center gap-0.5 p-1 transition-all ${
+                    isAssigned ? 'border-primary bg-primary/20' : 'border-border bg-card hover:border-primary/50'
+                  }`}
+                >
+                  <EffectAnimationPreview entry={entry} size={56} row={previewRow < entry.r ? previewRow : 0} />
+                  <span className="text-[9px] text-muted-foreground font-mono">{entry.f.replace('.png','')}</span>
+                </button>
+              );
+            })}
+            {filteredAnims.length === 0 && (
+              <p className="col-span-5 text-center text-muted-foreground text-sm py-8">Lade Animationen…</p>
+            )}
+          </div>
+        ) : (
+          <div className="grid grid-cols-8 gap-1">
+            {filteredIcons.map(name => {
+              const isAssigned = currentMap[selectedUnit] === name;
+              return (
+                <button
+                  key={name}
+                  onClick={() => assign(name)}
+                  title={name}
+                  className={`aspect-square rounded-md border-2 flex items-center justify-center transition-all ${
+                    isAssigned ? 'border-primary bg-primary/20' : 'border-border bg-card hover:border-primary/50'
+                  }`}
+                >
+                  <img
+                    src={iconUrl(name)}
+                    alt={name}
+                    loading="lazy"
+                    className="w-full h-full object-contain p-0.5"
+                    style={{ imageRendering: 'pixelated' }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

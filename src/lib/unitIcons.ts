@@ -4,10 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 const STORAGE_KEY = 'unitIconMap.v1';
 const ATTACK_KEY = 'unitAttackIconMap.v1';
 const CLONE_KEY = 'unitCloneIconMap.v1';
+const ANIM_KEY = 'unitAnimationMap.v1';
 const MIGRATED_FLAG = 'unitIconMap.migratedToCloud.v1';
 
 export type UnitIconMap = Partial<Record<UnitType, string>>;
-export type Slot = 'unit' | 'attack' | 'clone';
+export type Slot = 'unit' | 'attack' | 'clone' | 'animation';
 
 // Build list of available icon filenames (1023 icons)
 export const ALL_ICONS: string[] = Array.from({ length: 1023 }, (_, i) =>
@@ -18,12 +19,35 @@ export function iconUrl(filename: string): string {
   return `/unit-icons/${filename}`;
 }
 
+/** Animation sprite-sheet manifest entry. Frame size is always 64x64. */
+export interface AnimEntry { f: string; c: number; r: number }
+let ANIM_MANIFEST: AnimEntry[] = [];
+let animManifestPromise: Promise<AnimEntry[]> | null = null;
+export function getAnimationManifest(): AnimEntry[] { return ANIM_MANIFEST; }
+export function loadAnimationManifest(): Promise<AnimEntry[]> {
+  if (ANIM_MANIFEST.length) return Promise.resolve(ANIM_MANIFEST);
+  if (animManifestPromise) return animManifestPromise;
+  animManifestPromise = fetch('/effect-animations/manifest.json')
+    .then(r => r.json())
+    .then((j: AnimEntry[]) => { ANIM_MANIFEST = j; return j; })
+    .catch(e => { console.warn('[unitIcons] anim manifest load failed', e); return []; });
+  return animManifestPromise;
+}
+export function animationUrl(filename: string): string {
+  return `/effect-animations/${filename}`;
+}
+export function getAnimationEntry(filename: string | null | undefined): AnimEntry | null {
+  if (!filename) return null;
+  return ANIM_MANIFEST.find(a => a.f === filename) ?? null;
+}
+
 interface Caches {
   unit: UnitIconMap;
   attack: UnitIconMap;
   clone: UnitIconMap;
+  animation: UnitIconMap;
 }
-const cache: Caches = { unit: {}, attack: {}, clone: {} };
+const cache: Caches = { unit: {}, attack: {}, clone: {}, animation: {} };
 const listeners = new Set<() => void>();
 let loaded = false;
 let loadingPromise: Promise<void> | null = null;
@@ -47,6 +71,7 @@ function writeLocalMirror() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cache.unit));
     localStorage.setItem(ATTACK_KEY, JSON.stringify(cache.attack));
     localStorage.setItem(CLONE_KEY, JSON.stringify(cache.clone));
+    localStorage.setItem(ANIM_KEY, JSON.stringify(cache.animation));
   } catch {}
 }
 
@@ -59,6 +84,7 @@ export async function initIconAssignments(): Promise<void> {
   cache.unit = loadLocal(STORAGE_KEY);
   cache.attack = loadLocal(ATTACK_KEY);
   cache.clone = loadLocal(CLONE_KEY);
+  cache.animation = loadLocal(ANIM_KEY);
   emit();
 
   loadingPromise = (async () => {
@@ -72,7 +98,7 @@ export async function initIconAssignments(): Promise<void> {
       return;
     }
 
-    const remote: Caches = { unit: {}, attack: {}, clone: {} };
+    const remote: Caches = { unit: {}, attack: {}, clone: {}, animation: {} };
     for (const row of data ?? []) {
       const slot = row.slot as Slot;
       if (remote[slot]) remote[slot][row.unit_type as UnitType] = row.icon_filename;
@@ -81,7 +107,8 @@ export async function initIconAssignments(): Promise<void> {
     const remoteEmpty =
       Object.keys(remote.unit).length === 0 &&
       Object.keys(remote.attack).length === 0 &&
-      Object.keys(remote.clone).length === 0;
+      Object.keys(remote.clone).length === 0 &&
+      Object.keys(remote.animation).length === 0;
 
     const alreadyMigrated = (() => {
       try { return localStorage.getItem(MIGRATED_FLAG) === '1'; } catch { return false; }
@@ -90,12 +117,13 @@ export async function initIconAssignments(): Promise<void> {
     const localHasData =
       Object.keys(cache.unit).length +
       Object.keys(cache.attack).length +
-      Object.keys(cache.clone).length > 0;
+      Object.keys(cache.clone).length +
+      Object.keys(cache.animation).length > 0;
 
     if (remoteEmpty && localHasData && !alreadyMigrated) {
       // Migrate local → cloud (one-time)
       const rows: { slot: Slot; unit_type: string; icon_filename: string }[] = [];
-      (['unit','attack','clone'] as Slot[]).forEach(slot => {
+      (['unit','attack','clone','animation'] as Slot[]).forEach(slot => {
         for (const [unit_type, icon_filename] of Object.entries(cache[slot])) {
           if (icon_filename) rows.push({ slot, unit_type, icon_filename });
         }
@@ -111,6 +139,7 @@ export async function initIconAssignments(): Promise<void> {
       cache.unit = remote.unit;
       cache.attack = remote.attack;
       cache.clone = remote.clone;
+      cache.animation = remote.animation;
       writeLocalMirror();
       emit();
     }
@@ -147,6 +176,7 @@ if (typeof window !== 'undefined') {
 export function loadIconMap(): UnitIconMap { return cache.unit; }
 export function loadAttackIconMap(): UnitIconMap { return cache.attack; }
 export function loadCloneIconMap(): UnitIconMap { return cache.clone; }
+export function loadAnimationMap(): UnitIconMap { return cache.animation; }
 
 export function getUnitIcon(type: UnitType): string | null {
   return cache.unit[type] ?? null;
@@ -157,6 +187,10 @@ export function getAttackIcon(type: UnitType | string | undefined): string | nul
 }
 export function getCloneIcon(type: UnitType): string | null {
   return cache.clone[type] ?? null;
+}
+export function getAnimation(type: UnitType | string | undefined): string | null {
+  if (!type) return null;
+  return cache.animation[type as UnitType] ?? null;
 }
 
 async function persistDiff(slot: Slot, next: UnitIconMap) {
@@ -197,6 +231,7 @@ function setMap(slot: Slot, next: UnitIconMap) {
 export function saveIconMap(map: UnitIconMap) { setMap('unit', map); }
 export function saveAttackIconMap(map: UnitIconMap) { setMap('attack', map); }
 export function saveCloneIconMap(map: UnitIconMap) { setMap('clone', map); }
+export function saveAnimationMap(map: UnitIconMap) { setMap('animation', map); }
 
 export function subscribeIconMap(cb: () => void): () => void {
   listeners.add(cb);
