@@ -2607,7 +2607,19 @@ export function tickObeliskAura(
           grid[r][c].obeliskAura = 2;
           grid[r][c].obeliskAuraTeam = ob.team;
           const u = grid[r][c].unit;
-          if (u && u.team === ob.team && u.hp > 0 && !u.dead) u.obeliskBuff = 3;
+          if (u && u.hp > 0 && !u.dead) {
+            if (u.team === ob.team) {
+              u.obeliskBuff = 2;
+            } else {
+              // Enemies in the beam take 5 damage
+              u.hp = Math.max(0, u.hp - 5);
+              logs.push(`🗿 Obelisk-Strahl trifft ${UNIT_DEFS[u.type].label} (5 Schaden)`);
+              if (u.hp <= 0) {
+                u.dead = true;
+                grid[u.row][u.col].unit = null;
+              }
+            }
+          }
           r += dr; c += dc;
         }
       }
