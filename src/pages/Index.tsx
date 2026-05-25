@@ -254,6 +254,20 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
 
       {/* Grid */}
       <div className="px-4 relative">
+        {/* Eliminations-Modus: großer 30s-Countdown oben mittig während Placement */}
+        {game.phase === 'place_player' && game.placeTimer !== undefined && (
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+            <div className={`px-4 py-1 rounded-full bg-background/80 backdrop-blur-sm border border-border shadow-lg ${
+              game.placeTimer <= 5 ? 'animate-pulse' : ''
+            }`}>
+              <span className={`text-2xl font-black font-mono tabular-nums ${
+                game.placeTimer <= 5 ? 'text-danger' : game.placeTimer <= 10 ? 'text-warning' : 'text-foreground'
+              }`}>
+                {game.placeTimer}s
+              </span>
+            </div>
+          </div>
+        )}
         <BattleGrid
           grid={game.grid}
           phase={game.phase}
