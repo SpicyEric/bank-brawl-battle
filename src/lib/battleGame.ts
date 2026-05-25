@@ -572,18 +572,34 @@ export function getActivationTurn(row: number, team: Team): number {
 
 export function createUnit(type: UnitType, team: Team, row: number, col: number, color?: 'red' | 'blue' | 'green', slotIndex?: number): Unit {
   const def = UNIT_DEFS[type];
-  return {
+  // Deterministic stagger so multiple same-type units don't fire their special
+  // on the exact same tick (avoids huge frame spikes when e.g. 5 mages pulse
+  // together). Offset is derived from slotIndex + col + row so it's stable
+  // across SP/MP and identical for both clients.
+  const seed = (slotIndex ?? 0) + col * 3 + row * 5 + (team === 'enemy' ? 1 : 0);
+  const stagger = (period: number) => ((seed % period) + period) % period + 1;
+  const unit: Unit = {
     id: crypto.randomUUID(),
     type, team, row, col,
     hp: def.hp, maxHp: def.hp,
     attack: def.attack,
     cooldown: 0, maxCooldown: def.cooldown,
-    // Stormrunner ignores row activation — starts moving instantly from any row.
     activationTurn: type === 'stormrunner' ? 0 : getActivationTurn(row, team),
     startRow: row,
     color: color ?? UNIT_COLOR_GROUPS[type],
     slotIndex,
   };
+  switch (type) {
+    case 'mage':       unit.impulseTimer  = stagger(7); break;
+    case 'magnetiker': unit.magnetTimer   = stagger(4); break;
+    case 'frost':      unit.frostNovaTimer = stagger(7); break;
+    case 'rider':      unit.hornTimer     = stagger(9); break;
+    case 'archer':     unit.volleyTimer   = stagger(4); break;
+    case 'dragon':     unit.spinTimer     = stagger(10); break;
+    case 'cloner':     unit.cloneTimer    = stagger(6); break;
+    case 'shadowblade': unit.teleportTimer = stagger(5); break;
+  }
+  return unit;
 }
 
 // Effective color for RPS damage (per-instance, falls back to type default for legacy/AI units)
