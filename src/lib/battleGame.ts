@@ -537,15 +537,15 @@ export function getMaxUnits(myScore: number, opponentScore: number, roundNumber:
   return Math.min(roundNumber + bonus, MAX_UNITS);
 }
 export const GRID_SIZE = 8;
-export const PLAYER_ROWS = [5, 6, 7];
-export const ENEMY_ROWS = [0, 1, 2];
+export const PLAYER_ROWS = [4, 5, 6, 7];
+export const ENEMY_ROWS = [0, 1, 2, 3];
 export const POINTS_TO_WIN = 8;
 export const OVERTIME_THRESHOLD = 7; // at this score, 2-point lead required
 export const AUTO_OVERTIMES = 3; // first 3 overtimes are automatic
 export const MAX_OVERTIMES = 5; // after 5th overtime → forced draw
-export const ROUND_TIME_LIMIT = 45; // seconds
-export const PLACE_TIME_LIMIT = 20; // seconds for placement phase (difficulty 2+)
-export const MULTI_PLACE_TIME_LIMIT = 20; // seconds for multiplayer placement phase
+export const ROUND_TIME_LIMIT = 120; // seconds (Eliminations-Match: viel Zeit für Kampf)
+export const PLACE_TIME_LIMIT = 30; // seconds for placement phase (simultaneous live-placement)
+export const MULTI_PLACE_TIME_LIMIT = 30; // seconds for multiplayer placement phase
 
 export const COUNTER_MULTIPLIER = 1.3;
 export const WEAKNESS_MULTIPLIER = 0.7;

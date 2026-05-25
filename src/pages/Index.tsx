@@ -254,6 +254,20 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
 
       {/* Grid */}
       <div className="px-4 relative">
+        {/* Eliminations-Modus: großer 30s-Countdown oben mittig während Placement */}
+        {game.phase === 'place_player' && game.placeTimer !== undefined && (
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
+            <div className={`px-4 py-1 rounded-full bg-background/80 backdrop-blur-sm border border-border shadow-lg ${
+              game.placeTimer <= 5 ? 'animate-pulse' : ''
+            }`}>
+              <span className={`text-2xl font-black font-mono tabular-nums ${
+                game.placeTimer <= 5 ? 'text-danger' : game.placeTimer <= 10 ? 'text-warning' : 'text-foreground'
+              }`}>
+                {game.placeTimer}s
+              </span>
+            </div>
+          </div>
+        )}
         <BattleGrid
           grid={game.grid}
           phase={game.phase}
@@ -360,10 +374,10 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               placedSlots={game.placedSlots}
               onDragHover={(row, col, type) => {
                 if (row === null || col === null || !type) { setDragPreview(null); return; }
-                // Only show preview on valid placement zones
+                // Only show preview on valid placement zones (4-row half)
                 const isPlayerRow = roster
-                  ? (flipped ? row < 3 : [5, 6, 7].includes(row))
-                  : [5, 6, 7].includes(row);
+                  ? (flipped ? row < 4 : [4, 5, 6, 7].includes(row))
+                  : [4, 5, 6, 7].includes(row);
                 const targetCell = game.grid[row]?.[col];
                 if (!isPlayerRow || !targetCell || targetCell.unit || targetCell.terrain === 'water') {
                   setDragPreview(null);
@@ -376,7 +390,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 if (!roster) return;
                 const cell = game.grid[row]?.[col];
                 if (!cell || cell.unit || cell.terrain === 'water') return;
-                const playerRows = [5, 6, 7];
+                const playerRows = [4, 5, 6, 7];
                 if (!playerRows.includes(row)) return;
                 const type = roster[slotIdx];
                 game.setSelectedSlot(slotIdx);
@@ -385,13 +399,15 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 setLastPlaced({ row, col, type });
               }}
             />
-            <button
-              onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
-              disabled={!isMultiplayer && !game.placeTimer && game.playerUnits.length < game.playerMaxUnits}
-              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              ✅ Bereit {isMultiplayer && game.playerUnits.length === 0 ? '(Aufgeben)' : ''}
-            </button>
+            {isMultiplayer && (
+              <button
+                onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
+                disabled={!game.placeTimer && game.playerUnits.length < game.playerMaxUnits}
+                className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ✅ Bereit {game.playerUnits.length === 0 ? '(Aufgeben)' : ''}
+              </button>
+            )}
           </div>
         )}
 
@@ -592,12 +608,9 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 <p className="text-xs text-muted-foreground">Nächste Runde startet automatisch...</p>
               </div>
             ) : (
-              <button
-                onClick={game.nextRound}
-                className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
-              >
-                ➡️ {game.inOvertime ? 'Verlängerung' : 'Nächste Runde'} ({game.roundNumber + 1})
-              </button>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Match-Ende wird berechnet...</p>
+              </div>
             )}
           </div>
         )}

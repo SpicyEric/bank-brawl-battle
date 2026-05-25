@@ -651,8 +651,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
 
       <div className="grid grid-cols-8 gap-[2px] w-full h-full bg-border rounded-xl overflow-hidden border border-border">
          {(flipped ? [...grid].reverse().flat() : grid.flat()).map((cell) => {
-          const isPlayerZone = flipped ? cell.row < 3 : PLAYER_ROWS.includes(cell.row);
-          const isEnemyZone = flipped ? PLAYER_ROWS.includes(cell.row) : cell.row < 3;
+          const isPlayerZone = flipped ? cell.row < 4 : PLAYER_ROWS.includes(cell.row);
+          const isEnemyZone = flipped ? PLAYER_ROWS.includes(cell.row) : cell.row < 4;
           const unit = cell.unit;
           const def = unit ? UNIT_DEFS[unit.type] : null;
           const colorGroup = unit && !unit.dead ? (unit.color || UNIT_COLOR_GROUPS[unit.type]) : null;
@@ -675,6 +675,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isDragOrigin = dragOriginKey === cellKey;
           const dragAuraKind = !isDragOrigin ? dragAuraCells.get(cellKey) : undefined;
           const pulseKind = placementPulse.get(cellKey);
+          // Enemy unit overlay during placement (live-placement view)
+          const showEnemyOverlay = unit && !isDead && isPlacing
+            && (flipped ? unit.team === 'player' : unit.team === 'enemy');
 
 
           // Slide offset
@@ -698,8 +701,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               onClick={() => onCellClick(cell.row, cell.col)}
               style={cellBgStyle}
               className={`aspect-square flex flex-col items-center justify-center relative overflow-visible
-                ${isPlayerZone && (isPlacing || showZoneColors) && !unit && terrain !== 'water' ? 'bg-primary/5' : ''} ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'hover:bg-primary/15 cursor-pointer' : isPlayerZone && isPlacing && terrain === 'water' ? 'cursor-not-allowed' : ''}
-                ${(isEnemyZone && (showZoneColors || !isPlacing)) || (isEnemyZone && !unit) ? 'bg-danger/5' : ''}
+                ${isPlayerZone && (isPlacing || showZoneColors) ? 'bg-success/15' : ''} ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'hover:bg-success/25 cursor-pointer' : isPlayerZone && isPlacing && terrain === 'water' ? 'cursor-not-allowed' : ''}
+                ${isEnemyZone && (isPlacing || showZoneColors) ? 'bg-danger/15' : ''}
                 ${isDead ? 'bg-muted/40' : ''}
                 
                 
@@ -707,6 +710,10 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                 transition-colors duration-200
               `}
             >
+              {/* Enemy live-placement overlay (red tint over enemy sprite during placement) */}
+              {showEnemyOverlay && (
+                <div className="absolute inset-0 z-[15] pointer-events-none rounded-sm bg-danger/30 ring-1 ring-danger/50" />
+              )}
               {/* Lava overlay – persistent */}
               {(cell.lavaTicks ?? 0) > 0 && (
                 <div className="absolute inset-0 z-0 pointer-events-none cell-lava" />
