@@ -9,6 +9,7 @@ import {
   applyPostAttackEffects, applyDeathEffects, applyMirrorReflect, processLavaTick, processGhostTick, shouldSkipMove,
   spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
+  tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest, applyShadowpriestCurse,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
