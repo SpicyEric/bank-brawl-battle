@@ -2486,15 +2486,16 @@ export function tickBomberActions(
 ): void {
   const bombers = allUnits.filter(u => u.type === 'bomber' && u.hp > 0 && !u.dead);
   for (const b of bombers) {
-    // Place timer
-    if (b.bombPlaceTimer === undefined) b.bombPlaceTimer = 3;
-    b.bombPlaceTimer -= 1;
+    // Place timer (every 4 ticks; obelisk-buffed bombers halve to every 2 ticks)
     const buffed = (b.obeliskBuff || 0) > 0;
-    if (b.bombPlaceTimer <= 0 || buffed) {
-      if (!buffed) b.bombPlaceTimer = 3;
+    const placeReset = buffed ? 2 : 4;
+    if (b.bombPlaceTimer === undefined) b.bombPlaceTimer = placeReset;
+    b.bombPlaceTimer -= 1;
+    if (b.bombPlaceTimer <= 0) {
+      b.bombPlaceTimer = placeReset;
       const cell = grid[b.row]?.[b.col];
       if (cell && !cell.bomb) {
-        cell.bomb = { fuse: 2, dmg: 35, ownerTeam: b.team };
+        cell.bomb = { fuse: 2, dmg: 30, ownerTeam: b.team };
         logs.push(`💣 Sprengmeister legt eine Bombe${buffed ? ' (Obelisk-Buff)' : ''}`);
       }
     }
@@ -2508,7 +2509,7 @@ export function tickBomberActions(
       for (const e of enemies) {
         const cell = grid[e.row]?.[e.col];
         if (!cell) continue;
-        cell.bomb = { fuse: 1, dmg: 35, ownerTeam: b.team };
+        cell.bomb = { fuse: 1, dmg: 30, ownerTeam: b.team };
         count++;
         events.push({
           type: 'spawn',
