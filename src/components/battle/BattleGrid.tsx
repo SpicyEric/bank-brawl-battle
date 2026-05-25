@@ -86,24 +86,20 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const prevFocus = useRef(false);
   const prevSacrifice = useRef(false);
 
-  // Random battlefield background per round (re-rolls on each new placement phase)
+  // Random battlefield background per MATCH (re-rolls when matchId changes)
   const BATTLEFIELDS = useMemo(() => [
     { id: 'grass' as const, url: battlefieldGrass },
     { id: 'desert' as const, url: battlefieldDesert },
   ], []);
   const [battlefield, setBattlefield] = useState(() => BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
   const battlefieldBg = battlefield.url;
-  const prevPhaseRef = useRef<Phase>(phase);
+  const prevMatchIdRef = useRef<number | undefined>(matchId);
   useEffect(() => {
-    const prev = prevPhaseRef.current;
-    const isNewRoundStart =
-      (phase === 'place_player' || phase === 'place_enemy') &&
-      (prev === 'round_won' || prev === 'round_lost' || prev === 'round_draw' || prev === 'battle');
-    if (isNewRoundStart) {
+    if (matchId !== undefined && matchId !== prevMatchIdRef.current) {
       setBattlefield(BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+      prevMatchIdRef.current = matchId;
     }
-    prevPhaseRef.current = phase;
-  }, [phase, BATTLEFIELDS]);
+  }, [matchId, BATTLEFIELDS]);
 
 
   // War cry flash animation (own or opponent)
