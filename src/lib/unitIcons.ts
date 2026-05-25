@@ -4,10 +4,11 @@ import { supabase } from '@/integrations/supabase/client';
 const STORAGE_KEY = 'unitIconMap.v1';
 const ATTACK_KEY = 'unitAttackIconMap.v1';
 const CLONE_KEY = 'unitCloneIconMap.v1';
+const ANIM_KEY = 'unitAnimationMap.v1';
 const MIGRATED_FLAG = 'unitIconMap.migratedToCloud.v1';
 
 export type UnitIconMap = Partial<Record<UnitType, string>>;
-export type Slot = 'unit' | 'attack' | 'clone';
+export type Slot = 'unit' | 'attack' | 'clone' | 'animation';
 
 // Build list of available icon filenames (1023 icons)
 export const ALL_ICONS: string[] = Array.from({ length: 1023 }, (_, i) =>
@@ -18,12 +19,35 @@ export function iconUrl(filename: string): string {
   return `/unit-icons/${filename}`;
 }
 
+/** Animation sprite-sheet manifest entry. Frame size is always 64x64. */
+export interface AnimEntry { f: string; c: number; r: number }
+let ANIM_MANIFEST: AnimEntry[] = [];
+let animManifestPromise: Promise<AnimEntry[]> | null = null;
+export function getAnimationManifest(): AnimEntry[] { return ANIM_MANIFEST; }
+export function loadAnimationManifest(): Promise<AnimEntry[]> {
+  if (ANIM_MANIFEST.length) return Promise.resolve(ANIM_MANIFEST);
+  if (animManifestPromise) return animManifestPromise;
+  animManifestPromise = fetch('/effect-animations/manifest.json')
+    .then(r => r.json())
+    .then((j: AnimEntry[]) => { ANIM_MANIFEST = j; return j; })
+    .catch(e => { console.warn('[unitIcons] anim manifest load failed', e); return []; });
+  return animManifestPromise;
+}
+export function animationUrl(filename: string): string {
+  return `/effect-animations/${filename}`;
+}
+export function getAnimationEntry(filename: string | null | undefined): AnimEntry | null {
+  if (!filename) return null;
+  return ANIM_MANIFEST.find(a => a.f === filename) ?? null;
+}
+
 interface Caches {
   unit: UnitIconMap;
   attack: UnitIconMap;
   clone: UnitIconMap;
+  animation: UnitIconMap;
 }
-const cache: Caches = { unit: {}, attack: {}, clone: {} };
+const cache: Caches = { unit: {}, attack: {}, clone: {}, animation: {} };
 const listeners = new Set<() => void>();
 let loaded = false;
 let loadingPromise: Promise<void> | null = null;
