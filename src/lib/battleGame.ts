@@ -84,6 +84,7 @@ export interface Cell {
   terrain: TerrainType;
   lavaTicks?: number; // vulkanit lava: ticks remaining
   lavaOwnerTeam?: Team; // immune team
+  lavaDmg?: number; // per-tick damage (default 8)
 }
 
 // Movement patterns: relative offsets the unit can move to per turn
