@@ -2584,7 +2584,7 @@ export function tickObeliskAura(
       grid[r][c].obeliskAuraTeam = ob.team;
       const u = grid[r][c].unit;
       if (u && u.team === ob.team && u.hp > 0 && !u.dead && u.id !== ob.id) {
-        u.obeliskBuff = 3;
+        u.obeliskBuff = 2;
       }
     }
     // Beam timer
