@@ -397,22 +397,37 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   }, []);
 
   // Place unit on my side
-  const placeUnit = useCallback((row: number, col: number) => {
-    if (phase !== 'place_player' || !isMyTurnToPlace || !selectedUnit) return;
-    if (playerBannedUnits.includes(selectedUnit)) return; // Fatigue ban
+  const placeUnit = useCallback((row: number, col: number, overrideSlot?: number) => {
+    if (phase !== 'place_player' || !isMyTurnToPlace) return;
     if (!myRows.includes(row)) return;
     if (playerUnits.length >= getMaxUnits(playerScore, enemyScore, roundNumber)) return;
     if (grid[row][col].unit) return;
     if (grid[row][col].terrain === 'water') return;
 
-    const unit = createUnit(selectedUnit, myTeam, row, col);
+    let type: UnitType | null = null;
+    let color: 'red' | 'green' | 'blue' | undefined;
+    let slotIdx: number | undefined;
+
+    if (hasRoster) {
+      const useSlot = overrideSlot !== undefined ? overrideSlot : selectedSlot;
+      if (useSlot === null || useSlot === undefined) return;
+      type = roster![useSlot];
+      color = SLOT_COLORS[useSlot];
+      slotIdx = useSlot;
+    } else {
+      if (!selectedUnit) return;
+      if (playerBannedUnits.includes(selectedUnit)) return;
+      type = selectedUnit;
+    }
+
+    const unit = createUnit(type, myTeam, row, col, color, slotIdx);
     setPlayerUnits(prev => [...prev, unit]);
     setGrid(prev => {
       const next = prev.map(r => r.map(c => ({ ...c })));
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
-  }, [phase, isMyTurnToPlace, selectedUnit, playerUnits, grid, myRows, myTeam, playerBannedUnits]);
+  }, [phase, isMyTurnToPlace, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, myRows, myTeam, playerBannedUnits, playerScore, enemyScore, roundNumber]);
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
