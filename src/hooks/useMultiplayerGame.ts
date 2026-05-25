@@ -25,13 +25,19 @@ const SLOT_COLORS: ('red' | 'green' | 'blue')[] = ['red','red','red','green','gr
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning, color: (u as any).color, slotIndex: (u as any).slotIndex };
+  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning, bleeding: u.bleeding, bombPlaceTimer: (u as any).bombPlaceTimer, bombSpecialTimer: (u as any).bombSpecialTimer, obeliskBeamTimer: (u as any).obeliskBeamTimer, obeliskBeamLeft: (u as any).obeliskBeamLeft, obeliskBuff: (u as any).obeliskBuff, color: (u as any).color, slotIndex: (u as any).slotIndex };
 }
 
 function serializeGrid(grid: Cell[][]) {
   return grid.map(row => row.map(cell => ({
     row: cell.row, col: cell.col, terrain: cell.terrain,
     unit: cell.unit ? serializeUnit(cell.unit) : null,
+    lavaTicks: cell.lavaTicks,
+    lavaOwnerTeam: cell.lavaOwnerTeam,
+    lavaDmg: cell.lavaDmg,
+    bomb: cell.bomb ?? null,
+    obeliskAura: cell.obeliskAura,
+    obeliskAuraTeam: cell.obeliskAuraTeam,
   })));
 }
 
