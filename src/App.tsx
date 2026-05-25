@@ -10,6 +10,7 @@ import Tutorial from "./pages/Tutorial";
 import Multiplayer from "./pages/Multiplayer";
 import UnitRoster from "./pages/UnitRoster";
 import AdminIcons from "./pages/AdminIcons";
+import Simulator from "./pages/Simulator";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
