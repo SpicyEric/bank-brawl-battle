@@ -1524,8 +1524,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     shieldWallUsed, shieldWallActive, activateShieldWall,
     waitingForOpponent: false,
     aiMoraleActive,
-    inOvertime, overtimeCount, drawOfferPending,
-    acceptDraw, continueOvertime,
+    inOvertime: false,
+    overtimeCount: 0,
+    drawOfferPending: false,
+    acceptDraw: () => {},
+    continueOvertime: () => {},
     // Fatigue system
     playerBannedUnits,
     playerBannedSlots,
