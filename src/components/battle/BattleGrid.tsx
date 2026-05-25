@@ -596,8 +596,25 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   // When flipped, visual row position is inverted for overlay effects
   const visualRow = (r: number) => flipped ? (GRID_SIZE - 1 - r) : r;
 
+  // Track grid pixel width for sprite-sheet animations (need px sizes for CSS steps())
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [gridPx, setGridPx] = useState(0);
+  useEffect(() => {
+    loadAnimationManifest();
+    const el = gridRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(entries => {
+      for (const e of entries) setGridPx(e.contentRect.width);
+    });
+    ro.observe(el);
+    setGridPx(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, []);
+  const cellPx = gridPx / GRID_SIZE;
+
   return (
-    <div className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto relative">
+    <div ref={gridRef} className="w-full aspect-square max-w-[min(100vw-2rem,28rem)] mx-auto relative">
+
       <div className="grid grid-cols-8 gap-[2px] w-full h-full bg-border rounded-xl overflow-hidden border border-border">
          {(flipped ? [...grid].reverse().flat() : grid.flat()).map((cell) => {
           const isPlayerZone = flipped ? cell.row < 3 : PLAYER_ROWS.includes(cell.row);
