@@ -537,8 +537,10 @@ export function getMaxUnits(myScore: number, opponentScore: number, roundNumber:
   return Math.min(roundNumber + bonus, MAX_UNITS);
 }
 export const GRID_SIZE = 8;
-export const PLAYER_ROWS = [4, 5, 6, 7];
-export const ENEMY_ROWS = [0, 1, 2, 3];
+// Full-grid placement: both sides can build anywhere on the 8x8 board.
+// (Spy/intro mechanic keeps each side's formation hidden from the other.)
+export const PLAYER_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
+export const ENEMY_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
 export const POINTS_TO_WIN = 8;
 export const OVERTIME_THRESHOLD = 7; // at this score, 2-point lead required
 export const AUTO_OVERTIMES = 3; // first 3 overtimes are automatic
@@ -608,16 +610,9 @@ export function generateTerrain(grid: Cell[][]): Cell[][] {
 // Calculate activation turn based on row distance from center
 // Player rows: 5 (front, turn 0), 6 (mid, turn 2), 7 (back, turn 3)
 // Enemy rows: 2 (front, turn 0), 1 (mid, turn 2), 0 (back, turn 3)
-export function getActivationTurn(row: number, team: Team): number {
-  if (team === 'player') {
-    if (row === 5) return 0;
-    if (row === 6) return 2;
-    return 3; // row 7
-  } else {
-    if (row === 2) return 0;
-    if (row === 1) return 2;
-    return 3; // row 0
-  }
+export function getActivationTurn(_row: number, _team: Team): number {
+  // Full-grid placement + simultaneous start: every unit activates on turn 0.
+  return 0;
 }
 
 export function createUnit(type: UnitType, team: Team, row: number, col: number, color?: 'red' | 'blue' | 'green', slotIndex?: number): Unit {
