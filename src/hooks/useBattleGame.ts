@@ -1302,7 +1302,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const newPS = playerScoreRef.current + 1;
       playerScoreRef.current = newPS;
       setPlayerScore(newPS);
-      const result = checkGameOver(newPS, enemyScoreRef.current, overtimeCount);
+      const result = checkGameOver(newPS, enemyScoreRef.current);
       if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
       else setPhase('round_won');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Du hast mehr Einheiten übrig!', ...prev]);
@@ -1310,7 +1310,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const newES = enemyScoreRef.current + 1;
       enemyScoreRef.current = newES;
       setEnemyScore(newES);
-      const result = checkGameOver(playerScoreRef.current, newES, overtimeCount);
+      const result = checkGameOver(playerScoreRef.current, newES);
       if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
       else setPhase('round_lost');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Der Gegner hat mehr Einheiten!', ...prev]);
@@ -1321,7 +1321,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       enemyScoreRef.current = newES;
       setPlayerScore(newPS);
       setEnemyScore(newES);
-      const result = checkGameOver(newPS, newES, overtimeCount);
+      const result = checkGameOver(newPS, newES);
       if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
       else setPhase('round_draw');
       setBattleLog(prev => ['⏰ Zeit abgelaufen! Gleichstand – beide erhalten einen Punkt!', ...prev]);
