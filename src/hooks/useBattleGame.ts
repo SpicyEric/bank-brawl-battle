@@ -3,7 +3,7 @@ import {
   Unit, UnitType, Cell, Phase, ColorGroup,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateAIPlacement, getMaxUnits, generateTerrain, setBondsForPlacement, moveTankFormation,
-  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  GRID_SIZE, MAX_UNITS, PLAYER_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, ROUNDS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
   OVERTIME_THRESHOLD, AUTO_OVERTIMES, MAX_OVERTIMES, PLACE_TIME_LIMIT,
   getActivationTurn,
   applyPostAttackEffects, applyDeathEffects, applyMirrorReflect, processLavaTick, processGhostTick, shouldSkipMove,
@@ -111,25 +111,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const [drawOfferPending, setDrawOfferPending] = useState(false);
   const [gameDraw, setGameDraw] = useState(false);
 
-  // Overtime win check: need 2-point lead once both are at OVERTIME_THRESHOLD+
-  const checkGameOver = useCallback((pScore: number, eScore: number, otCount: number): { over: boolean; won: boolean; draw: boolean } => {
-    const bothAtThreshold = pScore >= OVERTIME_THRESHOLD && eScore >= OVERTIME_THRESHOLD;
-
-    if (bothAtThreshold) {
-      // Forced draw after MAX_OVERTIMES
-      if (otCount >= MAX_OVERTIMES) {
-        return { over: true, won: false, draw: true };
-      }
-      // Need 2-point lead
-      if (Math.abs(pScore - eScore) >= 2) {
-        return { over: true, won: pScore > eScore, draw: false };
-      }
-      return { over: false, won: false, draw: false };
-    }
-
-    // Normal win
-    if (pScore >= POINTS_TO_WIN) return { over: true, won: true, draw: false };
-    if (eScore >= POINTS_TO_WIN) return { over: true, won: false, draw: false };
+  // Round-based win check: first to ROUNDS_TO_WIN round wins wins the match
+  const checkGameOver = useCallback((pScore: number, eScore: number): { over: boolean; won: boolean; draw: boolean } => {
+    if (pScore >= ROUNDS_TO_WIN) return { over: true, won: true, draw: false };
+    if (eScore >= ROUNDS_TO_WIN) return { over: true, won: false, draw: false };
     return { over: false, won: false, draw: false };
   }, []);
 
