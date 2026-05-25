@@ -16,7 +16,7 @@ export const ZONE_POSITIONS: ZonePos[] = [
   'bottom-left', 'bottom', 'bottom-right',
 ];
 
-const ZONE_DELTA: Record<ZonePos, { dr: number; dc: number }> = {
+export const ZONE_DELTA: Record<ZonePos, { dr: number; dc: number }> = {
   'top-left':     { dr: -1, dc: -1 },
   'top':          { dr: -1, dc:  0 },
   'top-right':    { dr: -1, dc:  1 },
@@ -26,6 +26,28 @@ const ZONE_DELTA: Record<ZonePos, { dr: number; dc: number }> = {
   'bottom':       { dr:  1, dc:  0 },
   'bottom-right': { dr:  1, dc:  1 },
 };
+
+/** Aura cells around (row,col) for a unit type. Returns map "r-c" -> 'buff' | 'nerf'. */
+export function auraCellsAround(
+  type: UnitType,
+  row: number,
+  col: number,
+  zones: AuraZoneMap,
+): Map<string, 'buff' | 'nerf'> {
+  const out = new Map<string, 'buff' | 'nerf'>();
+  const z = zones[type];
+  if (!z) return out;
+  for (const pos of ZONE_POSITIONS) {
+    const kind = z[pos];
+    if (!kind) continue;
+    const { dr, dc } = ZONE_DELTA[pos];
+    const r = row + dr;
+    const c = col + dc;
+    if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+    out.set(`${r}-${c}`, kind);
+  }
+  return out;
+}
 
 export type AuraZoneMap = Partial<Record<UnitType, Partial<Record<ZonePos, Exclude<ZoneType, 'neutral'>>>>>;
 export type AuraEffectMap = Partial<Record<UnitType, { buff: string | null; nerf: string | null }>>;
