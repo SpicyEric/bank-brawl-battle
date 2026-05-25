@@ -85,8 +85,12 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const prevSacrifice = useRef(false);
 
   // Random battlefield background per round (re-rolls on each new placement phase)
-  const BATTLEFIELDS = useMemo(() => [battlefieldGrass, battlefieldDesert], []);
-  const [battlefieldBg, setBattlefieldBg] = useState<string>(() => BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+  const BATTLEFIELDS = useMemo(() => [
+    { id: 'grass' as const, url: battlefieldGrass },
+    { id: 'desert' as const, url: battlefieldDesert },
+  ], []);
+  const [battlefield, setBattlefield] = useState(() => BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+  const battlefieldBg = battlefield.url;
   const prevPhaseRef = useRef<Phase>(phase);
   useEffect(() => {
     const prev = prevPhaseRef.current;
@@ -94,7 +98,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       (phase === 'place_player' || phase === 'place_enemy') &&
       (prev === 'round_won' || prev === 'round_lost' || prev === 'round_draw' || prev === 'battle');
     if (isNewRoundStart) {
-      setBattlefieldBg(BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+      setBattlefield(BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
     }
     prevPhaseRef.current = phase;
   }, [phase, BATTLEFIELDS]);
@@ -670,11 +674,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             : undefined;
 
           const vRow = flipped ? (GRID_SIZE - 1 - cell.row) : cell.row;
-          const cellBgStyle = !hasTerrain ? {
+          const cellBgStyle = {
             backgroundImage: `url(${battlefieldBg})`,
             backgroundSize: `${GRID_SIZE * 100}% ${GRID_SIZE * 100}%`,
             backgroundPosition: `${(cell.col / (GRID_SIZE - 1)) * 100}% ${(vRow / (GRID_SIZE - 1)) * 100}%`,
-          } : undefined;
+          };
 
           return (
             <button
@@ -686,10 +690,6 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               className={`aspect-square flex flex-col items-center justify-center relative overflow-visible
                 ${isPlayerZone && (isPlacing || showZoneColors) && !unit && terrain !== 'water' ? 'bg-primary/5' : ''} ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'hover:bg-primary/15 cursor-pointer' : isPlayerZone && isPlacing && terrain === 'water' ? 'cursor-not-allowed' : ''}
                 ${(isEnemyZone && (showZoneColors || !isPlacing)) || (isEnemyZone && !unit) ? 'bg-danger/5' : ''}
-                ${!unit && !hasTerrain ? '' : ''}
-                ${!unit && terrain === 'forest' ? 'bg-[hsl(145,30%,15%)]' : ''}
-                ${!unit && terrain === 'hill' ? 'bg-[hsl(35,25%,18%)]' : ''}
-                ${!unit && terrain === 'water' ? 'bg-[hsl(210,40%,18%)]' : ''}
                 ${isDead ? 'bg-muted/40' : ''}
                 ${isFlashing ? 'placement-attack-flash' : ''}
                 ${isMoveFlashing && !isFlashing ? 'placement-move-flash' : ''}
@@ -709,7 +709,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {isImpact && <div className="placement-impact" />}
               {/* Terrain emoji (show when no unit or unit is dead) */}
               {hasTerrain && (!unit || isDead) && (
-                <span className="text-[10px] opacity-50 select-none">{TERRAIN_DEFS[terrain].emoji}</span>
+                <span className="text-[10px] opacity-50 select-none">{terrain === 'forest' && battlefield.id === 'desert' ? '🌵' : TERRAIN_DEFS[terrain].emoji}</span>
               )}
               {isDead && (
                 <span className="text-sm opacity-40 select-none">💀</span>
