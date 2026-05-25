@@ -636,10 +636,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         if (unit.type === 'dragon' && (unit.spinTicksLeft ?? 0) > 0) continue;
 
         // Doppelganger original: idle (no move, no attack) while its phantom is still alive.
-        if (unit.type === 'doppelganger' && !unit.isPhantom && unit.phantomId) {
-          const phantomAlive = allUnits.some(u => u.id === unit.phantomId && !u.dead && u.hp > 0);
-          if (phantomAlive) continue;
-        }
+        // Doppelganger original: now stays active and fights normally even while phantom lives.
 
         // Webbed: can't act at all (spiderqueen net)
         if (unit.webbed && unit.webbed > 0) {
