@@ -1458,6 +1458,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     playerMaxUnits, enemyMaxUnits,
     gameOver, gameWon, gameDraw,
     placeUnit, removeUnit, confirmPlacement, startBattle,
+    moveFormation,
     resetGame, nextRound,
     moraleBoostUsed, moraleBoostActive, activateMoraleBoost,
     focusFireUsed, focusFireActive, activateFocusFire,
