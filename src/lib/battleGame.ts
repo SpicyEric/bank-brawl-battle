@@ -800,7 +800,8 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   }
 
   // Lane discipline: while in lane mode, prefer enemies inside the unit's lane corridor.
-  if (isLaneActive(unit)) {
+  const laneActive = isLaneActive(unit);
+  if (laneActive) {
     const tol = laneToleranceFor(unit.type);
     const laneEnemies = enemies.filter(e => Math.abs(e.col - unit.laneCol!) <= tol);
     if (laneEnemies.length > 0) {
@@ -813,6 +814,13 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
         return distance(unit, a) - distance(unit, b);
       });
       return laneEnemies[0];
+    }
+    // No lane enemies → if an out-of-lane enemy is already in our attack pattern,
+    // commit to it but break the lane (we're actively in combat now).
+    const inAttackRange = enemies.find(e => canAttack(unit, e));
+    if (inAttackRange) {
+      breakLane(unit);
+      return inAttackRange;
     }
   }
 
@@ -828,6 +836,7 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
       if (aColDist !== bColDist) return aColDist - bColDist;
       return distance(unit, a) - distance(unit, b);
     });
+    if (laneActive) breakLane(unit);
     return columnEnemies[0];
   }
 
@@ -841,11 +850,13 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
       if (aFront !== bFront) return bFront - aFront;
       return distance(unit, a) - distance(unit, b);
     });
+    if (laneActive) breakLane(unit);
     return frontlineSorted[0];
   }
 
   // Ranged units: target closest enemy
   enemies.sort((a, b) => distance(unit, a) - distance(unit, b));
+  if (laneActive) breakLane(unit);
   return enemies[0];
 }
 
