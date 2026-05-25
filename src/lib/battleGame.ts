@@ -1517,8 +1517,8 @@ export function effectiveCooldown(unit: Unit, grid: Cell[][]): number {
   let cd = unit.maxCooldown;
   if (unit.type === 'ranger' && t === 'forest') cd = 1;
   else if (unit.type === 'mountaineer' && t === 'hill') cd = 2;
-  // Obelisk buff: cap cooldown at 1
-  if ((unit.obeliskBuff || 0) > 0) cd = Math.min(cd, 1);
+  // Obelisk buff: cooldown drops to 0 (attack every tick) while buffed
+  if ((unit.obeliskBuff || 0) > 0) cd = 0;
   return cd;
 }
 
