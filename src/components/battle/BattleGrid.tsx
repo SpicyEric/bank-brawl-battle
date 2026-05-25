@@ -228,6 +228,22 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const processBattleEvents = (events: BattleEvent[]) => {
     if (events.length === 0) return;
 
+    // --- Animation stagger ---
+    // When many "heavy" specials trigger in the same tick (e.g. 5 mages
+    // pulsing at once), rendering them on the exact same frame causes a
+    // visible hitch. Gameplay state is already resolved — we only stagger
+    // the *visual* spawn of those effects by tiny micro-delays per unique
+    // attacker. Deterministic order = same on both SP/MP clients.
+    const HEAVY_TYPES = new Set(['impulse', 'mirrorExplode', 'frostNova', 'riderHorn', 'dragonSpin', 'teleport', 'chain', 'spawn']);
+    const STAGGER_MS = 55;
+    const staggerOrder = new Map<string, number>();
+    for (const evt of events) {
+      if (!HEAVY_TYPES.has(evt.type)) continue;
+      if (!staggerOrder.has(evt.attackerId)) staggerOrder.set(evt.attackerId, staggerOrder.size);
+    }
+    const delayFor = (attackerId: string) => (staggerOrder.get(attackerId) ?? 0) * STAGGER_MS;
+
+
     // Separate ranged (projectile) and melee events
     const rangedDamageEvents: BattleEvent[] = [];
     const meleeDamageEvents: BattleEvent[] = [];
