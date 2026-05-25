@@ -556,7 +556,7 @@ export function generateTerrain(grid: Cell[][]): Cell[][] {
   const newGrid = grid.map(r => r.map(c => ({ ...c, terrain: 'none' as TerrainType })));
   const terrainTypes: TerrainType[] = ['forest', 'hill', 'water'];
   // Place 4-7 terrain tiles in the middle area (rows 2-5)
-  const middleCount = 4 + Math.floor(Math.random() * 4);
+  const middleCount = 6 + Math.floor(Math.random() * 4);
   const used = new Set<string>();
 
   for (let i = 0; i < middleCount; i++) {
