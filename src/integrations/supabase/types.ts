@@ -71,6 +71,42 @@ export type Database = {
         }
         Relationships: []
       }
+      match_records: {
+        Row: {
+          client_id: string | null
+          created_at: string
+          data: Json
+          difficulty: number | null
+          id: string
+          mode: string
+          player1_label: string | null
+          player2_label: string | null
+          winner: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string
+          data: Json
+          difficulty?: number | null
+          id?: string
+          mode: string
+          player1_label?: string | null
+          player2_label?: string | null
+          winner?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string
+          data?: Json
+          difficulty?: number | null
+          id?: string
+          mode?: string
+          player1_label?: string | null
+          player2_label?: string | null
+          winner?: string | null
+        }
+        Relationships: []
+      }
       matchmaking_queue: {
         Row: {
           created_at: string
