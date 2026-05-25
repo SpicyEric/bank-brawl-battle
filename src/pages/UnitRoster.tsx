@@ -204,7 +204,7 @@ export default function UnitRoster() {
           Gedrückt halten = Info
         </p>
         <div className="grid grid-cols-3 gap-1.5">
-          {UNIT_TYPES.map(t => {
+          {pickerOrder.map(t => {
             const def = UNIT_DEFS[t];
             const isPlaced = placedUnits.has(t);
             const isSelected = selectedUnit === t;
