@@ -1126,8 +1126,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
 
   // Rider horn buff: +100% damage while hornBuff active
   if ((attacker.hornBuff || 0) > 0) dmg *= 2;
-  // Obelisk buff: +30% damage while obeliskBuff active
-  if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.3;
+  // Obelisk buff: +50% damage while obeliskBuff active
+  if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.5;
 
   return Math.floor(dmg);
 }
@@ -1517,8 +1517,8 @@ export function effectiveCooldown(unit: Unit, grid: Cell[][]): number {
   let cd = unit.maxCooldown;
   if (unit.type === 'ranger' && t === 'forest') cd = 1;
   else if (unit.type === 'mountaineer' && t === 'hill') cd = 2;
-  // Obelisk buff: cap cooldown at 1
-  if ((unit.obeliskBuff || 0) > 0) cd = Math.min(cd, 1);
+  // Obelisk buff: cooldown drops to 0 (attack every tick) while buffed
+  if ((unit.obeliskBuff || 0) > 0) cd = 0;
   return cd;
 }
 
@@ -2484,12 +2484,13 @@ export function tickBomberActions(
     // Place timer
     if (b.bombPlaceTimer === undefined) b.bombPlaceTimer = 3;
     b.bombPlaceTimer -= 1;
-    if (b.bombPlaceTimer <= 0) {
-      b.bombPlaceTimer = 3;
+    const buffed = (b.obeliskBuff || 0) > 0;
+    if (b.bombPlaceTimer <= 0 || buffed) {
+      if (!buffed) b.bombPlaceTimer = 3;
       const cell = grid[b.row]?.[b.col];
       if (cell && !cell.bomb) {
         cell.bomb = { fuse: 2, dmg: 35, ownerTeam: b.team };
-        logs.push(`💣 Sprengmeister legt eine Bombe`);
+        logs.push(`💣 Sprengmeister legt eine Bombe${buffed ? ' (Obelisk-Buff)' : ''}`);
       }
     }
     // Special timer
@@ -2566,7 +2567,7 @@ export function tickObeliskAura(
   allUnits: Unit[],
   grid: Cell[][],
   events: BattleEvent[],
-  _logs: string[],
+  logs: string[],
 ): void {
   // Clear transient aura marks
   for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
@@ -2584,7 +2585,7 @@ export function tickObeliskAura(
       grid[r][c].obeliskAuraTeam = ob.team;
       const u = grid[r][c].unit;
       if (u && u.team === ob.team && u.hp > 0 && !u.dead && u.id !== ob.id) {
-        u.obeliskBuff = 3;
+        u.obeliskBuff = 2;
       }
     }
     // Beam timer
@@ -2607,7 +2608,19 @@ export function tickObeliskAura(
           grid[r][c].obeliskAura = 2;
           grid[r][c].obeliskAuraTeam = ob.team;
           const u = grid[r][c].unit;
-          if (u && u.team === ob.team && u.hp > 0 && !u.dead) u.obeliskBuff = 3;
+          if (u && u.hp > 0 && !u.dead) {
+            if (u.team === ob.team) {
+              u.obeliskBuff = 2;
+            } else {
+              // Enemies in the beam take 5 damage
+              u.hp = Math.max(0, u.hp - 5);
+              logs.push(`🗿 Obelisk-Strahl trifft ${UNIT_DEFS[u.type].label} (5 Schaden)`);
+              if (u.hp <= 0) {
+                u.dead = true;
+                grid[u.row][u.col].unit = null;
+              }
+            }
+          }
           r += dr; c += dc;
         }
       }
