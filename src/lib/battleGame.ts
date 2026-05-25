@@ -632,9 +632,50 @@ export function createUnit(type: UnitType, team: Team, row: number, col: number,
     startRow: row,
     color: color ?? UNIT_COLOR_GROUPS[type],
     slotIndex,
+    laneCol: col,
+    laneBroken: false,
+    laneStuckTicks: 0,
   };
   // All special cooldown timers start at 0 (initialized lazily on first tick).
   return unit;
+}
+
+// ── Lane discipline ─────────────────────────────────────────────────────────
+// Units placed in a column try to advance straight up/down that column until
+// an enemy enters their attack pattern. Special-behavior units skip lane mode.
+const LANE_EXEMPT_TYPES = new Set<UnitType>([
+  'dragon', 'waterwalker', 'shadowblade', 'obelisk', 'bomber',
+  'mountaineer', 'ranger', 'vulkanit',
+  'healer', 'lamb',
+  'cloner', 'doppelganger',
+]);
+
+function laneToleranceFor(type: UnitType): number {
+  // Hard overrides for units whose movePattern doesn't include any orthogonal step
+  if (type === 'assassin') return 2;
+  const def = UNIT_DEFS[type];
+  let minSide = Infinity;
+  for (const m of def.movePattern) {
+    if (m.row === 0 && m.col === 0) continue;
+    // forward-progressing move
+    const sideways = Math.abs(m.col);
+    if (sideways < minSide) minSide = sideways;
+  }
+  if (!isFinite(minSide)) return 0;
+  return Math.max(0, minSide);
+}
+
+function isLaneActive(unit: Unit): boolean {
+  if (unit.laneBroken) return false;
+  if (unit.laneCol == null) return false;
+  if (LANE_EXEMPT_TYPES.has(unit.type)) return false;
+  if (unit.isClone || unit.isPhantom) return false;
+  if (UNIT_DEFS[unit.type].movePattern.length === 0) return false;
+  return true;
+}
+
+function forwardSign(team: Team): number {
+  return team === 'player' ? -1 : 1; // player moves toward lower rows
 }
 
 // Effective color for RPS damage (per-instance, falls back to type default for legacy/AI units)
