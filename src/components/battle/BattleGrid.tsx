@@ -25,6 +25,8 @@ interface BattleGridProps {
   flipped?: boolean;
   /** While the player is dragging a unit, show alternating attack/move preview around this cell */
   dragPreview?: { row: number; col: number; type: UnitType } | null;
+  /** Increments each new match — re-rolls battlefield background */
+  matchId?: number;
 }
 
 interface UnitPos { row: number; col: number }
