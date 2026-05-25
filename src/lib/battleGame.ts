@@ -2654,13 +2654,13 @@ export function applyShadowpriestCurse(
   if (target.hp <= 0 || target.dead) return;
   if (target.cursed) return; // already cursed, no more stacks needed
   target.curseStacks = (target.curseStacks || 0) + 1;
-  if (target.curseStacks >= 3) {
+  if (target.curseStacks >= 2) {
     target.cursed = true;
-    const burst = Math.round(target.hp * 0.30);
+    const burst = Math.min(target.hp, 30);
     target.hp = Math.max(0, target.hp - burst);
     target.unhealable = true;
-    target.curseAtkMul = 0.5;
-    logs.push(`🕯️ Fluch ausgelöst! → ${UNIT_DEFS[target.type].emoji} −${burst} ❤️ (unheilbar, −50% Angriff)`);
+    target.curseAtkMul = 0.4;
+    logs.push(`🕯️ Fluch ausgelöst! → ${UNIT_DEFS[target.type].emoji} −${burst} ❤️ (unheilbar, −60% Angriff)`);
     if (target.hp <= 0) (target as any).dead = true;
     if (events) {
       events.push({
