@@ -176,6 +176,7 @@ if (typeof window !== 'undefined') {
 export function loadIconMap(): UnitIconMap { return cache.unit; }
 export function loadAttackIconMap(): UnitIconMap { return cache.attack; }
 export function loadCloneIconMap(): UnitIconMap { return cache.clone; }
+export function loadAnimationMap(): UnitIconMap { return cache.animation; }
 
 export function getUnitIcon(type: UnitType): string | null {
   return cache.unit[type] ?? null;
@@ -186,6 +187,10 @@ export function getAttackIcon(type: UnitType | string | undefined): string | nul
 }
 export function getCloneIcon(type: UnitType): string | null {
   return cache.clone[type] ?? null;
+}
+export function getAnimation(type: UnitType | string | undefined): string | null {
+  if (!type) return null;
+  return cache.animation[type as UnitType] ?? null;
 }
 
 async function persistDiff(slot: Slot, next: UnitIconMap) {
