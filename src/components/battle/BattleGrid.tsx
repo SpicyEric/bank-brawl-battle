@@ -799,9 +799,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {isDead && (
                 <span className="text-sm opacity-40 select-none">💀</span>
               )}
-              {unit && !isDead && (
+              {unit && !isDead && !isHiddenEnemy && (
                 <div
-                  className="absolute inset-0 flex flex-col items-center justify-center z-10"
+                  className={`absolute inset-0 flex flex-col items-center justify-center z-10 ${
+                    battleEntry ? (unit.team === 'player' ? 'battle-entry-player' : 'battle-entry-enemy') : ''
+                  }`}
                   style={{
                     ...slideStyle,
                     transition: offset
