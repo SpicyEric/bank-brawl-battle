@@ -135,6 +135,8 @@ export const UNIT_COLOR_GROUPS: Record<UnitType, ColorGroup> = {
   ranger: 'green', mountaineer: 'green', cloner: 'green',
   magnetiker: 'blue', spiderqueen: 'blue', waterwalker: 'blue',
   doppelganger: 'blue', sniper: 'blue', chaindancer: 'blue',
+  // v3
+  bomber: 'red', shadowpriest: 'red', obelisk: 'green',
 };
 
 // Red > Green > Blue > Red (rock-paper-scissors)
