@@ -2012,10 +2012,10 @@ export function tickArcherVolley(
   ];
   const archers = allUnits.filter(u => u.type === 'archer' && u.hp > 0 && !u.dead);
   for (const a of archers) {
-    if (a.volleyTimer === undefined || a.volleyTimer <= 0) a.volleyTimer = 4;
+    if (a.volleyTimer === undefined || a.volleyTimer <= 0) a.volleyTimer = 7;
     a.volleyTimer -= 1;
     if (a.volleyTimer > 0) continue;
-    a.volleyTimer = 4;
+    a.volleyTimer = 7;
 
     let hitCount = 0;
     for (const { dr, dc } of dirs) {
