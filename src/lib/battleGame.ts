@@ -2123,9 +2123,11 @@ export function tickDragonSpin(
     logs.push(`🐉 ${d.team === 'player' ? '👤' : '💀'} Drache schwingt Feuerpeitsche!`);
 
     // Fire first batch of BEAMS_PER_TICK beams immediately this tick.
+    // Mark the very first beam with spinStart so the frontend can spawn the
+    // one-shot custom effect animation exactly once per full spin.
     for (let i = 0; i < BEAMS_PER_TICK; i++) {
       const idx = d.spinDirIdx ?? 0;
-      fireDragonBeam(d, idx, allUnits, grid, events, logs, i);
+      fireDragonBeam(d, idx, allUnits, grid, events, logs, i, i === 0);
       d.spinDirIdx = ((idx + (d.spinClockwise ? 1 : -1)) + 8) % 8;
     }
     d.spinTicksLeft -= 1;
