@@ -1082,6 +1082,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           }
         }
       }
+      } // end if (!FORMATION_MODE)
+
+
 
       // === Judge: +8 ATK per fallen ally (recomputed each tick) ===
       for (const u of allUnits) {
