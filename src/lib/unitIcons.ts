@@ -71,6 +71,7 @@ function writeLocalMirror() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(cache.unit));
     localStorage.setItem(ATTACK_KEY, JSON.stringify(cache.attack));
     localStorage.setItem(CLONE_KEY, JSON.stringify(cache.clone));
+    localStorage.setItem(ANIM_KEY, JSON.stringify(cache.animation));
   } catch {}
 }
 
@@ -97,7 +98,7 @@ export async function initIconAssignments(): Promise<void> {
       return;
     }
 
-    const remote: Caches = { unit: {}, attack: {}, clone: {} };
+    const remote: Caches = { unit: {}, attack: {}, clone: {}, animation: {} };
     for (const row of data ?? []) {
       const slot = row.slot as Slot;
       if (remote[slot]) remote[slot][row.unit_type as UnitType] = row.icon_filename;
@@ -106,7 +107,8 @@ export async function initIconAssignments(): Promise<void> {
     const remoteEmpty =
       Object.keys(remote.unit).length === 0 &&
       Object.keys(remote.attack).length === 0 &&
-      Object.keys(remote.clone).length === 0;
+      Object.keys(remote.clone).length === 0 &&
+      Object.keys(remote.animation).length === 0;
 
     const alreadyMigrated = (() => {
       try { return localStorage.getItem(MIGRATED_FLAG) === '1'; } catch { return false; }
@@ -115,12 +117,13 @@ export async function initIconAssignments(): Promise<void> {
     const localHasData =
       Object.keys(cache.unit).length +
       Object.keys(cache.attack).length +
-      Object.keys(cache.clone).length > 0;
+      Object.keys(cache.clone).length +
+      Object.keys(cache.animation).length > 0;
 
     if (remoteEmpty && localHasData && !alreadyMigrated) {
       // Migrate local → cloud (one-time)
       const rows: { slot: Slot; unit_type: string; icon_filename: string }[] = [];
-      (['unit','attack','clone'] as Slot[]).forEach(slot => {
+      (['unit','attack','clone','animation'] as Slot[]).forEach(slot => {
         for (const [unit_type, icon_filename] of Object.entries(cache[slot])) {
           if (icon_filename) rows.push({ slot, unit_type, icon_filename });
         }
@@ -136,6 +139,7 @@ export async function initIconAssignments(): Promise<void> {
       cache.unit = remote.unit;
       cache.attack = remote.attack;
       cache.clone = remote.clone;
+      cache.animation = remote.animation;
       writeLocalMirror();
       emit();
     }
