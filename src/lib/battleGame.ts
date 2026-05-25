@@ -2409,7 +2409,7 @@ export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs
       ...orig,
       id: crypto.randomUUID(),
       row: pick.r, col: pick.c,
-      hp: 20, maxHp: 20,
+      hp: 80, maxHp: 80,
       attack: 5,
       cooldown: 0, maxCooldown: 2,
       isPhantom: true,
