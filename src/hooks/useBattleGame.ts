@@ -45,12 +45,15 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const turnCountRef = useRef(0);
 
-  // Placement timer (difficulty 2+)
-  const hasPlaceTimer = difficulty >= 2;
+  // Placement timer: always-on 30s simultaneous live-placement
+  const hasPlaceTimer = true;
   const [placeTimer, setPlaceTimer] = useState(PLACE_TIME_LIMIT);
   const placeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playerUnitsRef = useRef(playerUnits);
   useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
+  // Track if AI drip-placement already kicked off for this match
+  const aiDripStartedRef = useRef(false);
+  const aiDripTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Fatigue system:
   // - Slot mode (roster): key = slot index (0..8). One slot = one bench-able unit instance.
