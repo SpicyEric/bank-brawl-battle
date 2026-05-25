@@ -146,6 +146,27 @@ export type Database = {
         }
         Relationships: []
       }
+      unit_types: {
+        Row: {
+          aura_zones: Json
+          created_at: string
+          unit_type: string
+          updated_at: string
+        }
+        Insert: {
+          aura_zones?: Json
+          created_at?: string
+          unit_type: string
+          updated_at?: string
+        }
+        Update: {
+          aura_zones?: Json
+          created_at?: string
+          unit_type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
