@@ -14,12 +14,16 @@ import { updateRoom, ensureAnonymousSession } from '@/lib/multiplayer';
 interface MultiplayerConfig {
   roomId: string;
   role: 'player1' | 'player2';
+  roster?: UnitType[];
 }
+
+// Slot color layout matches UnitRoster: slots 0-2 red, 3-5 green, 6-8 blue
+const SLOT_COLORS: ('red' | 'green' | 'blue')[] = ['red','red','red','green','green','green','blue','blue','blue'];
 
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning };
+  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning, color: (u as any).color, slotIndex: (u as any).slotIndex };
 }
 
 function serializeGrid(grid: Cell[][]) {
