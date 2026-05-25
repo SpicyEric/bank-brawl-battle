@@ -122,6 +122,7 @@ export interface UnitDef {
   description: string;
   movePattern: Position[];
   attackPattern: Position[];
+  attackRange: number;
   strongVs: UnitType[];
   weakVs: UnitType[];
 }
