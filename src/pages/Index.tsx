@@ -60,6 +60,16 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
   const [nextRoundCountdown, setNextRoundCountdown] = useState<number | null>(null);
   const prevPhase = useRef(game.phase);
   const nextRoundTriggered = useRef(false);
+  const [matchId, setMatchId] = useState(0);
+  const prevGameOver = useRef(game.gameOver);
+
+  // New match = transition out of gameOver back into placement (resetGame), or mount of multiplayer
+  useEffect(() => {
+    if (prevGameOver.current && !game.gameOver) {
+      setMatchId(m => m + 1);
+    }
+    prevGameOver.current = game.gameOver;
+  }, [game.gameOver]);
 
   // Sync SFX mute with music mute
   useEffect(() => { setSfxMuted(muted); }, [muted]);
