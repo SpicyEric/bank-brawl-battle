@@ -1217,34 +1217,6 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         </div>
       ))}
 
-      {/* Dragon special: custom one-shot effect animation centered on dragon (covers ~7×7 cells) */}
-      {dragonAnims.map(a => {
-        const entry = getAnimationEntry(a.file);
-        if (!entry || cellPx <= 0) return null;
-        const SPAN = 7; // cells across (3 cell radius + dragon cell)
-        const sizePx = Math.round(cellPx * SPAN);
-        // Center on dragon cell. Cell center = (col + 0.5) * cellPx, then offset by sizePx/2.
-        const centerX = (a.col + 0.5) * cellPx;
-        const centerY = (visualRow(a.row) + 0.5) * cellPx;
-        return (
-          <div
-            key={a.id}
-            style={{
-              position: 'absolute',
-              left: centerX - sizePx / 2,
-              top: centerY - sizePx / 2,
-              width: sizePx,
-              height: sizePx,
-              pointerEvents: 'none',
-              zIndex: 9,
-              mixBlendMode: 'screen',
-              opacity: 0.5,
-            }}
-          >
-            <EffectAnimationPreview entry={entry} size={sizePx} row={0} fps={Math.max(10, entry.c)} loop={false} />
-          </div>
-        );
-      })}
     </div>
   );
 }
