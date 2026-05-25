@@ -28,7 +28,7 @@ interface BattleGridProps {
   /** Increments each new match — re-rolls battlefield background */
   matchId?: number;
   /** Per-cell aura overlay map: "r-c" -> 'buff' | 'nerf' (shown around placed units). */
-  auraOverlay?: Map<string, 'buff' | 'nerf'>;
+  auraOverlay?: import('@/lib/auraData').AuraOverlayMap;
   /** Per-unit-type aura zones (used for drag-preview and placement-pulse overlays). */
   auraZones?: import('@/lib/auraData').AuraZoneMap;
   /** Cells belonging to the currently selected formation (shown highlighted during combat). */
@@ -145,16 +145,25 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     prevSacrifice.current = !!sacrificeFlash;
   }, [sacrificeFlash]);
 
-  // Battle entry animation: when phase transitions into 'battle', briefly slide
-  // all units in from off-grid (player from bottom, enemy from top).
-  const [battleEntry, setBattleEntry] = useState(false);
+  // Battle entry animation: when phase transitions into 'battle', units march
+  // in row by row from off-grid. The whole formation has a uniform row-offset
+  // that ticks down from 4 → 0 (1 row per step). Player marches up from below,
+  // enemy marches down from above. Units off-screen are hidden via opacity.
+  const ENTRY_STEPS = 4;
+  const ENTRY_STEP_MS = 260;
+  const [entryStep, setEntryStep] = useState(0); // 0 = no entry / final position
   const prevPhaseForEntry = useRef(phase);
   useEffect(() => {
     if (prevPhaseForEntry.current !== 'battle' && phase === 'battle') {
-      setBattleEntry(true);
-      const t = setTimeout(() => setBattleEntry(false), 850);
+      setEntryStep(ENTRY_STEPS);
+      let step = ENTRY_STEPS;
+      const iv = setInterval(() => {
+        step -= 1;
+        setEntryStep(step);
+        if (step <= 0) clearInterval(iv);
+      }, ENTRY_STEP_MS);
       prevPhaseForEntry.current = phase;
-      return () => clearTimeout(t);
+      return () => clearInterval(iv);
     }
     prevPhaseForEntry.current = phase;
   }, [phase]);
@@ -772,15 +781,18 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {/* Aura overlay (placement preview) */}
               {auraOverlay && (() => {
                 const k = auraOverlay.get(cellKey);
-                if (!k) return null;
-                const isBuff = k === 'buff';
+                if (!k || (k.buff === 0 && k.nerf === 0)) return null;
+                const net = k.buff - k.nerf;
+                const isBuff = net >= 0 && k.buff > 0;
                 const pulsing = !!pulseKind;
+                const count = isBuff ? k.buff : k.nerf;
+                const label = `${isBuff ? '+' : '−'}${count > 1 ? count : ''}`;
                 return (
                   <div
                     className={`absolute inset-0 z-[6] pointer-events-none flex items-center justify-center rounded-sm ${isBuff ? 'bg-green-500/25 ring-1 ring-green-400/60' : 'bg-red-500/25 ring-1 ring-red-400/60'} ${pulsing ? 'placement-aura-pulse' : ''}`}
                   >
                     <span className={`text-base font-black drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ${isBuff ? 'text-green-200' : 'text-red-200'}`}>
-                      {isBuff ? '+' : '−'}
+                      {label}
                     </span>
                   </div>
                 );
@@ -799,19 +811,38 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {isDead && (
                 <span className="text-sm opacity-40 select-none">💀</span>
               )}
-              {unit && !isDead && !isHiddenEnemy && (
+              {unit && !isDead && !isHiddenEnemy && (() => {
+                // Row-by-row marching entry: uniform offset that ticks down.
+                // Player marches up from below: visual offset = +entryStep rows.
+                // Enemy marches down from above: visual offset = -entryStep rows.
+                const entryDr = entryStep > 0
+                  ? (unit.team === 'player' ? entryStep : -entryStep)
+                  : 0;
+                const visualDr = (flipped ? -entryDr : entryDr);
+                // Hide a unit while it's still off-grid
+                const visualRow = cell.row + visualDr;
+                const offGrid = visualRow < 0 || visualRow >= GRID_SIZE;
+                const entryStyle = entryStep > 0
+                  ? {
+                      transform: `translateY(${visualDr * 100}%)`,
+                      transition: `transform ${ENTRY_STEP_MS}ms linear`,
+                      opacity: offGrid ? 0 : 1,
+                    }
+                  : undefined;
+                const combinedStyle = entryStep > 0
+                  ? entryStyle
+                  : {
+                      ...slideStyle,
+                      transition: offset
+                        ? 'none'
+                        : (impulsePushedIds.has(unit.id)
+                            ? 'transform 1500ms cubic-bezier(0.12, 0.85, 0.25, 1)'
+                            : 'transform 580ms ease-out'),
+                    };
+                return (
                 <div
-                  className={`absolute inset-0 flex flex-col items-center justify-center z-10 ${
-                    battleEntry ? (unit.team === 'player' ? 'battle-entry-player' : 'battle-entry-enemy') : ''
-                  }`}
-                  style={{
-                    ...slideStyle,
-                    transition: offset
-                      ? 'none'
-                      : (impulsePushedIds.has(unit.id)
-                          ? 'transform 1500ms cubic-bezier(0.12, 0.85, 0.25, 1)'
-                          : 'transform 580ms ease-out'),
-                  }}
+                  className={`absolute inset-0 flex flex-col items-center justify-center z-10`}
+                  style={combinedStyle as any}
                 >
                   {/* Persistent freeze overlay – stays visible the entire time the unit is frozen */}
                   {isFrozen && (
@@ -917,7 +948,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                     return null;
                   })()}
                 </div>
-              )}
+                );
+              })()}
             </button>
           );
         })}
