@@ -579,7 +579,7 @@ export function generateTerrain(grid: Cell[][]): Cell[][] {
   }
 
   // Occasionally place 1-3 terrain tiles on player-side rows (5-7 and 0-2)
-  const sideCount = Math.floor(Math.random() * 4); // 0-3 tiles
+  const sideCount = 1 + Math.floor(Math.random() * 4); // 1-4 tiles
   const sideRows = [0, 1, 5, 6, 7]; // row 2 already covered by middle
   for (let i = 0; i < sideCount; i++) {
     let row: number, col: number;
