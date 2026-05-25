@@ -254,36 +254,32 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     });
   }, [phase]);
 
-  // Confirm placement
+  // Confirm placement → directly start battle (Eliminations-Modus)
+  // Enemies are already on the grid via the AI-drip; we just need to lock-in bonds and go.
   const confirmPlacement = useCallback(() => {
     if (placeTimerRef.current) clearInterval(placeTimerRef.current);
-
-    // If no units placed and timer forced it, auto-lose the round
-    if (playerUnits.length === 0) {
-      const newES = enemyScoreRef.current + 1;
-      enemyScoreRef.current = newES;
-      setEnemyScore(newES);
-      setPhase('round_lost');
-      setBattleLog(prev => ['⏰ Keine Einheiten platziert – Runde verloren!', ...prev]);
-      return;
-    }
+    // Cancel any remaining AI-drip placements
+    for (const t of aiDripTimeoutsRef.current) clearTimeout(t);
+    aiDripTimeoutsRef.current = [];
 
     const pUnits = playerUnits.map(u => ({ ...u }));
+    // If AI drip didn't finish placing all units, fill the rest immediately
+    let enemies: Unit[] = enemyUnits.map(u => ({ ...u }));
+    if (enemies.length < enemyMaxUnits) {
+      const remaining = enemyMaxUnits - enemies.length;
+      const extras = generateAIPlacement(pUnits, remaining, grid, difficulty, enemyBannedUnits)
+        .filter(p => !enemies.find(e => e.row === p.row && e.col === p.col))
+        .slice(0, remaining)
+        .map(p => createUnit(p.type, 'enemy', p.row, p.col));
+      enemies = [...enemies, ...extras];
+    }
 
-    // If AI already placed first (enemy-starts round), reuse those units instead of regenerating
-    const enemies: Unit[] = enemyUnits.length > 0
-      ? enemyUnits.map(u => ({ ...u }))
-      : generateAIPlacement(pUnits, enemyMaxUnits, grid, difficulty, enemyBannedUnits)
-          .map(p => createUnit(p.type, 'enemy', p.row, p.col));
-
-    // Set bonds for all units (player + enemy)
     const allUnits = [...pUnits, ...enemies];
     setBondsForPlacement(allUnits);
 
     setPlayerUnits(pUnits);
     setEnemyUnits(enemies);
 
-    // Build full grid preserving terrain
     setGrid(prev => {
       const newGrid = prev.map(r => r.map(c => ({ ...c, unit: null as Unit | null })));
       for (const u of pUnits) newGrid[u.row][u.col].unit = u;
@@ -291,11 +287,16 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       return newGrid;
     });
 
-    setPhase('place_enemy');
+    // Skip place_enemy phase, go directly into battle
+    startBattleRef.current?.();
   }, [playerUnits, enemyUnits, enemyBannedUnits, enemyMaxUnits, grid, difficulty]);
 
   // Keep confirmPlacementRef in sync for auto-confirm timer
   useEffect(() => { confirmPlacementRef.current = confirmPlacement; }, [confirmPlacement]);
+
+  // Forward-ref for startBattle (defined below)
+  const startBattleRef = useRef<(() => void) | null>(null);
+
 
   // Start battle
   const startBattle = useCallback(() => {
