@@ -2732,8 +2732,10 @@ export function tickBombFuses(
       const u = grid[r][c].unit;
       if (!u || u.hp <= 0 || u.dead) continue;
       if (u.team === ex.ownerTeam) continue;
-      u.hp = Math.max(0, u.hp - ex.dmg);
-      logs.push(`💥 Bombe → ${UNIT_DEFS[u.type].emoji} ${ex.dmg}${u.hp <= 0 ? ' ☠️' : ''}`);
+      const isCenter = dr === 0 && dc === 0;
+      const dmg = isCenter ? 23 : 17;
+      u.hp = Math.max(0, u.hp - dmg);
+      logs.push(`💥 Bombe → ${UNIT_DEFS[u.type].emoji} ${dmg}${u.hp <= 0 ? ' ☠️' : ''}`);
       if (u.hp <= 0) (u as any).dead = true;
     }
     events.push({
