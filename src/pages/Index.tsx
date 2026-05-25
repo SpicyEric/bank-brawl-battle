@@ -110,10 +110,9 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
     return () => { cancelled = true; };
   }, []);
   const auraOverlay = useMemo(() => {
-    if (game.phase !== 'place_player' && game.phase !== 'battle') return undefined;
-    const all = [...(game.playerUnits ?? []), ...(game.enemyUnits ?? [])];
-    return computeAuraOverlay(all, auraZones);
-  }, [game.playerUnits, game.enemyUnits, game.phase, auraZones]);
+    if (game.phase !== 'place_player') return undefined;
+    return computeAuraOverlay(game.playerUnits ?? [], auraZones);
+  }, [game.playerUnits, game.phase, auraZones]);
 
   // Formation selection (combat-phase: tap own unit → select formation → tap adjacent cell → move)
   const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null);
