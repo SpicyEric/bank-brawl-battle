@@ -1328,12 +1328,12 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     }
   }, [battleTimer, phase, playerUnits, enemyUnits]);
 
-  const gameOverResult = checkGameOver(playerScore, enemyScore, overtimeCount);
+  const gameOverResult = checkGameOver(playerScore, enemyScore);
   const gameOver = gameOverResult.over;
   const gameWon = gameOverResult.won;
 
-  // Check if we're in overtime
-  const inOvertime = playerScore >= OVERTIME_THRESHOLD && enemyScore >= OVERTIME_THRESHOLD;
+  // Overtime no longer used in singleplayer round-based mode
+  const inOvertime = false;
 
   // Accept draw offer (singleplayer: player decides alone)
   const acceptDraw = useCallback(() => {
