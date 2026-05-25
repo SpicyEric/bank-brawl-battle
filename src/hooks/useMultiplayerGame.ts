@@ -1208,9 +1208,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     continueOvertime: () => {},
     playerBannedUnits,
     playerBannedSlots: [] as number[],
-    selectedSlot: null as number | null,
-    setSelectedSlot: (_: number | null) => {},
-    roster: undefined as UnitType[] | undefined,
+    selectedSlot,
+    setSelectedSlot,
+    roster: hasRoster ? roster! : undefined,
     placedSlots: [] as number[],
     playerFatigue,
   };
