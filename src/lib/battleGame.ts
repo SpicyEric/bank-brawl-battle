@@ -2027,6 +2027,7 @@ function fireDragonBeam(
   events: BattleEvent[],
   logs: string[],
   beamOrder: number = 0,
+  spinStart: boolean = false,
 ): void {
   const { dr, dc } = DRAGON_SPIN_DIRS[dirIdx];
   const cells: { row: number; col: number }[] = [];
@@ -2065,6 +2066,7 @@ function fireDragonBeam(
     spinCells: cells,
     spinDirIdx: dirIdx,
     spinBeamOrder: beamOrder,
+    spinStart,
   });
 
   if (hits > 0) {
