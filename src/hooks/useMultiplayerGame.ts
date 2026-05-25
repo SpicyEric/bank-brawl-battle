@@ -49,7 +49,7 @@ function getDeterministicFirstPlacer(roomId: string, roundNumber: number): 1 | 2
 }
 
 export function useMultiplayerGame(config: MultiplayerConfig) {
-  const { roomId, role, roster } = config;
+  const { roomId, role, roster, opponentRoster } = config;
   const hasRoster = !!(roster && roster.length === 9);
   const isHost = role === 'player1';
   const myRows = isHost ? PLAYER_ROWS : ENEMY_ROWS;
