@@ -214,7 +214,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 70,
     attack: 18,
     cooldown: 2,
-    description: 'Extrem mobiler Springer. Springt bis zu 3 Felder in alle Richtungen und über Hindernisse. Wechselt nach jedem Angriff sein Ziel. Bläst alle 9 Ticks ins Horn: Verbündete in 5×5 um sich machen 2 Ticks lang +50% Schaden.',
+    description: 'Extrem mobiler Springer. Springt bis zu 3 Felder in alle Richtungen und über Hindernisse. Wechselt nach jedem Angriff sein Ziel. Bläst alle 9 Ticks ins Horn: Verbündete in 5×5 um sich machen 2 Ticks lang +100% Schaden.',
     movePattern: [
       // Large star pattern: 3 squares in all 8 directions (jumps over obstacles)
       // Cardinal: 2 and 3 steps
