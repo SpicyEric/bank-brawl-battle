@@ -696,11 +696,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               `}
             >
               {/* Lava overlay – persistent */}
-              {cell.lavaTicks && cell.lavaTicks > 0 && (
+              {(cell.lavaTicks ?? 0) > 0 && (
                 <div className="absolute inset-0 z-0 pointer-events-none cell-lava" />
               )}
               {/* Obelisk aura overlay */}
-              {cell.obeliskAura && cell.obeliskAura > 0 && (
+              {(cell.obeliskAura ?? 0) > 0 && (
                 <div
                   className={`absolute inset-0 z-0 pointer-events-none rounded-sm ${cell.obeliskAura === 2 ? 'cell-obelisk-beam' : 'cell-obelisk-aura'}`}
                 />

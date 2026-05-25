@@ -214,7 +214,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 70,
     attack: 18,
     cooldown: 2,
-    description: 'Extrem mobiler Springer. Springt bis zu 3 Felder in alle Richtungen und über Hindernisse. Wechselt nach jedem Angriff sein Ziel. Bläst alle 9 Ticks ins Horn: Verbündete in 5×5 um sich machen 2 Ticks lang +50% Schaden.',
+    description: 'Extrem mobiler Springer. Springt bis zu 3 Felder in alle Richtungen und über Hindernisse. Wechselt nach jedem Angriff sein Ziel. Bläst alle 9 Ticks ins Horn: Verbündete in 5×5 um sich machen 2 Ticks lang +100% Schaden.',
     movePattern: [
       // Large star pattern: 3 squares in all 8 directions (jumps over obstacles)
       // Cardinal: 2 and 3 steps
@@ -318,7 +318,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // Mechanics marked "(geplant)" in the description are currently approximated via stats/patterns.
   banshee: {
     label: 'Banshee', emoji: '👻', hp: 70, attack: 16, cooldown: 2,
-    description: 'Diagonale Bewegung. Stirbt einmalig nur scheinbar – steht nach 3 Runden mit 40 HP und nur noch 10 ATK wieder auf (zweiter Tod ist endgültig).',
+    description: 'Diagonale Bewegung. Stirbt einmalig nur scheinbar – steht nach 3 Runden mit 70 HP und 10 ATK wieder auf (zweiter Tod ist endgültig).',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -360,7 +360,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   arsonist: {
     label: 'Brandstifter', emoji: '🔥', hp: 65, attack: 4, cooldown: 2,
-    description: 'Geringer Sofortschaden, zündet aber an: 5 Schaden pro Tick für 4 Ticks. Stapelbar. Hinterlässt zudem eine Brandspur (3 Ticks), die nur Feinden Schaden zufügt.',
+    description: 'Geringer Sofortschaden, zündet aber an: 5 Schaden pro Tick für 4 Ticks. Stapelbar. Hinterlässt zudem eine Brandspur (6 Ticks), die nur Feinden Schaden zufügt.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
@@ -419,7 +419,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   cloner: {
     label: 'Kloner', emoji: '🧬', hp: 90, attack: 12, cooldown: 2,
-    description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt alle 6 Ticks einen Klon (max. 3 Klone insgesamt), der auf Feinde zustürmt.',
+    description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt alle 6 Ticks einen Klon (max. 3 Klone insgesamt). Klone: 6 HP, 6 ATK, stürmen auf Feinde zu.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
@@ -967,6 +967,24 @@ export function moveToward(unit: Unit, target: Unit, grid: Cell[][], allUnits?: 
   const possibleMoves = getMoveCells(unit, grid);
   if (possibleMoves.length === 0) return { row: unit.row, col: unit.col };
 
+  // Bomber: avoid bomb cells; if standing on a bomb, MUST move; otherwise approach nearest enemy.
+  if (unit.type === 'bomber') {
+    const enemies = (allUnits || []).filter(u => u.team !== unit.team && u.hp > 0 && !u.dead);
+    const standingOnBomb = !!grid[unit.row]?.[unit.col]?.bomb;
+    const safeMoves = possibleMoves.filter(p => !grid[p.row]?.[p.col]?.bomb);
+    const pool = safeMoves.length > 0 ? safeMoves : possibleMoves;
+    if (enemies.length === 0) {
+      // No enemies: just step off bomb if needed
+      if (standingOnBomb && pool.length > 0) return pool[0];
+      return { row: unit.row, col: unit.col };
+    }
+    const minDistTo = (p: Position) => Math.min(...enemies.map(e => distance(p, e)));
+    const candidates: Position[] = [...pool];
+    if (!standingOnBomb && !grid[unit.row]?.[unit.col]?.bomb) candidates.push({ row: unit.row, col: unit.col });
+    candidates.sort((a, b) => minDistTo(a) - minDistTo(b));
+    return candidates[0];
+  }
+
   // Cloner (original): retreat — pick the move that maximizes min-distance to nearest enemy.
   if (unit.type === 'cloner' && !unit.isClone) {
     const enemies = (allUnits || []).filter(u => u.team !== unit.team && u.hp > 0 && !u.dead);
@@ -1106,8 +1124,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // Shield aura: defender adjacent to friendly tank takes -20% damage
   if (grid && hasAdjacentFriendlyTank(defender, grid)) dmg *= 0.8;
 
-  // Rider horn buff: +50% damage while hornBuff active
-  if ((attacker.hornBuff || 0) > 0) dmg *= 1.5;
+  // Rider horn buff: +100% damage while hornBuff active
+  if ((attacker.hornBuff || 0) > 0) dmg *= 2;
   // Obelisk buff: +30% damage while obeliskBuff active
   if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.3;
 
@@ -1469,7 +1487,7 @@ export function leaveArsonistTrail(grid: Cell[][], unit: Unit): void {
   if (unit.type !== 'arsonist') return;
   const cell = grid[unit.row]?.[unit.col];
   if (!cell || cell.terrain === 'water') return;
-  cell.lavaTicks = 3;
+  cell.lavaTicks = 6;
   cell.lavaOwnerTeam = unit.team;
 }
 
@@ -1592,7 +1610,8 @@ export function processGhostTick(_units: Unit[], grid: Cell[][], logs: string[])
     u.reviveIn -= 1;
     if (u.reviveIn <= 0) {
       u.reviveIn = undefined;
-      u.hp = 40;
+      u.hp = 70;
+      u.maxHp = 70;
       u.attack = 10;
       (u as any).dead = false;
       u.bansheeRevived = true;
@@ -1647,9 +1666,9 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
         ...c,
         id: crypto.randomUUID(),
         row: r, col,
-        hp: 3,
-        maxHp: 3,
-        attack: 3,
+        hp: 6,
+        maxHp: 6,
+        attack: 6,
         isClone: true,
         parentClonerId: c.id,
         cloneTimer: undefined,
@@ -1954,7 +1973,7 @@ export function tickRiderHorn(
       innerCells,
       outerCells,
     });
-    logs.push(`📯 ${r.team === 'player' ? '👤' : '💀'} Reiter-Horn! (+50% Schaden für ${buffed} Verbündete, 2 Ticks)`);
+    logs.push(`📯 ${r.team === 'player' ? '👤' : '💀'} Reiter-Horn! (+100% Schaden für ${buffed} Verbündete, 2 Ticks)`);
   }
 }
 
@@ -2551,7 +2570,7 @@ export function tickObeliskAura(
 ): void {
   // Clear transient aura marks
   for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
-    grid[r][c].obeliskAura = 0;
+    grid[r][c].obeliskAura = undefined;
     grid[r][c].obeliskAuraTeam = undefined;
   }
   const obelisks = allUnits.filter(u => u.type === 'obelisk' && u.hp > 0 && !u.dead);
