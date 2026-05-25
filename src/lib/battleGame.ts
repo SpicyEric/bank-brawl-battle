@@ -82,6 +82,11 @@ export interface Unit {
   curseAtkMul?: number; // shadowpriest curse: damage multiplier (0.5)
   soulHarvestTimer?: number; // shadowpriest: ticks until next harvest (every 8)
   permAtkBonus?: number; // shadowpriest: permanent ATK bonus from harvests
+  // Lane discipline (column-based placement matters): unit prefers to advance in its spawn column
+  // until an enemy enters its attack pattern. Set at spawn from `col`.
+  laneCol?: number;
+  laneBroken?: boolean; // once true, unit drops lane discipline for the rest of combat
+  laneStuckTicks?: number; // ticks in a row where no forward-in-lane move was possible
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
