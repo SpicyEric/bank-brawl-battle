@@ -780,8 +780,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                         : isFrozen
                         ? 'drop-shadow(0 0 5px hsl(210, 80%, 60%)) drop-shadow(0 0 10px hsl(210, 80%, 60%))'
                         : (flipped ? unit.team === 'enemy' : unit.team === 'player')
-                          ? 'drop-shadow(0 0 4px hsl(152, 60%, 48%)) drop-shadow(0 0 8px hsl(152, 60%, 48%))'
-                          : 'drop-shadow(0 0 4px hsl(0, 72%, 55%)) drop-shadow(0 0 8px hsl(0, 72%, 55%))',
+                          ? 'drop-shadow(0 0 5px hsl(152, 80%, 50%)) drop-shadow(0 0 10px hsl(152, 80%, 50%)) drop-shadow(0 0 16px hsl(152, 85%, 45%))'
+                          : 'drop-shadow(0 0 5px hsl(0, 85%, 55%)) drop-shadow(0 0 10px hsl(0, 85%, 55%)) drop-shadow(0 0 16px hsl(0, 85%, 50%))',
                     }}
                   >
                     {unit.type && <UnitGlyph type={unit.type} isClone={unit.isClone} className="inline-block w-5 h-5 sm:w-6 sm:h-6 align-middle" />}
