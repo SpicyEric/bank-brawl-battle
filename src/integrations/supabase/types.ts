@@ -148,18 +148,21 @@ export type Database = {
       }
       unit_types: {
         Row: {
+          aura_effect: Json
           aura_zones: Json
           created_at: string
           unit_type: string
           updated_at: string
         }
         Insert: {
+          aura_effect?: Json
           aura_zones?: Json
           created_at?: string
           unit_type: string
           updated_at?: string
         }
         Update: {
+          aura_effect?: Json
           aura_zones?: Json
           created_at?: string
           unit_type?: string
