@@ -44,6 +44,9 @@ export default function UnitRoster() {
   const [slots, setSlots] = useState<(UnitType | null)[]>(Array(ROSTER_SIZE).fill(null));
   const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(null);
   const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
+  // Randomize the picker order once per mount so players don't always reach
+  // for the same units in the same spots.
+  const pickerOrder = useMemo(() => shuffle(UNIT_TYPES), []);
 
   // Multiplayer state
   const [submitting, setSubmitting] = useState(false);
