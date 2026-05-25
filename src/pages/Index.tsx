@@ -608,12 +608,9 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 <p className="text-xs text-muted-foreground">Nächste Runde startet automatisch...</p>
               </div>
             ) : (
-              <button
-                onClick={game.nextRound}
-                className="w-full py-3.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all"
-              >
-                ➡️ {game.inOvertime ? 'Verlängerung' : 'Nächste Runde'} ({game.roundNumber + 1})
-              </button>
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">Match-Ende wird berechnet...</p>
+              </div>
             )}
           </div>
         )}
