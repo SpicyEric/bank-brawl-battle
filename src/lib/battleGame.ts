@@ -1116,8 +1116,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // Forest bonus: defender in forest takes -20% damage
   if (defenderTerrain === 'forest') dmg *= 0.8;
 
-  // Ranger: on a forest tile, effective ATK is 19 (base 14) → scale damage accordingly
-  if (attacker.type === 'ranger' && attackerTerrain === 'forest') dmg *= (19 / 14);
+  // Ranger: on a forest tile, effective ATK is 24 (base 19) → scale damage accordingly
+  if (attacker.type === 'ranger' && attackerTerrain === 'forest') dmg *= (24 / 19);
 
   // Waterwalker: -30% incoming damage on water
   if (defender.type === 'waterwalker' && defenderTerrain === 'water') dmg *= 0.7;
