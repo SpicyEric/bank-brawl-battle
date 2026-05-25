@@ -498,6 +498,31 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
 };
+
+// Per-unit attack range (Chebyshev). Range N = all cells within max(|dr|,|dc|) ≤ N.
+// Range 1 = 8 surrounding cells, range 2 = 24 cells (5×5−1), range 3 = 48 cells (7×7−1).
+export const UNIT_ATTACK_RANGE: Record<UnitType, number> = {
+  warrior: 1, assassin: 1, dragon: 2, rider: 1, archer: 3, frost: 2,
+  tank: 1, mage: 2, healer: 1,
+  banshee: 1, vampire: 1, vulkanit: 2, shadowblade: 1,
+  stormrunner: 1, arsonist: 1, lightning: 2,
+  mirror: 2, lamb: 1, judge: 1, icegolem: 1, cloner: 1,
+  magnetiker: 2, spiderqueen: 2, waterwalker: 2,
+  doppelganger: 1, sniper: 3, chaindancer: 2,
+  bomber: 2, shadowpriest: 2, obelisk: 1,
+};
+
+function chebyshevDisc(range: number): Position[] {
+  const out: Position[] = [];
+  for (let dr = -range; dr <= range; dr++) {
+    for (let dc = -range; dc <= range; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      out.push({ row: dr, col: dc });
+    }
+  }
+  return out;
+}
+
 {
   const colorMembers: Record<ColorGroup, UnitType[]> = { red: [], green: [], blue: [] };
   (Object.keys(UNIT_COLOR_GROUPS) as UnitType[]).forEach(t => colorMembers[UNIT_COLOR_GROUPS[t]].push(t));
@@ -507,6 +532,12 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     const losesTo = (Object.keys(COLOR_BEATS) as ColorGroup[]).find(k => COLOR_BEATS[k] === myColor)!;
     UNIT_DEFS[t].strongVs = colorMembers[beats];
     UNIT_DEFS[t].weakVs = colorMembers[losesTo];
+    const range = UNIT_ATTACK_RANGE[t];
+    UNIT_DEFS[t].attackRange = range;
+    // bomber & obelisk never attack directly – keep empty pattern, but expose range for UI.
+    if (t !== 'bomber' && t !== 'obelisk') {
+      UNIT_DEFS[t].attackPattern = chebyshevDisc(range);
+    }
   });
 }
 
