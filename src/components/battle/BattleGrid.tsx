@@ -549,34 +549,8 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     }
 
     // --- Dragon fire-spin: per-tick 3-cell beam, cells ignite one after another ---
-    // If a custom effect animation is assigned to the dragon, replace the rotating
-    // per-cell flames with ONE big one-shot animation centered on the dragon.
-    const dragonAnimFile = getAnimation('dragon');
-    const dragonAnimEntry = getAnimationEntry(dragonAnimFile);
     for (const evt of events) {
       if (evt.type !== 'dragonSpin') continue;
-
-      if (dragonAnimEntry) {
-        // Spawn one big one-shot animation ONLY on the very first beam of a fresh spin.
-        if (evt.spinStart) {
-          dragonAnimCounter.current += 1;
-          const anim = {
-            id: `dragonAnim-${dragonAnimCounter.current}`,
-            row: evt.attackerRow,
-            col: evt.attackerCol,
-            file: dragonAnimEntry.f,
-          };
-          const baseDelay = delayFor(evt.attackerId);
-          setTimeout(() => {
-            setDragonAnims(prev => [...prev, anim]);
-            setTimeout(() => {
-              setDragonAnims(prev => prev.filter(a => a.id !== anim.id));
-            }, 1400);
-          }, baseDelay);
-        }
-        // Skip per-cell sequential flame rendering when custom anim is used.
-        continue;
-      }
 
       // Fallback: original per-cell rotating flames
       const cells = evt.spinCells || [];
@@ -1243,34 +1217,6 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         </div>
       ))}
 
-      {/* Dragon special: custom one-shot effect animation centered on dragon (covers ~7×7 cells) */}
-      {dragonAnims.map(a => {
-        const entry = getAnimationEntry(a.file);
-        if (!entry || cellPx <= 0) return null;
-        const SPAN = 7; // cells across (3 cell radius + dragon cell)
-        const sizePx = Math.round(cellPx * SPAN);
-        // Center on dragon cell. Cell center = (col + 0.5) * cellPx, then offset by sizePx/2.
-        const centerX = (a.col + 0.5) * cellPx;
-        const centerY = (visualRow(a.row) + 0.5) * cellPx;
-        return (
-          <div
-            key={a.id}
-            style={{
-              position: 'absolute',
-              left: centerX - sizePx / 2,
-              top: centerY - sizePx / 2,
-              width: sizePx,
-              height: sizePx,
-              pointerEvents: 'none',
-              zIndex: 9,
-              mixBlendMode: 'screen',
-              opacity: 0.5,
-            }}
-          >
-            <EffectAnimationPreview entry={entry} size={sizePx} row={0} fps={Math.max(10, entry.c)} loop={false} />
-          </div>
-        );
-      })}
     </div>
   );
 }
