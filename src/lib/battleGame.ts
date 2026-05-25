@@ -444,21 +444,21 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   waterwalker: {
-    label: 'Wasserwandler', emoji: '🌊', hp: 85, attack: 19, cooldown: 2,
-    description: 'Strebt zwanghaft in den nächsten Tümpel. Auf Wasser: -30% erlittener Schaden, regeneriert +3 HP pro Tick. Ohne Wasserfeld kämpft er normal.',
+    label: 'Wasserwandler', emoji: '🌊', hp: 85, attack: 24, cooldown: 2,
+    description: 'Strebt zwanghaft in den nächsten Tümpel. Auf Wasser: -30% erlittener Schaden, regeneriert +3 HP pro Tick. Wechselt nach 4 Idle-Ticks zu einem neuen Wasserfeld.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   doppelganger: {
     label: 'Doppelgänger', emoji: '👥', hp: 85, attack: 17, cooldown: 2,
-    description: 'Spawnt zu Rundenstart ein lila leuchtendes Phantom (20 HP, 5 Dmg, 5 Ticks unverwundbar) irgendwo in den 3 Gegnerlinien. Original bleibt still, bis das Phantom stirbt.',
+    description: 'Spawnt zu Rundenstart ein lila leuchtendes Phantom (80 HP, 5 Dmg, 5 Ticks unverwundbar) irgendwo in den 3 Gegnerlinien. Original kämpft normal weiter.',
     movePattern: DIAGONAL,
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
   },
   sniper: {
-    label: 'Scharfschütze', emoji: '🎯', hp: 50, attack: 35, cooldown: 3,
+    label: 'Scharfschütze', emoji: '🎯', hp: 40, attack: 25, cooldown: 4,
     description: 'Bewegt sich nie. Greift immer die Einheit mit niedrigstem HP auf dem ganzen Feld an. Hoher Schaden.',
     movePattern: [],
     attackPattern: (() => {
@@ -481,22 +481,22 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   // ===== NEW UNITS v3 =====
   bomber: {
-    label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 0, cooldown: 3,
-    description: 'Bewegt sich in alle 8 Richtungen (1 Feld). Greift nicht direkt an. Alle 3 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (35 Dmg, 3×3). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
+    label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 0, cooldown: 4,
+    description: 'Bewegt sich in alle 8 Richtungen (1 Feld). Greift nicht direkt an. Alle 4 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (30 Dmg, 3×3). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
     movePattern: ALL_ADJACENT,
     attackPattern: [], // never attacks directly
     strongVs: [], weakVs: [],
   },
   obelisk: {
     label: 'Obelisk', emoji: '🗿', hp: 150, attack: 0, cooldown: 0,
-    description: 'Steht still. Adjacent (Plus) Verbündete dauerhaft gebufft: +30% Schaden & Cooldown 1. Alle 3 Ticks für 2 Ticks: Strahl in 4 Richtungen über das ganze Feld – buff alle getroffenen Verbündeten.',
+    description: 'Steht still. Adjacent (Plus) Verbündete dauerhaft gebufft: +50% Schaden & Cooldown halbiert (min 1). Alle 3 Ticks für 2 Ticks: Strahl in 4 Richtungen über das ganze Feld.',
     movePattern: [],
     attackPattern: [],
     strongVs: [], weakVs: [],
   },
   shadowpriest: {
     label: 'Schattenpriester', emoji: '🕯️', hp: 80, attack: 10, cooldown: 3,
-    description: 'Bewegt sich diagonal (1 Feld), greift orthogonal bis 2 Felder an. Jeder Treffer legt einen Fluch-Stack. Bei 3 Stacks: Ziel verliert sofort 30% HP, dauerhaft −50% Schaden & nicht mehr heilbar. Alle 8 Ticks: +5 ATK pro verfluchtem Gegner (Cooldown senkt sich auf 2).',
+    description: 'Bewegt sich diagonal (1 Feld), greift orthogonal bis 2 Felder an. Jeder Treffer legt einen Fluch-Stack. Bei 2 Stacks: Ziel verliert sofort 30 HP, dauerhaft −60% Schaden & nicht mehr heilbar. Alle 7 Ticks: +5 ATK pro verfluchtem Gegner (permanent).',
     movePattern: DIAGONAL,
     attackPattern: [
       ...ORTHOGONAL,
