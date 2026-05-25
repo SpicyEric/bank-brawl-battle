@@ -35,8 +35,39 @@ function ScoreDots({ score, max, color }: { score: number; max: number; color: '
 }
 
 function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | 'player2' }) {
-  const game = useMultiplayerGame({ roomId, role });
-  return <GameUI game={game} isMultiplayer flipped={role === 'player2'} />;
+  const [roster, setRoster] = useState<UnitType[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { getRoomById } = await import('@/lib/multiplayer');
+        const room: any = await getRoomById(roomId);
+        const field = role === 'player1' ? 'player1_roster' : 'player2_roster';
+        const list = (room?.[field] as UnitType[] | null) || null;
+        if (cancelled) return;
+        if (list && list.length === 9) setRoster(list);
+        else setLoadError('Roster nicht gefunden');
+      } catch (e: any) {
+        if (!cancelled) setLoadError(e.message || 'Roster konnte nicht geladen werden');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [roomId, role]);
+
+  if (loadError) {
+    return <div className="min-h-[100dvh] flex items-center justify-center text-danger text-sm p-6 text-center">{loadError}</div>;
+  }
+  if (!roster) {
+    return <div className="min-h-[100dvh] flex items-center justify-center text-muted-foreground text-sm">Lade Roster…</div>;
+  }
+  return <MultiplayerGameInner roomId={roomId} role={role} roster={roster} />;
+}
+
+function MultiplayerGameInner({ roomId, role, roster }: { roomId: string; role: 'player1' | 'player2'; roster: UnitType[] }) {
+  const game = useMultiplayerGame({ roomId, role, roster });
+  return <GameUI game={game} isMultiplayer flipped={role === 'player2'} roster={roster} />;
 }
 
 function SinglePlayerGame() {
