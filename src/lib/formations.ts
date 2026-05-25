@@ -50,10 +50,12 @@ export function findFormationContaining(units: Unit[], unitId: string): Unit[] |
 export function canMoveFormation(formation: Unit[], dr: number, dc: number, grid: Cell[][]): boolean {
   if (formation.length === 0) return false;
   const ids = new Set(formation.map(u => u.id));
+  const rowCount = grid.length;
+  const colCount = grid[0]?.length ?? GRID_SIZE;
   for (const u of formation) {
     const r = u.row + dr;
     const c = u.col + dc;
-    if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return false;
+    if (r < 0 || r >= rowCount || c < 0 || c >= colCount) return false;
     const cell = grid[r]?.[c];
     if (!cell) return false;
     if (cell.terrain === 'water') return false;

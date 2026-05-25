@@ -19,6 +19,13 @@ import { matchRecorder } from '@/lib/matchRecorder';
 // Roster slots: 0..2 = red, 3..5 = green, 6..8 = blue
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
 const FORMATION_MODE = true;
+const BATTLE_WORLD_ROWS = 24;
+
+function createBattleWorldGrid(): Cell[][] {
+  return Array.from({ length: BATTLE_WORLD_ROWS }, (_, row) =>
+    Array.from({ length: GRID_SIZE }, (_, col) => ({ row, col, unit: null, terrain: 'none' as const }))
+  );
+}
 
 export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const hasRoster = !!(roster && roster.length === 9);
@@ -289,7 +296,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     setPlayerUnits(battlePlayers);
     setEnemyUnits(battleEnemies);
 
-    setGrid(createEmptyGrid());
+    const worldGrid = createBattleWorldGrid();
+    for (const u of battlePlayers) worldGrid[u.row][u.col].unit = u;
+    for (const e of battleEnemies) worldGrid[e.row][e.col].unit = e;
+    setGrid(worldGrid);
 
     // Skip place_enemy phase, go directly into battle
     startBattleRef.current?.();
