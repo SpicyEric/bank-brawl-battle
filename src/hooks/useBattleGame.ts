@@ -683,7 +683,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         // Healer: heal allies first, attack only if no one to heal
         if (unit.type === 'healer') {
           const allies = allUnits.filter(u => u.team === unit.team && u.id !== unit.id && u.hp > 0 && !u.dead);
-          const healable = allies.filter(a => a.hp < a.maxHp);
+          const healable = allies.filter(a => a.hp < a.maxHp && !a.unhealable);
 
           if (healable.length > 0 && unit.cooldown <= 0) {
             // Try to heal someone in range
