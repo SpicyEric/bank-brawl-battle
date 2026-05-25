@@ -1954,7 +1954,7 @@ export function tickRiderHorn(
       innerCells,
       outerCells,
     });
-    logs.push(`📯 ${r.team === 'player' ? '👤' : '💀'} Reiter-Horn! (+50% Schaden für ${buffed} Verbündete, 2 Ticks)`);
+    logs.push(`📯 ${r.team === 'player' ? '👤' : '💀'} Reiter-Horn! (+100% Schaden für ${buffed} Verbündete, 2 Ticks)`);
   }
 }
 
