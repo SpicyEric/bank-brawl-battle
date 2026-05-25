@@ -100,6 +100,37 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
   const [matchId, setMatchId] = useState(0);
   const prevGameOver = useRef(game.gameOver);
 
+  // === Spy: hold a button during placement to peek at opponent for up to 3s, once per match ===
+  const [spyUsed, setSpyUsed] = useState(false);
+  const [spying, setSpying] = useState(false);
+  const spyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const startSpy = () => {
+    if (spyUsed || spying || isMultiplayer) return;
+    setSpying(true);
+    spyTimerRef.current = setTimeout(() => {
+      setSpying(false);
+      setSpyUsed(true);
+      spyTimerRef.current = null;
+    }, 3000);
+  };
+  const stopSpy = () => {
+    if (!spying) return;
+    if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
+    setSpying(false);
+    setSpyUsed(true);
+  };
+  // Reset spy state on each new match
+  useEffect(() => {
+    setSpyUsed(false);
+    setSpying(false);
+    if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
+  }, [matchId]);
+  // Auto-stop spy if phase changes away from placement
+  useEffect(() => {
+    if (game.phase !== 'place_player' && spying) stopSpy();
+  }, [game.phase]);
+  const hideEnemyUnits = !isMultiplayer && game.phase === 'place_player' && !spying;
+
   // Aura zones (loaded once from DB), recomputed overlay each render based on placed units
   const [auraZones, setAuraZones] = useState<import('@/lib/auraData').AuraZoneMap>({});
   useEffect(() => {
