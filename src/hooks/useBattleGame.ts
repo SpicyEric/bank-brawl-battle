@@ -561,7 +561,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const acting = allUnits.filter(u => {
         if (u.hp <= 0) return false;
         // Staggered activation: units don't act until their activation turn
-        if (u.activationTurn !== undefined && currentTurn < u.activationTurn) return false;
+        if (!FORMATION_MODE && u.activationTurn !== undefined && currentTurn < u.activationTurn) return false;
         return true;
       }).sort((a, b) => a.maxCooldown - b.maxCooldown);
 
@@ -572,7 +572,6 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       // calcDamage() preserves color RPS + crit/variance. Player formations move
       // manually via moveFormation(unitId, dr, dc); enemy formations shuffle one
       // cell toward the nearest player unit each tick.
-      const FORMATION_MODE = true;
       if (FORMATION_MODE) {
         // 1) Auto-attack range 1
         for (const unit of acting) {
@@ -614,31 +613,35 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           });
           if (best.hp <= 0) (best as any).dead = true;
         }
-        // 2) Enemy formation move toward nearest player
-        const enemyFormations = findFormations(allUnits, 'enemy');
-        const playersAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
-        for (const grp of enemyFormations) {
-          if (grp.length === 0 || playersAlive.length === 0) continue;
+        // 2) Formations move one cell toward the nearest opposing formation.
+        const moveTeamFormations = (team: 'player' | 'enemy') => {
+          const formations = findFormations(allUnits, team);
+          const opponentsAlive = allUnits.filter(u => u.team !== team && u.hp > 0 && !u.dead);
+          for (const grp of formations) {
+            if (grp.length === 0 || opponentsAlive.length === 0) continue;
           let target: Unit | null = null;
           let bestDist = Infinity;
-          for (const e of grp) for (const p of playersAlive) {
-            const d = Math.abs(p.row - e.row) + Math.abs(p.col - e.col);
-            if (d < bestDist) { bestDist = d; target = p; }
+            for (const u of grp) for (const opponent of opponentsAlive) {
+              const d = Math.abs(opponent.row - u.row) + Math.abs(opponent.col - u.col);
+              if (d < bestDist) { bestDist = d; target = opponent; }
+            }
+            if (!target || bestDist <= 1) continue;
+            let cr = 0, cc = 0;
+            for (const u of grp) { cr += u.row; cc += u.col; }
+            cr /= grp.length; cc /= grp.length;
+            const ddr = Math.sign(target.row - cr);
+            const ddc = Math.sign(target.col - cc);
+            const tries: Array<[number, number]> = [];
+            if (ddr !== 0 && ddc !== 0) tries.push([ddr, ddc]);
+            if (ddr !== 0) tries.push([ddr, 0]);
+            if (ddc !== 0) tries.push([0, ddc]);
+            for (const [mdr, mdc] of tries) {
+              if (applyFormationMove(grp, mdr, mdc, newGrid)) break;
+            }
           }
-          if (!target) continue;
-          let cr = 0, cc = 0;
-          for (const e of grp) { cr += e.row; cc += e.col; }
-          cr /= grp.length; cc /= grp.length;
-          const ddr = Math.sign(target.row - cr);
-          const ddc = Math.sign(target.col - cc);
-          const tries: Array<[number, number]> = [];
-          if (ddr !== 0 && ddc !== 0) tries.push([ddr, ddc]);
-          if (ddr !== 0) tries.push([ddr, 0]);
-          if (ddc !== 0) tries.push([0, ddc]);
-          for (const [mdr, mdc] of tries) {
-            if (applyFormationMove(grp, mdr, mdc, newGrid)) break;
-          }
-        }
+        };
+        moveTeamFormations('player');
+        moveTeamFormations('enemy');
       } else {
 
 
