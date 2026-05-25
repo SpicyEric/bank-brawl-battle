@@ -2566,7 +2566,7 @@ export function tickObeliskAura(
   allUnits: Unit[],
   grid: Cell[][],
   events: BattleEvent[],
-  _logs: string[],
+  logs: string[],
 ): void {
   // Clear transient aura marks
   for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
