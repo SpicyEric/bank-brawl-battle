@@ -195,6 +195,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
           grid={game.grid}
           phase={game.phase}
           flipped={flipped}
+          matchId={matchId}
           onCellClick={(row, col) => {
             if (game.phase === 'place_player') {
               const unit = game.grid[row][col].unit;
