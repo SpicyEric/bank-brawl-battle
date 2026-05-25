@@ -247,9 +247,7 @@ function simulateOneBattle(p1Types: UnitType[], p2Types: UnitType[]): BattleResu
     for (const unit of acting) {
       if (unit.hp <= 0) continue;
       if (unit.type === 'dragon' && (unit.spinTicksLeft ?? 0) > 0) continue;
-      if (unit.type === 'doppelganger' && !unit.isPhantom && unit.phantomId) {
-        if (allUnits.some(u => u.id === unit.phantomId && !u.dead && u.hp > 0)) continue;
-      }
+      // Doppelganger original: stays active (no idle gate).
       if (unit.webbed && unit.webbed > 0) { unit.webbed -= 1; continue; }
 
       const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
