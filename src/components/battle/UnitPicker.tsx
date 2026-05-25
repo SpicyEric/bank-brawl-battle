@@ -108,7 +108,7 @@ export function UnitPicker({
       }
       if (!isDragging.current) return;
       setDragGhost({ x: e.clientX, y: e.clientY, emoji: UNIT_DEFS[dragStart.current.type].emoji, type: dragStart.current.type });
-      const cell = findCellAtPoint(e.clientX, e.clientY);
+      const cell = findCellAtPoint(e.clientX, e.clientY - DRAG_Y_OFFSET);
       if (cell) {
         lastHover.current = cell;
         onDragHover?.(cell.row, cell.col, dragStart.current.type);
