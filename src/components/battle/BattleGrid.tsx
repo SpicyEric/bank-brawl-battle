@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType, TERRAIN_DEFS } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { UnitGlyph } from '@/components/UnitGlyph';
 import { getAttackIcon, iconUrl, getAnimation, getAnimationEntry, loadAnimationManifest } from '@/lib/unitIcons';
 import { EffectAnimationPreview } from '@/components/EffectAnimationPreview';
+import battlefieldGrass from '@/assets/battlefield-grass.png';
+import battlefieldDesert from '@/assets/battlefield-desert.png';
 
 interface BattleGridProps {
   grid: Cell[][];
