@@ -685,7 +685,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               className={`aspect-square flex flex-col items-center justify-center relative overflow-visible
                 ${isPlayerZone && (isPlacing || showZoneColors) && !unit && terrain !== 'water' ? 'bg-primary/5' : ''} ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'hover:bg-primary/15 cursor-pointer' : isPlayerZone && isPlacing && terrain === 'water' ? 'cursor-not-allowed' : ''}
                 ${(isEnemyZone && (showZoneColors || !isPlacing)) || (isEnemyZone && !unit) ? 'bg-danger/5' : ''}
-                ${!unit && !hasTerrain ? 'bg-card' : ''}
+                ${!unit && !hasTerrain ? 'bg-transparent' : ''}
                 ${!unit && terrain === 'forest' ? 'bg-[hsl(145,30%,15%)]' : ''}
                 ${!unit && terrain === 'hill' ? 'bg-[hsl(35,25%,18%)]' : ''}
                 ${!unit && terrain === 'water' ? 'bg-[hsl(210,40%,18%)]' : ''}
