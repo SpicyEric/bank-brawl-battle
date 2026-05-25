@@ -151,6 +151,3 @@ function AuraZoneGrid({ zones }: { zones: Partial<Record<ZonePos, 'buff' | 'nerf
     </div>
   );
 }
-
-// Keep ZONE_POSITIONS import alive (tree-shake safety)
-void ZONE_POSITIONS;
