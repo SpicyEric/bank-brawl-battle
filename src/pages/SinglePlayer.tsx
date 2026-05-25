@@ -23,6 +23,28 @@ const SinglePlayer = () => {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('menu');
   const [subMenu, setSubMenu] = useState<SubMenu>('main');
+  const [downloading, setDownloading] = useState(false);
+
+  const handleExport = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const rows = await fetchAllMatches(5000);
+      if (!rows || rows.length === 0) {
+        toast.info('Noch keine Matches aufgezeichnet.');
+        return;
+      }
+      const blob = generateMatchesPdf(rows as never);
+      const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+      downloadBlob(blob, `match-auswertung-${stamp}.pdf`);
+      toast.success(`${rows.length} Matches exportiert.`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Export fehlgeschlagen.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
