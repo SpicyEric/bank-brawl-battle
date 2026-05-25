@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType, TERRAIN_DEFS } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { UnitGlyph } from '@/components/UnitGlyph';
 import { getAttackIcon, iconUrl, getAnimation, getAnimationEntry, loadAnimationManifest } from '@/lib/unitIcons';
 import { EffectAnimationPreview } from '@/components/EffectAnimationPreview';
+import battlefieldGrass from '@/assets/battlefield-grass.png';
+import battlefieldDesert from '@/assets/battlefield-desert.png';
 
 interface BattleGridProps {
   grid: Cell[][];
@@ -81,6 +83,22 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
   const prevOpponentMorale = useRef<'buff' | 'debuff' | null>(null);
   const prevFocus = useRef(false);
   const prevSacrifice = useRef(false);
+
+  // Random battlefield background per round (re-rolls on each new placement phase)
+  const BATTLEFIELDS = useMemo(() => [battlefieldGrass, battlefieldDesert], []);
+  const [battlefieldBg, setBattlefieldBg] = useState<string>(() => BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+  const prevPhaseRef = useRef<Phase>(phase);
+  useEffect(() => {
+    const prev = prevPhaseRef.current;
+    const isNewRoundStart =
+      (phase === 'place_player' || phase === 'place_enemy') &&
+      (prev === 'round_won' || prev === 'round_lost' || prev === 'round_draw' || prev === 'battle');
+    if (isNewRoundStart) {
+      setBattlefieldBg(BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+    }
+    prevPhaseRef.current = phase;
+  }, [phase, BATTLEFIELDS]);
+
 
   // War cry flash animation (own or opponent)
   useEffect(() => {
@@ -651,16 +669,24 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             ? { transform: `translate(${offset.dc * 100}%, ${offset.dr * 100}%)` }
             : undefined;
 
+          const vRow = flipped ? (GRID_SIZE - 1 - cell.row) : cell.row;
+          const cellBgStyle = !hasTerrain ? {
+            backgroundImage: `url(${battlefieldBg})`,
+            backgroundSize: `${GRID_SIZE * 100}% ${GRID_SIZE * 100}%`,
+            backgroundPosition: `${(cell.col / (GRID_SIZE - 1)) * 100}% ${(vRow / (GRID_SIZE - 1)) * 100}%`,
+          } : undefined;
+
           return (
             <button
               key={cellKey}
               data-cell-row={cell.row}
               data-cell-col={cell.col}
               onClick={() => onCellClick(cell.row, cell.col)}
+              style={cellBgStyle}
               className={`aspect-square flex flex-col items-center justify-center relative overflow-visible
                 ${isPlayerZone && (isPlacing || showZoneColors) && !unit && terrain !== 'water' ? 'bg-primary/5' : ''} ${isPlayerZone && isPlacing && !unit && terrain !== 'water' ? 'hover:bg-primary/15 cursor-pointer' : isPlayerZone && isPlacing && terrain === 'water' ? 'cursor-not-allowed' : ''}
                 ${(isEnemyZone && (showZoneColors || !isPlacing)) || (isEnemyZone && !unit) ? 'bg-danger/5' : ''}
-                ${!unit && !hasTerrain ? 'bg-card' : ''}
+                ${!unit && !hasTerrain ? '' : ''}
                 ${!unit && terrain === 'forest' ? 'bg-[hsl(145,30%,15%)]' : ''}
                 ${!unit && terrain === 'hill' ? 'bg-[hsl(35,25%,18%)]' : ''}
                 ${!unit && terrain === 'water' ? 'bg-[hsl(210,40%,18%)]' : ''}
