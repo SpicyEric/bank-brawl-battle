@@ -1537,9 +1537,7 @@ export function handleTerrainSeeker(unit: Unit, grid: Cell[][], _allUnits: Unit[
   const terrain = getSeekTerrain(unit.type);
   if (!terrain) return 'normal';
 
-  // Anti-stall: if no damage dealt for 10 ticks, abandon seek behavior and fight normally
   unit.seekerIdleTicks = (unit.seekerIdleTicks || 0) + 1;
-  if (unit.seekerIdleTicks >= 10) return 'normal';
 
   // Collect all matching tiles
   const tiles: { row: number; col: number; occupiedByOther: boolean }[] = [];
@@ -1550,24 +1548,38 @@ export function handleTerrainSeeker(unit: Unit, grid: Cell[][], _allUnits: Unit[
   }
   if (tiles.length === 0) return 'normal';
 
-  // Already standing on matching terrain → defend in place
-  if (grid[unit.row][unit.col].terrain === terrain) return 'on_terrain';
+  const curKey = `${unit.row},${unit.col}`;
+  const onMatchingTerrain = grid[unit.row][unit.col].terrain === terrain;
 
-  // Pick nearest free tile
-  const free = tiles.filter(t => !t.occupiedByOther);
-  if (free.length === 0) return 'wait';
-  free.sort((a, b) => distance(unit, a) - distance(unit, b));
-  const goal = free[0];
+  // Standing on matching terrain
+  if (onMatchingTerrain) {
+    if (!unit.visitedTerrainCells) unit.visitedTerrainCells = [];
+    if (!unit.visitedTerrainCells.includes(curKey)) unit.visitedTerrainCells.push(curKey);
+    // After 4 idle ticks without dealing damage, hop to a different terrain tile
+    if (unit.seekerIdleTicks >= 4) {
+      // unchanged: caller will treat as 'normal' if we can't find a new tile
+    } else {
+      return 'on_terrain';
+    }
+  }
+
+  // Pick a free tile we haven't visited yet (or any free tile if all visited)
+  const visited = new Set(unit.visitedTerrainCells || []);
+  const free = tiles.filter(t => !t.occupiedByOther && `${t.row},${t.col}` !== curKey);
+  if (free.length === 0) return onMatchingTerrain ? 'on_terrain' : 'wait';
+  const unvisited = free.filter(t => !visited.has(`${t.row},${t.col}`));
+  const pool = unvisited.length > 0 ? unvisited : free;
+  pool.sort((a, b) => distance(unit, a) - distance(unit, b));
+  const goal = pool[0];
 
   const possibleMoves = getMoveCells(unit, grid);
-  if (possibleMoves.length === 0) return 'wait';
+  if (possibleMoves.length === 0) return onMatchingTerrain ? 'on_terrain' : 'wait';
 
   // Prefer a direct move that lands ON the goal tile
   const direct = possibleMoves.find(p => p.row === goal.row && p.col === goal.col);
   let newPos: Position | null = direct ?? null;
 
   if (!newPos) {
-    // Use BFS toward goal (fake target Unit-shape: only row/col matter)
     const fakeTarget = { row: goal.row, col: goal.col, id: '__seek__', team: unit.team } as Unit;
     const step = bfsFirstStep(unit, fakeTarget, grid);
     if (step) {
@@ -1575,19 +1587,22 @@ export function handleTerrainSeeker(unit: Unit, grid: Cell[][], _allUnits: Unit[
       if (valid) newPos = valid;
     }
     if (!newPos) {
-      // Fallback greedy: move that minimizes distance to goal
       const sorted = [...possibleMoves].sort((a, b) => distance(a, goal) - distance(b, goal));
       newPos = sorted[0];
     }
   }
 
-  if (!newPos || (newPos.row === unit.row && newPos.col === unit.col)) return 'wait';
+  if (!newPos || (newPos.row === unit.row && newPos.col === unit.col)) {
+    return onMatchingTerrain ? 'on_terrain' : 'wait';
+  }
 
   // Commit the move on the grid
   grid[unit.row][unit.col].unit = null;
   unit.row = newPos.row;
   unit.col = newPos.col;
   grid[unit.row][unit.col].unit = unit;
+  // Reset idle counter when we move (will re-accumulate if still no damage)
+  unit.seekerIdleTicks = 0;
   return 'moved';
 }
 
