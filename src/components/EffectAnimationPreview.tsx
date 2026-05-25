@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { animationUrl, type AnimEntry } from '@/lib/unitIcons';
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
   row?: number;
   /** Frames per second. Defaults to 14. */
   fps?: number;
+  /** If false, animation plays exactly once and freezes on the last frame. Defaults to true. */
+  loop?: boolean;
   className?: string;
 }
 
@@ -16,16 +18,18 @@ interface Props {
  * Plays a 64×64 sprite-sheet animation using CSS steps().
  * Sheets are N cols × 9 rows of 64×64 frames.
  */
-export function EffectAnimationPreview({ entry, size = 64, row = 0, fps = 14, className }: Props) {
+export function EffectAnimationPreview({ entry, size = 64, row = 0, fps = 14, loop = true, className }: Props) {
   const url = animationUrl(entry.f);
   const cols = entry.c;
   const rows = entry.r;
-  const scale = size / 64;
   const sheetW = cols * size;
   const sheetH = rows * size;
   const duration = cols / fps;
   // Unique animation name so each sprite can have its own keyframe range
-  const animName = useMemo(() => `sprite-${entry.f.replace('.png','')}-c${cols}`, [entry.f, cols]);
+  const animName = useMemo(
+    () => `sprite-${entry.f.replace('.png', '')}-c${cols}-${loop ? 'loop' : 'once'}`,
+    [entry.f, cols, loop],
+  );
 
   return (
     <>
@@ -45,9 +49,10 @@ export function EffectAnimationPreview({ entry, size = 64, row = 0, fps = 14, cl
           backgroundSize: `${sheetW}px ${sheetH}px`,
           backgroundPosition: `0 ${-row * size}px`,
           imageRendering: 'pixelated',
-          animation: `${animName} ${duration}s steps(${cols}) infinite`,
+          animation: `${animName} ${duration}s steps(${cols}) ${loop ? 'infinite' : '1 forwards'}`,
         }}
       />
     </>
   );
 }
+
