@@ -1239,7 +1239,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         const newPS = playerScoreRef.current + 1;
         playerScoreRef.current = newPS;
         setPlayerScore(newPS);
-        const result = checkGameOver(newPS, enemyScoreRef.current, overtimeCount);
+        const result = checkGameOver(newPS, enemyScoreRef.current);
         if (result.draw) {
           setGameDraw(true);
           setPhase('game_draw');
@@ -1250,7 +1250,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         const newES = enemyScoreRef.current + 1;
         enemyScoreRef.current = newES;
         setEnemyScore(newES);
-        const result = checkGameOver(playerScoreRef.current, newES, overtimeCount);
+        const result = checkGameOver(playerScoreRef.current, newES);
         if (result.draw) {
           setGameDraw(true);
           setPhase('game_draw');
