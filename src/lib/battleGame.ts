@@ -6,7 +6,9 @@ export type UnitType =
   | 'banshee' | 'magnetiker' | 'vulkanit' | 'mirror' | 'doppelganger'
   | 'spiderqueen' | 'judge' | 'waterwalker' | 'chaindancer' | 'shadowblade'
   | 'lamb' | 'vampire' | 'icegolem' | 'stormrunner' | 'ranger'
-  | 'arsonist' | 'lightning' | 'mountaineer' | 'sniper' | 'cloner';
+  | 'arsonist' | 'lightning' | 'mountaineer' | 'sniper' | 'cloner'
+  // v3 additions:
+  | 'bomber' | 'obelisk' | 'shadowpriest';
 export type Team = 'player' | 'enemy';
 export type Phase = 'place_player' | 'place_enemy' | 'battle' | 'round_won' | 'round_lost' | 'round_draw' | 'game_draw';
 
