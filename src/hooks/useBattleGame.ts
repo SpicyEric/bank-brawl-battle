@@ -569,9 +569,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       // Individual movement AIs (lock-on, kiting, terrain seekers, dash, flying,
       // special tick patterns) are skipped here. Each unit auto-attacks the
       // lowest-HP adjacent enemy (Chebyshev 1) when its cooldown is ready.
-      // calcDamage() preserves color RPS + crit/variance. Player formations move
-      // manually via moveFormation(unitId, dr, dc); enemy formations shuffle one
-      // cell toward the nearest player unit each tick.
+      // calcDamage() preserves color RPS + crit/variance. Player and enemy
+      // formations both shift one cell toward the nearest opposing unit each tick.
       if (FORMATION_MODE) {
         // 1) Auto-attack range 1
         for (const unit of acting) {
@@ -1191,6 +1190,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
+    battleTick();
     battleRef.current = setInterval(battleTick, 675);
     timerRef.current = setInterval(() => {
       setBattleTimer(prev => {
