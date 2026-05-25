@@ -1571,6 +1571,7 @@ export function handleTerrainSeeker(unit: Unit, grid: Cell[][], _allUnits: Unit[
 export function tickTerrainHeals(allUnits: Unit[], grid: Cell[][], logs: string[]): void {
   for (const u of allUnits) {
     if (u.hp <= 0 || (u as any).dead) continue;
+    if (u.unhealable) continue;
     if (u.type === 'waterwalker' && grid[u.row]?.[u.col]?.terrain === 'water' && u.hp < u.maxHp) {
       const heal = Math.min(3, u.maxHp - u.hp);
       if (heal > 0) {
