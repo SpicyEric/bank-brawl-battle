@@ -360,10 +360,10 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               placedSlots={game.placedSlots}
               onDragHover={(row, col, type) => {
                 if (row === null || col === null || !type) { setDragPreview(null); return; }
-                // Only show preview on valid placement zones
+                // Only show preview on valid placement zones (4-row half)
                 const isPlayerRow = roster
-                  ? (flipped ? row < 3 : [5, 6, 7].includes(row))
-                  : [5, 6, 7].includes(row);
+                  ? (flipped ? row < 4 : [4, 5, 6, 7].includes(row))
+                  : [4, 5, 6, 7].includes(row);
                 const targetCell = game.grid[row]?.[col];
                 if (!isPlayerRow || !targetCell || targetCell.unit || targetCell.terrain === 'water') {
                   setDragPreview(null);
@@ -376,7 +376,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 if (!roster) return;
                 const cell = game.grid[row]?.[col];
                 if (!cell || cell.unit || cell.terrain === 'water') return;
-                const playerRows = [5, 6, 7];
+                const playerRows = [4, 5, 6, 7];
                 if (!playerRows.includes(row)) return;
                 const type = roster[slotIdx];
                 game.setSelectedSlot(slotIdx);
@@ -385,13 +385,15 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 setLastPlaced({ row, col, type });
               }}
             />
-            <button
-              onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
-              disabled={!isMultiplayer && !game.placeTimer && game.playerUnits.length < game.playerMaxUnits}
-              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              ✅ Bereit {isMultiplayer && game.playerUnits.length === 0 ? '(Aufgeben)' : ''}
-            </button>
+            {isMultiplayer && (
+              <button
+                onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
+                disabled={!game.placeTimer && game.playerUnits.length < game.playerMaxUnits}
+                className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ✅ Bereit {game.playerUnits.length === 0 ? '(Aufgeben)' : ''}
+              </button>
+            )}
           </div>
         )}
 
