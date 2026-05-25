@@ -84,7 +84,7 @@ function SinglePlayerGame() {
   return <GameUI game={game} isMultiplayer={false} roster={validRoster} />;
 }
 
-function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; roster?: UnitType[] }) {
+function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnType<typeof useBattleGame>, 'moveFormation'> & { moveFormation?: ReturnType<typeof useBattleGame>['moveFormation']; waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; roster?: UnitType[] }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<{ type: UnitType; color?: ColorGroup } | null>(null);
