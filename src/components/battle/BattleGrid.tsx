@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { Cell, GRID_SIZE, PLAYER_ROWS, UNIT_DEFS, UNIT_COLOR_GROUPS, Phase, ColorGroup, UnitType, TERRAIN_DEFS } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { UnitGlyph } from '@/components/UnitGlyph';
-import { getAttackIcon, iconUrl } from '@/lib/unitIcons';
+import { getAttackIcon, iconUrl, getAnimation, getAnimationEntry, loadAnimationManifest } from '@/lib/unitIcons';
+import { EffectAnimationPreview } from '@/components/EffectAnimationPreview';
 
 interface BattleGridProps {
   grid: Cell[][];
