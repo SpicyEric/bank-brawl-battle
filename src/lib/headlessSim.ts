@@ -371,7 +371,7 @@ function simulateOneBattle(p1Types: UnitType[], p2Types: UnitType[]): BattleResu
 
         // Lightning chain
         if (unit.type === 'lightning') {
-          const hopMults = [0.5, 0.4, 0.3, 0.2, 0.1];
+          const hopMults = [0.3, 0.2, 0.15, 0.1, 0.05];
           const hit = new Set<string>([target.id]);
           let current = { row: target.row, col: target.col };
           for (const mult of hopMults) {
