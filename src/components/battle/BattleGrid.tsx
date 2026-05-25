@@ -1264,7 +1264,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               pointerEvents: 'none',
               zIndex: 9,
               mixBlendMode: 'screen',
-              opacity: 0.3,
+              opacity: 0.5,
             }}
           >
             <EffectAnimationPreview entry={entry} size={sizePx} row={0} fps={Math.max(10, entry.c)} loop={false} />
