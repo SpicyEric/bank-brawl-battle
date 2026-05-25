@@ -162,6 +162,30 @@ const Simulator = () => {
               </div>
             </div>
 
+            {report.rosterP1 && report.rosterP2 && (
+              <div className="bg-card/80 backdrop-blur-sm border border-border rounded-xl p-4">
+                <h3 className="font-bold text-foreground mb-2 text-sm">🎲 Feste Roster dieser Simulation</h3>
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Spieler 1</div>
+                    <div className="flex flex-wrap gap-1">
+                      {report.rosterP1.map((t, i) => (
+                        <span key={i} className="bg-secondary/60 px-2 py-0.5 rounded">{UNIT_DEFS[t].emoji} {UNIT_DEFS[t].label}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Spieler 2</div>
+                    <div className="flex flex-wrap gap-1">
+                      {report.rosterP2.map((t, i) => (
+                        <span key={i} className="bg-secondary/60 px-2 py-0.5 rounded">{UNIT_DEFS[t].emoji} {UNIT_DEFS[t].label}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-card/80 backdrop-blur-sm border border-border rounded-xl p-4">
                 <h3 className="font-bold text-foreground mb-2 text-sm">🔥 Krasseste Konter (Team-vs-Team Winrate)</h3>
