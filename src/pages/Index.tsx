@@ -280,6 +280,27 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               }
               return;
             }
+            // === Combat phase: formation drag (SP only) ===
+            if (game.phase === 'battle' && !isMultiplayer && game.moveFormation) {
+              const unit = game.grid[row][col].unit;
+              if (selectedFormationId) {
+                const sel = game.playerUnits.find(u => u.id === selectedFormationId);
+                if (sel) {
+                  const dr = Math.sign(row - sel.row);
+                  const dc = Math.sign(col - sel.col);
+                  if ((dr !== 0 || dc !== 0) && Math.abs(row - sel.row) <= 1 && Math.abs(col - sel.col) <= 1) {
+                    const ok = game.moveFormation(selectedFormationId, dr, dc);
+                    if (ok) { setSelectedFormationId(null); return; }
+                  }
+                }
+                // Tap elsewhere → re-select or deselect
+                if (unit && unit.team === 'player') { setSelectedFormationId(unit.id); return; }
+                setSelectedFormationId(null);
+                if (unit) setInspectUnit({ type: unit.type, color: unit.color as ColorGroup | undefined });
+                return;
+              }
+              if (unit && unit.team === 'player') { setSelectedFormationId(unit.id); return; }
+            }
             const unit = game.grid[row][col].unit;
             if (unit) setInspectUnit({ type: unit.type, color: unit.color as ColorGroup | undefined });
           }}
@@ -290,7 +311,10 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
           focusFireActive={game.focusFireActive}
           sacrificeFlash={game.sacrificeUsed}
           dragPreview={dragPreview}
+          auraOverlay={auraOverlay}
+          selectedFormationCells={selectedFormationCells}
         />
+
 
         {phaseOverlay && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none phase-overlay-fade">
