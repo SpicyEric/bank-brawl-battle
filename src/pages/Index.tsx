@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useBattleGame } from '@/hooks/useBattleGame';
 import { useMultiplayerGame } from '@/hooks/useMultiplayerGame';
@@ -10,6 +10,8 @@ import { useMusic } from '@/hooks/useMusic';
 import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT, OVERTIME_THRESHOLD, ColorGroup } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
 import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, sfxFocusFire, sfxSacrifice, sfxShieldWall, setSfxMuted } from '@/lib/sfx';
+import { computeAuraOverlay } from '@/lib/auraData';
+import { findFormationContaining } from '@/lib/formations';
 import {
   DropdownMenu,
   DropdownMenuContent,
