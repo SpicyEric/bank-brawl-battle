@@ -840,7 +840,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           let lightningChainCells: { row: number; col: number }[] | undefined;
           if (unit.type === 'lightning') {
             lightningChainCells = [{ row: target.row, col: target.col }];
-            const hopMults = [0.5, 0.4, 0.3, 0.2, 0.1];
+            const hopMults = [0.3, 0.2, 0.15, 0.1, 0.05];
             const hit = new Set<string>([target.id]);
             let current: { row: number; col: number } = { row: target.row, col: target.col };
             for (const mult of hopMults) {
