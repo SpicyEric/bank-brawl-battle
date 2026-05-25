@@ -14,12 +14,16 @@ import { updateRoom, ensureAnonymousSession } from '@/lib/multiplayer';
 interface MultiplayerConfig {
   roomId: string;
   role: 'player1' | 'player2';
+  roster?: UnitType[];
 }
+
+// Slot color layout matches UnitRoster: slots 0-2 red, 3-5 green, 6-8 blue
+const SLOT_COLORS: ('red' | 'green' | 'blue')[] = ['red','red','red','green','green','green','blue','blue','blue'];
 
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning };
+  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning, color: (u as any).color, slotIndex: (u as any).slotIndex };
 }
 
 function serializeGrid(grid: Cell[][]) {
@@ -35,14 +39,16 @@ function getDeterministicFirstPlacer(roomId: string, roundNumber: number): 1 | 2
 }
 
 export function useMultiplayerGame(config: MultiplayerConfig) {
-  const { roomId, role } = config;
+  const { roomId, role, roster } = config;
+  const hasRoster = !!(roster && roster.length === 9);
   const isHost = role === 'player1';
   const myRows = isHost ? PLAYER_ROWS : ENEMY_ROWS;
   const myTeam = isHost ? 'player' as const : 'enemy' as const;
 
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
-  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>('warrior');
+  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(hasRoster ? roster![0] : 'warrior');
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(hasRoster ? 0 : null);
   const [playerUnits, setPlayerUnits] = useState<Unit[]>([]);
   const [enemyUnits, setEnemyUnits] = useState<Unit[]>([]);
   const [turnCount, setTurnCount] = useState(0);
@@ -391,22 +397,37 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   }, []);
 
   // Place unit on my side
-  const placeUnit = useCallback((row: number, col: number) => {
-    if (phase !== 'place_player' || !isMyTurnToPlace || !selectedUnit) return;
-    if (playerBannedUnits.includes(selectedUnit)) return; // Fatigue ban
+  const placeUnit = useCallback((row: number, col: number, overrideSlot?: number) => {
+    if (phase !== 'place_player' || !isMyTurnToPlace) return;
     if (!myRows.includes(row)) return;
     if (playerUnits.length >= getMaxUnits(playerScore, enemyScore, roundNumber)) return;
     if (grid[row][col].unit) return;
     if (grid[row][col].terrain === 'water') return;
 
-    const unit = createUnit(selectedUnit, myTeam, row, col);
+    let type: UnitType | null = null;
+    let color: 'red' | 'green' | 'blue' | undefined;
+    let slotIdx: number | undefined;
+
+    if (hasRoster) {
+      const useSlot = overrideSlot !== undefined ? overrideSlot : selectedSlot;
+      if (useSlot === null || useSlot === undefined) return;
+      type = roster![useSlot];
+      color = SLOT_COLORS[useSlot];
+      slotIdx = useSlot;
+    } else {
+      if (!selectedUnit) return;
+      if (playerBannedUnits.includes(selectedUnit)) return;
+      type = selectedUnit;
+    }
+
+    const unit = createUnit(type, myTeam, row, col, color, slotIdx);
     setPlayerUnits(prev => [...prev, unit]);
     setGrid(prev => {
       const next = prev.map(r => r.map(c => ({ ...c })));
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
-  }, [phase, isMyTurnToPlace, selectedUnit, playerUnits, grid, myRows, myTeam, playerBannedUnits]);
+  }, [phase, isMyTurnToPlace, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, myRows, myTeam, playerBannedUnits, playerScore, enemyScore, roundNumber]);
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
@@ -1111,7 +1132,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setEnemyUnits([]);
     setBattleLog([]);
     setTurnCount(0);
-    setSelectedUnit(UNIT_TYPES.find(t => !playerBannedUnits.includes(t)) || 'warrior');
+    setSelectedUnit(hasRoster ? roster![0] : (UNIT_TYPES.find(t => !playerBannedUnits.includes(t)) || 'warrior'));
+    if (hasRoster) setSelectedSlot(0);
     setGrid(newGrid);
     setPhase('place_player');
     setBattleTimer(ROUND_TIME_LIMIT);
@@ -1187,9 +1209,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     continueOvertime: () => {},
     playerBannedUnits,
     playerBannedSlots: [] as number[],
-    selectedSlot: null as number | null,
-    setSelectedSlot: (_: number | null) => {},
-    roster: undefined as UnitType[] | undefined,
+    selectedSlot,
+    setSelectedSlot,
+    roster: hasRoster ? roster! : undefined,
     placedSlots: [] as number[],
     playerFatigue,
   };
