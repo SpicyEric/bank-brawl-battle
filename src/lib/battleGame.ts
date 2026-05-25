@@ -1421,7 +1421,7 @@ export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[]
   }
   // Lamb: heal all allies +30% maxHp
   if (deadUnit.type === 'lamb') {
-    const allies = allUnits.filter(u => u.team === deadUnit.team && u.hp > 0 && !u.dead && u.id !== deadUnit.id);
+    const allies = allUnits.filter(u => u.team === deadUnit.team && u.hp > 0 && !u.dead && u.id !== deadUnit.id && !u.unhealable);
     for (const a of allies) {
       const heal = Math.round(a.maxHp * 0.30);
       a.hp = Math.min(a.maxHp, a.hp + heal);
