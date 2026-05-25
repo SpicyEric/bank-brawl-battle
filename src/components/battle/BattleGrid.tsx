@@ -811,19 +811,38 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {isDead && (
                 <span className="text-sm opacity-40 select-none">💀</span>
               )}
-              {unit && !isDead && !isHiddenEnemy && (
+              {unit && !isDead && !isHiddenEnemy && (() => {
+                // Row-by-row marching entry: uniform offset that ticks down.
+                // Player marches up from below: visual offset = +entryStep rows.
+                // Enemy marches down from above: visual offset = -entryStep rows.
+                const entryDr = entryStep > 0
+                  ? (unit.team === 'player' ? entryStep : -entryStep)
+                  : 0;
+                const visualDr = (flipped ? -entryDr : entryDr);
+                // Hide a unit while it's still off-grid
+                const visualRow = cell.row + visualDr;
+                const offGrid = visualRow < 0 || visualRow >= GRID_SIZE;
+                const entryStyle = entryStep > 0
+                  ? {
+                      transform: `translateY(${visualDr * 100}%)`,
+                      transition: `transform ${ENTRY_STEP_MS}ms linear`,
+                      opacity: offGrid ? 0 : 1,
+                    }
+                  : undefined;
+                const combinedStyle = entryStep > 0
+                  ? entryStyle
+                  : {
+                      ...slideStyle,
+                      transition: offset
+                        ? 'none'
+                        : (impulsePushedIds.has(unit.id)
+                            ? 'transform 1500ms cubic-bezier(0.12, 0.85, 0.25, 1)'
+                            : 'transform 580ms ease-out'),
+                    };
+                return (
                 <div
-                  className={`absolute inset-0 flex flex-col items-center justify-center z-10 ${
-                    battleEntry ? (unit.team === 'player' ? 'battle-entry-player' : 'battle-entry-enemy') : ''
-                  }`}
-                  style={{
-                    ...slideStyle,
-                    transition: offset
-                      ? 'none'
-                      : (impulsePushedIds.has(unit.id)
-                          ? 'transform 1500ms cubic-bezier(0.12, 0.85, 0.25, 1)'
-                          : 'transform 580ms ease-out'),
-                  }}
+                  className={`absolute inset-0 flex flex-col items-center justify-center z-10`}
+                  style={combinedStyle as any}
                 >
                   {/* Persistent freeze overlay – stays visible the entire time the unit is frozen */}
                   {isFrozen && (
