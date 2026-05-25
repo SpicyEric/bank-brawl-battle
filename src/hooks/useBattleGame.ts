@@ -12,6 +12,7 @@ import {
   tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest, applyShadowpriestCurse,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
+import { findFormations, applyFormationMove, findFormationContaining } from '@/lib/formations';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 import { matchRecorder } from '@/lib/matchRecorder';
 
@@ -561,6 +562,84 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         return true;
       }).sort((a, b) => a.maxCooldown - b.maxCooldown);
 
+      // === FORMATION_MODE (SP-only rewrite, Step 3+4) ============================
+      // Individual movement AIs (lock-on, kiting, terrain seekers, dash, flying,
+      // special tick patterns) are skipped here. Each unit auto-attacks the
+      // lowest-HP adjacent enemy (Chebyshev 1) when its cooldown is ready.
+      // calcDamage() preserves color RPS + crit/variance. Player formations move
+      // manually via moveFormation(unitId, dr, dc); enemy formations shuffle one
+      // cell toward the nearest player unit each tick.
+      const FORMATION_MODE = true;
+      if (FORMATION_MODE) {
+        // 1) Auto-attack range 1
+        for (const unit of acting) {
+          if (unit.hp <= 0 || unit.dead) continue;
+          unit.cooldown = Math.max(0, unit.cooldown - 1);
+          if (unit.cooldown > 0) continue;
+          let best: Unit | null = null;
+          for (const other of allUnits) {
+            if (other === unit || other.team === unit.team) continue;
+            if (other.hp <= 0 || other.dead) continue;
+            const adr = Math.abs(other.row - unit.row);
+            const adc = Math.abs(other.col - unit.col);
+            if (adr <= 1 && adc <= 1 && (adr + adc) > 0) {
+              if (!best || other.hp < best.hp) best = other;
+            }
+          }
+          if (!best) continue;
+          let dmg = calcDamage(unit, best, newGrid);
+          if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
+          else {
+            dmg = Math.round(dmg * enemyDmgMod);
+            if (best.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
+          }
+          best.hp = Math.max(0, best.hp - dmg);
+          unit.cooldown = unit.maxCooldown;
+          events.push({
+            type: best.hp <= 0 ? 'kill' : 'hit',
+            attackerId: unit.id,
+            attackerRow: unit.row,
+            attackerCol: unit.col,
+            attackerEmoji: UNIT_DEFS[unit.type].emoji,
+            attackerType: unit.type,
+            targetId: best.id,
+            targetRow: best.row,
+            targetCol: best.col,
+            damage: dmg,
+            isStrong: false, isWeak: false,
+            isRanged: false,
+          });
+          if (best.hp <= 0) (best as any).dead = true;
+        }
+        // 2) Enemy formation move toward nearest player
+        const enemyFormations = findFormations(allUnits, 'enemy');
+        const playersAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
+        for (const grp of enemyFormations) {
+          if (grp.length === 0 || playersAlive.length === 0) continue;
+          let target: Unit | null = null;
+          let bestDist = Infinity;
+          for (const e of grp) for (const p of playersAlive) {
+            const d = Math.abs(p.row - e.row) + Math.abs(p.col - e.col);
+            if (d < bestDist) { bestDist = d; target = p; }
+          }
+          if (!target) continue;
+          let cr = 0, cc = 0;
+          for (const e of grp) { cr += e.row; cc += e.col; }
+          cr /= grp.length; cc /= grp.length;
+          const ddr = Math.sign(target.row - cr);
+          const ddc = Math.sign(target.col - cc);
+          const tries: Array<[number, number]> = [];
+          if (ddr !== 0 && ddc !== 0) tries.push([ddr, ddc]);
+          if (ddr !== 0) tries.push([ddr, 0]);
+          if (ddc !== 0) tries.push([0, ddc]);
+          for (const [mdr, mdc] of tries) {
+            if (applyFormationMove(grp, mdr, mdc, newGrid)) break;
+          }
+        }
+      } else {
+
+
+
       // === Burn DoT processing (Brandstifter / Arsonist) ===
       for (const u of allUnits) {
         if (!u.burning || u.burning.length === 0 || u.hp <= 0) continue;
@@ -1003,6 +1082,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           }
         }
       }
+      } // end if (!FORMATION_MODE)
+
+
 
       // === Judge: +8 ATK per fallen ally (recomputed each tick) ===
       for (const u of allUnits) {
@@ -1339,6 +1421,33 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     matchRecorder.endMatch(winner, { player1: playerScore, player2: enemyScore });
   }, [gameOver, gameWon, gameDraw, playerScore, enemyScore]);
 
+  // Formation movement (player drag during combat / placement)
+  const moveFormation = useCallback((unitId: string, dr: number, dc: number) => {
+    if (dr === 0 && dc === 0) return false;
+    if (Math.abs(dr) > 1 || Math.abs(dc) > 1) return false;
+    let success = false;
+    setGrid(prevGrid => {
+      const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
+      const all: Unit[] = [];
+      for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) all.push(cell.unit);
+      const formation = findFormationContaining(all, unitId);
+      if (!formation || formation.length === 0) return prevGrid;
+      // Only allow moving own (player) formations from here
+      if (formation[0].team !== 'player') return prevGrid;
+      if (!applyFormationMove(formation, dr, dc, newGrid)) return prevGrid;
+      success = true;
+      // Sync playerUnits state (positions changed)
+      setPlayerUnits(prev => prev.map(u => {
+        const moved = formation.find(f => f.id === u.id);
+        return moved ? { ...u, row: moved.row, col: moved.col } : u;
+      }));
+      return newGrid;
+    });
+    return success;
+  }, []);
+
+
+
   return {
     grid, phase, selectedUnit, setSelectedUnit,
     selectedSlot, setSelectedSlot,
@@ -1349,6 +1458,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     playerMaxUnits, enemyMaxUnits,
     gameOver, gameWon, gameDraw,
     placeUnit, removeUnit, confirmPlacement, startBattle,
+    moveFormation,
     resetGame, nextRound,
     moraleBoostUsed, moraleBoostActive, activateMoraleBoost,
     focusFireUsed, focusFireActive, activateFocusFire,

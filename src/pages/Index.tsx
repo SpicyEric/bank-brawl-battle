@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useBattleGame } from '@/hooks/useBattleGame';
 import { useMultiplayerGame } from '@/hooks/useMultiplayerGame';
@@ -10,6 +10,8 @@ import { useMusic } from '@/hooks/useMusic';
 import { POINTS_TO_WIN, UnitType, ROUND_TIME_LIMIT, OVERTIME_THRESHOLD, ColorGroup } from '@/lib/battleGame';
 import { Settings, RotateCcw, Home, VolumeX, Volume2 } from 'lucide-react';
 import { sfxPlace, sfxRemove, sfxConfirm, sfxBattleStart, sfxVictory, sfxDefeat, sfxWarCry, sfxFocusFire, sfxSacrifice, sfxShieldWall, setSfxMuted } from '@/lib/sfx';
+import { computeAuraOverlay } from '@/lib/auraData';
+import { findFormationContaining } from '@/lib/formations';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -84,7 +86,7 @@ function SinglePlayerGame() {
   return <GameUI game={game} isMultiplayer={false} roster={validRoster} />;
 }
 
-function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typeof useBattleGame> & { waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; roster?: UnitType[] }) {
+function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnType<typeof useBattleGame>, 'moveFormation'> & { moveFormation?: ReturnType<typeof useBattleGame>['moveFormation']; waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; roster?: UnitType[] }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<{ type: UnitType; color?: ColorGroup } | null>(null);
@@ -97,6 +99,33 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
   const nextRoundTriggered = useRef(false);
   const [matchId, setMatchId] = useState(0);
   const prevGameOver = useRef(game.gameOver);
+
+  // Aura zones (loaded once from DB), recomputed overlay each render based on placed units
+  const [auraZones, setAuraZones] = useState<import('@/lib/auraData').AuraZoneMap>({});
+  useEffect(() => {
+    let cancelled = false;
+    import('@/lib/auraData').then(m => m.loadAuraData()).then(({ zones }) => {
+      if (!cancelled) setAuraZones(zones);
+    });
+    return () => { cancelled = true; };
+  }, []);
+  const auraOverlay = useMemo(() => {
+    if (game.phase !== 'place_player' && game.phase !== 'battle') return undefined;
+    const all = [...(game.playerUnits ?? []), ...(game.enemyUnits ?? [])];
+    return computeAuraOverlay(all, auraZones);
+  }, [game.playerUnits, game.enemyUnits, game.phase, auraZones]);
+
+  // Formation selection (combat-phase: tap own unit → select formation → tap adjacent cell → move)
+  const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null);
+  const selectedFormationCells = useMemo(() => {
+    if (!selectedFormationId || game.phase !== 'battle') return undefined;
+    const all = [...(game.playerUnits ?? []), ...(game.enemyUnits ?? [])];
+    const grp = findFormationContaining(all, selectedFormationId);
+    if (!grp) return undefined;
+    return new Set(grp.map(u => `${u.row}-${u.col}`));
+  }, [selectedFormationId, game.playerUnits, game.enemyUnits, game.phase]);
+  useEffect(() => { if (game.phase !== 'battle') setSelectedFormationId(null); }, [game.phase]);
+
 
   // New match = transition out of gameOver back into placement (resetGame), or mount of multiplayer
   useEffect(() => {
@@ -251,6 +280,27 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
               }
               return;
             }
+            // === Combat phase: formation drag (SP only) ===
+            if (game.phase === 'battle' && !isMultiplayer && game.moveFormation) {
+              const unit = game.grid[row][col].unit;
+              if (selectedFormationId) {
+                const sel = game.playerUnits.find(u => u.id === selectedFormationId);
+                if (sel) {
+                  const dr = Math.sign(row - sel.row);
+                  const dc = Math.sign(col - sel.col);
+                  if ((dr !== 0 || dc !== 0) && Math.abs(row - sel.row) <= 1 && Math.abs(col - sel.col) <= 1) {
+                    const ok = game.moveFormation(selectedFormationId, dr, dc);
+                    if (ok) { setSelectedFormationId(null); return; }
+                  }
+                }
+                // Tap elsewhere → re-select or deselect
+                if (unit && unit.team === 'player') { setSelectedFormationId(unit.id); return; }
+                setSelectedFormationId(null);
+                if (unit) setInspectUnit({ type: unit.type, color: unit.color as ColorGroup | undefined });
+                return;
+              }
+              if (unit && unit.team === 'player') { setSelectedFormationId(unit.id); return; }
+            }
             const unit = game.grid[row][col].unit;
             if (unit) setInspectUnit({ type: unit.type, color: unit.color as ColorGroup | undefined });
           }}
@@ -261,7 +311,10 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: ReturnType<typ
           focusFireActive={game.focusFireActive}
           sacrificeFlash={game.sacrificeUsed}
           dragPreview={dragPreview}
+          auraOverlay={auraOverlay}
+          selectedFormationCells={selectedFormationCells}
         />
+
 
         {phaseOverlay && (
           <div className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none phase-overlay-fade">
