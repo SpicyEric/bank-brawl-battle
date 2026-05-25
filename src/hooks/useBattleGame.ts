@@ -969,7 +969,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           }
           target.hp = Math.max(0, target.hp - dmg);
           // Reset terrain-seeker idle counter on successful damage
-          if (dmg > 0 && (unit.type === 'ranger' || unit.type === 'mountaineer' || unit.type === 'waterwalker')) {
+          if (dmg > 0 && unit.type === 'waterwalker') {
             unit.seekerIdleTicks = 0;
           }
           // Cooldown reset honors terrain bonuses (ranger=1 on forest, mountaineer=2 on hill)
