@@ -40,6 +40,8 @@ interface UnitPickerProps {
   onDragDrop?: (row: number, col: number, slotIdx: number) => void;
 }
 
+const DRAG_Y_OFFSET = 105;
+
 export function UnitPicker({
   selected, onSelect, placedCount, maxUnits,
   bannedUnits = [], fatigue = {}, unitTypes,
@@ -108,7 +110,7 @@ export function UnitPicker({
       }
       if (!isDragging.current) return;
       setDragGhost({ x: e.clientX, y: e.clientY, emoji: UNIT_DEFS[dragStart.current.type].emoji, type: dragStart.current.type });
-      const cell = findCellAtPoint(e.clientX, e.clientY);
+      const cell = findCellAtPoint(e.clientX, e.clientY - DRAG_Y_OFFSET);
       if (cell) {
         lastHover.current = cell;
         onDragHover?.(cell.row, cell.col, dragStart.current.type);
@@ -130,7 +132,7 @@ export function UnitPicker({
       onDragHover?.(null, null, null);
       if (didLongPress.current) { didLongPress.current = false; return; }
       if (wasDragging && startInfo && slotIdx !== null) {
-        const cell = findCellAtPoint(e.clientX, e.clientY);
+        const cell = findCellAtPoint(e.clientX, e.clientY - DRAG_Y_OFFSET);
         if (cell) onDragDrop?.(cell.row, cell.col, slotIdx);
       }
       // Pure tap: slot is already selected from pointerdown — nothing else to do
