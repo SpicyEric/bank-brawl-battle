@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMusic } from '@/hooks/useMusic';
-import { ArrowLeft, Swords, BookOpen, Trophy, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Swords, BookOpen, Trophy, ChevronRight, FileBarChart2, Loader2 } from 'lucide-react';
 import menuBg from '@/assets/menu-bg.png';
+import { fetchAllMatches } from '@/lib/matchRecorder';
+import { generateMatchesPdf, downloadBlob } from '@/lib/matchPdf';
+import { toast } from 'sonner';
 
 export type Difficulty = 1 | 2 | 3 | 4 | 5;
 
@@ -20,6 +23,28 @@ const SinglePlayer = () => {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('menu');
   const [subMenu, setSubMenu] = useState<SubMenu>('main');
+  const [downloading, setDownloading] = useState(false);
+
+  const handleExport = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      const rows = await fetchAllMatches(5000);
+      if (!rows || rows.length === 0) {
+        toast.info('Noch keine Matches aufgezeichnet.');
+        return;
+      }
+      const blob = generateMatchesPdf(rows as never);
+      const stamp = new Date().toISOString().slice(0,16).replace(/[:T]/g,'-');
+      downloadBlob(blob, `match-auswertung-${stamp}.pdf`);
+      toast.success(`${rows.length} Matches exportiert.`);
+    } catch (e) {
+      console.error(e);
+      toast.error('Export fehlgeschlagen.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -80,6 +105,22 @@ const SinglePlayer = () => {
                 <div className="text-left flex-1">
                   <span className="block">Tutorial</span>
                   <span className="text-xs font-normal text-muted-foreground">Lerne die Grundlagen</span>
+                </div>
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </button>
+
+              {/* Auswertung */}
+              <button
+                onClick={handleExport}
+                disabled={downloading}
+                className="w-full py-4 px-4 rounded-xl bg-secondary text-secondary-foreground font-bold text-base hover:bg-accent active:scale-[0.97] transition-all flex items-center gap-3 disabled:opacity-60"
+              >
+                {downloading
+                  ? <Loader2 size={20} className="text-primary shrink-0 animate-spin" />
+                  : <FileBarChart2 size={20} className="text-primary shrink-0" />}
+                <div className="text-left flex-1">
+                  <span className="block">Auswertung</span>
+                  <span className="text-xs font-normal text-muted-foreground">Alle Matches als PDF herunterladen</span>
                 </div>
                 <ChevronRight size={16} className="text-muted-foreground" />
               </button>

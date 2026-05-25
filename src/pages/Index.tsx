@@ -36,6 +36,7 @@ function ScoreDots({ score, max, color }: { score: number; max: number; color: '
 
 function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | 'player2' }) {
   const [roster, setRoster] = useState<UnitType[] | null>(null);
+  const [opponentRoster, setOpponentRoster] = useState<UnitType[] | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -45,10 +46,13 @@ function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | '
         const { getRoomById } = await import('@/lib/multiplayer');
         const room: any = await getRoomById(roomId);
         const field = role === 'player1' ? 'player1_roster' : 'player2_roster';
+        const oppField = role === 'player1' ? 'player2_roster' : 'player1_roster';
         const list = (room?.[field] as UnitType[] | null) || null;
+        const oppList = (room?.[oppField] as UnitType[] | null) || undefined;
         if (cancelled) return;
         if (list && list.length === 9) setRoster(list);
         else setLoadError('Roster nicht gefunden');
+        if (oppList && oppList.length === 9) setOpponentRoster(oppList);
       } catch (e: any) {
         if (!cancelled) setLoadError(e.message || 'Roster konnte nicht geladen werden');
       }
@@ -62,11 +66,11 @@ function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | '
   if (!roster) {
     return <div className="min-h-[100dvh] flex items-center justify-center text-muted-foreground text-sm">Lade Roster…</div>;
   }
-  return <MultiplayerGameInner roomId={roomId} role={role} roster={roster} />;
+  return <MultiplayerGameInner roomId={roomId} role={role} roster={roster} opponentRoster={opponentRoster} />;
 }
 
-function MultiplayerGameInner({ roomId, role, roster }: { roomId: string; role: 'player1' | 'player2'; roster: UnitType[] }) {
-  const game = useMultiplayerGame({ roomId, role, roster });
+function MultiplayerGameInner({ roomId, role, roster, opponentRoster }: { roomId: string; role: 'player1' | 'player2'; roster: UnitType[]; opponentRoster?: UnitType[] }) {
+  const game = useMultiplayerGame({ roomId, role, roster, opponentRoster });
   return <GameUI game={game} isMultiplayer flipped={role === 'player2'} roster={roster} />;
 }
 

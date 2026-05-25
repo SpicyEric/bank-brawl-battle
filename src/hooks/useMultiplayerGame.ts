@@ -12,11 +12,13 @@ import {
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { updateRoom, ensureAnonymousSession } from '@/lib/multiplayer';
+import { matchRecorder } from '@/lib/matchRecorder';
 
 interface MultiplayerConfig {
   roomId: string;
   role: 'player1' | 'player2';
   roster?: UnitType[];
+  opponentRoster?: UnitType[];
 }
 
 // Slot color layout matches UnitRoster: slots 0-2 red, 3-5 green, 6-8 blue
@@ -47,7 +49,7 @@ function getDeterministicFirstPlacer(roomId: string, roundNumber: number): 1 | 2
 }
 
 export function useMultiplayerGame(config: MultiplayerConfig) {
-  const { roomId, role, roster } = config;
+  const { roomId, role, roster, opponentRoster } = config;
   const hasRoster = !!(roster && roster.length === 9);
   const isHost = role === 'player1';
   const myRows = isHost ? PLAYER_ROWS : ENEMY_ROWS;
@@ -1218,6 +1220,73 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
   const resetGame = useCallback(() => {}, []);
   const startBattle = useCallback(() => {}, []);
+
+  // === Match recording (host only — authoritative state) ===
+  const recorderStartedRef = useRef(false);
+  const recordedRoundRef = useRef(0);
+  const matchEndedRef = useRef(false);
+
+  useEffect(() => {
+    if (!isHost || recorderStartedRef.current) return;
+    if (!hasRoster) return;
+    recorderStartedRef.current = true;
+    matchRecorder.start({
+      mode: 'multiplayer',
+      player1Label: 'Spieler 1 (Host)',
+      player2Label: 'Spieler 2',
+    });
+    matchRecorder.setRoster('player1', roster!, (slot) => SLOT_COLORS[slot]);
+    if (opponentRoster && opponentRoster.length === 9) {
+      matchRecorder.setRoster('player2', opponentRoster, (slot) => SLOT_COLORS[slot]);
+    }
+    matchEndedRef.current = false;
+    return () => { if (!matchEndedRef.current) matchRecorder.cancel(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pick up opponent roster if it arrives after mount
+  useEffect(() => {
+    if (!isHost || !recorderStartedRef.current) return;
+    if (opponentRoster && opponentRoster.length === 9) {
+      matchRecorder.setRoster('player2', opponentRoster, (slot) => SLOT_COLORS[slot]);
+    }
+  }, [opponentRoster, isHost]);
+
+  useEffect(() => {
+    if (!isHost || !recorderStartedRef.current) return;
+    if (phase !== 'battle') return;
+    if (recordedRoundRef.current === roundNumber) return;
+    recordedRoundRef.current = roundNumber;
+    // Host: playerUnits = player1, enemyUnits = player2
+    const placements = [
+      ...playerUnits.map(u => ({ team: 'player1' as const, type: u.type, color: (u as any).color, row: u.row, col: u.col, hp: u.hp })),
+      ...enemyUnits.map(u => ({ team: 'player2' as const, type: u.type, color: (u as any).color, row: u.row, col: u.col, hp: u.hp })),
+    ];
+    matchRecorder.startRound(roundNumber, placements);
+  }, [phase, roundNumber, isHost, playerUnits, enemyUnits]);
+
+  useEffect(() => {
+    if (!isHost || !recorderStartedRef.current || phase !== 'battle') return;
+    if (battleEvents.length === 0) return;
+    matchRecorder.tickAdvance();
+    const idMap = new Map<string, { team: 'player1' | 'player2'; type: UnitType }>();
+    for (const u of playerUnits) idMap.set(u.id, { team: 'player1', type: u.type });
+    for (const u of enemyUnits) idMap.set(u.id, { team: 'player2', type: u.type });
+    matchRecorder.addBattleEvents(
+      battleEvents,
+      (id) => idMap.get(id)?.team,
+      (id) => idMap.get(id)?.type,
+    );
+  }, [battleEvents, phase, isHost, playerUnits, enemyUnits]);
+
+  useEffect(() => {
+    if (!isHost || !recorderStartedRef.current || matchEndedRef.current) return;
+    if (!gameOver) return;
+    matchEndedRef.current = true;
+    const winner: 'player1' | 'player2' = gameWon ? 'player1' : 'player2';
+    matchRecorder.endRound(playerScore, enemyScore, winner);
+    matchRecorder.endMatch(winner, { player1: playerScore, player2: enemyScore });
+  }, [gameOver, gameWon, playerScore, enemyScore, isHost]);
 
   return {
     grid, phase, selectedUnit, setSelectedUnit,

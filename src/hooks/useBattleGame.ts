@@ -13,6 +13,7 @@ import {
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
+import { matchRecorder } from '@/lib/matchRecorder';
 
 // Roster slots: 0..2 = red, 3..5 = green, 6..8 = blue
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
@@ -1276,6 +1277,70 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     setDrawOfferPending(false);
     startNextRound();
   }, [startNextRound]);
+
+  // === Match recording (singleplayer) ===
+  const recorderStartedRef = useRef(false);
+  const recordedRoundRef = useRef(0);
+  const recordedEventsCountRef = useRef(0);
+  const matchEndedRef = useRef(false);
+
+  // Start match once on mount (when roster is available)
+  useEffect(() => {
+    if (recorderStartedRef.current) return;
+    if (!hasRoster) return;
+    recorderStartedRef.current = true;
+    matchRecorder.start({
+      mode: 'singleplayer',
+      difficulty,
+      player1Label: 'Spieler',
+      player2Label: `KI (Stufe ${difficulty})`,
+    });
+    matchRecorder.setRoster('player1', roster!, (slot) => SLOT_COLORS[slot]);
+    matchEndedRef.current = false;
+    return () => {
+      // Don't cancel on unmount if match already ended.
+      if (!matchEndedRef.current) matchRecorder.cancel();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Snapshot placements when entering battle phase
+  useEffect(() => {
+    if (phase !== 'battle' || !recorderStartedRef.current) return;
+    if (recordedRoundRef.current === roundNumber) return;
+    recordedRoundRef.current = roundNumber;
+    recordedEventsCountRef.current = 0;
+    const placements = [
+      ...playerUnits.map(u => ({ team: 'player1' as const, type: u.type, color: (u.color as ColorGroup | undefined), row: u.row, col: u.col, hp: u.hp })),
+      ...enemyUnits.map(u => ({ team: 'player2' as const, type: u.type, color: (u.color as ColorGroup | undefined), row: u.row, col: u.col, hp: u.hp })),
+    ];
+    matchRecorder.startRound(roundNumber, placements);
+  }, [phase, roundNumber, playerUnits, enemyUnits]);
+
+  // Stream battle events
+  useEffect(() => {
+    if (!recorderStartedRef.current || phase !== 'battle') return;
+    if (battleEvents.length === 0) return;
+    matchRecorder.tickAdvance();
+    const idMap = new Map<string, { team: 'player1' | 'player2'; type: UnitType }>();
+    for (const u of playerUnits) idMap.set(u.id, { team: 'player1', type: u.type });
+    for (const u of enemyUnits) idMap.set(u.id, { team: 'player2', type: u.type });
+    matchRecorder.addBattleEvents(
+      battleEvents,
+      (id) => idMap.get(id)?.team,
+      (id) => idMap.get(id)?.type,
+    );
+  }, [battleEvents, phase, playerUnits, enemyUnits]);
+
+  // End match on game over / draw
+  useEffect(() => {
+    if (!recorderStartedRef.current || matchEndedRef.current) return;
+    if (!gameOver && !gameDraw) return;
+    matchEndedRef.current = true;
+    const winner = gameDraw ? 'draw' : (gameWon ? 'player1' : 'player2');
+    matchRecorder.endRound(playerScore, enemyScore, winner);
+    matchRecorder.endMatch(winner, { player1: playerScore, player2: enemyScore });
+  }, [gameOver, gameWon, gameDraw, playerScore, enemyScore]);
 
   return {
     grid, phase, selectedUnit, setSelectedUnit,
