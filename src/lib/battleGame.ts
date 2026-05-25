@@ -967,6 +967,24 @@ export function moveToward(unit: Unit, target: Unit, grid: Cell[][], allUnits?: 
   const possibleMoves = getMoveCells(unit, grid);
   if (possibleMoves.length === 0) return { row: unit.row, col: unit.col };
 
+  // Bomber: avoid bomb cells; if standing on a bomb, MUST move; otherwise approach nearest enemy.
+  if (unit.type === 'bomber') {
+    const enemies = (allUnits || []).filter(u => u.team !== unit.team && u.hp > 0 && !u.dead);
+    const standingOnBomb = !!grid[unit.row]?.[unit.col]?.bomb;
+    const safeMoves = possibleMoves.filter(p => !grid[p.row]?.[p.col]?.bomb);
+    const pool = safeMoves.length > 0 ? safeMoves : possibleMoves;
+    if (enemies.length === 0) {
+      // No enemies: just step off bomb if needed
+      if (standingOnBomb && pool.length > 0) return pool[0];
+      return { row: unit.row, col: unit.col };
+    }
+    const minDistTo = (p: Position) => Math.min(...enemies.map(e => distance(p, e)));
+    const candidates: Position[] = [...pool];
+    if (!standingOnBomb && !grid[unit.row]?.[unit.col]?.bomb) candidates.push({ row: unit.row, col: unit.col });
+    candidates.sort((a, b) => minDistTo(a) - minDistTo(b));
+    return candidates[0];
+  }
+
   // Cloner (original): retreat — pick the move that maximizes min-distance to nearest enemy.
   if (unit.type === 'cloner' && !unit.isClone) {
     const enemies = (allUnits || []).filter(u => u.team !== unit.team && u.hp > 0 && !u.dead);
