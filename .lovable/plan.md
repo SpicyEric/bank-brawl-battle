@@ -1,55 +1,84 @@
-# Lane Discipline – Finalisierung nach Antworten
+# Plan: Komplett-Umbau Placement-System (SP + MP)
 
-## Entscheidungen (aus User-Antworten)
+## Übersicht
+Das alte rundenbasierte Eskalationssystem (1v1→2v2→3v3, Bereit-Button, AI-After-Player) wird durch ein einziges 30s-Live-Placement gefolgt von einem Eliminations-Kampf ersetzt. Hälftiges Feld mit eigener/gegnerischer Zone, gleichzeitiges Platzieren, automatischer Kampfstart, Sieg bei Auslöschung des Gegners.
 
-1. **Assassine:** Lane-Toleranz = 2 (5-Spalten-Korridor). Generelle Regel: Toleranz wird so gesetzt, dass jede Einheit sich tatsächlich nach vorne bewegen kann – keine Einheit darf durch Lane-Filter blockieren.
-2. **Lane-Break:** **Dauerhaft** für den Rest der Combat-Phase. Sobald gebrochen → bestehende Logik (z. B. „schwächsten Gegner suchen") greift wieder voll, freie Bewegung.
-3. **Reiter / Dash-Einheiten:** Lane **respektieren**. Dash darf nur in der Spalte (innerhalb Toleranz) ausgeführt werden, bis Lane gebrochen ist.
-4. **Heiler / Support:** `healer` und `lamb` werden aus Lane-Disziplin **ausgenommen** (kein `laneCol` → exempt). Obelisk ist eh statisch, bleibt exempt.
+## SCHRITT 1 — Feldaufteilung
 
-## Status im Code
+**`src/lib/battleGame.ts`**
+- `PLAYER_ROWS` von `[5,6,7]` → `[4,5,6,7]` ändern.
+- `ENEMY_ROWS` von `[0,1,2]` → `[0,1,2,3]` ändern.
 
-Die Grundimplementierung in `src/lib/battleGame.ts` existiert bereits aus dem letzten Schritt:
-- `Unit`-Felder `laneCol`, `laneBroken`, `laneStuckTicks`
-- `LANE_EXEMPT_TYPES`, `laneToleranceFor`, `isLaneActive`, `forwardSign`
-- Lane-Bevorzugung in `findTarget`
-- Lane-Move-Filter in `_selectBestMove` mit 4-Tick-Stuck-Break
+**`src/components/battle/BattleGrid.tsx`**
+- Zone-Tönung in den Zellen-Renderer einbauen: während `phase === 'place_player'` (und immer bei `showZoneColors`), bekommen Reihen 4-7 eine leichte grüne Tönung (`bg-success/10`), Reihen 0-3 leichte rote Tönung (`bg-danger/10`). Im `flipped`-Modus invertiert.
+- Bestehende Logik mit `[5,6,7]` und `[0,1,2]` durch `PLAYER_ROWS`/`ENEMY_ROWS`-Konstanten ersetzen (oder direkt 4er-Bereiche hartkodieren).
 
-## Was jetzt noch fertig gemacht wird
+**`src/pages/Index.tsx`**
+- `playerRows` für Drag-Drop von `[5,6,7]` → `[4,5,6,7]` (bzw. `[0,1,2,3]` flipped).
 
-### 1. Toleranz-Sanity-Check pro Unit-Typ
-- `laneToleranceFor` so anpassen, dass für jeden Typ **mindestens ein Vorwärts-Move im Korridor möglich** ist. Falls die aus `movePattern` abgeleitete Toleranz keinen Move mit `row != 0` zulässt, automatisch hochsetzen.
-- Explizite Overrides:
-  - `assassin: 2` (bestätigt)
-  - `mage: 1`
-  - alle orthogonalen (warrior, knight, rider, archer, sniper, tank, frost, chaindancer, banshee, magier-varianten falls orthogonal): `0`
-- Sicherstellen, dass keine bewegliche Einheit Toleranz so klein hat, dass sie nie laufen kann (Fallback: Toleranz = kleinste `|col|` aller Vorwärts-Moves).
+## SCHRITT 2 — Simultanes Live-Placement (30s)
 
-### 2. Reiter / Dash respektiert Lane
-- Im Reiter-Dash-Code (Mehrfach-Schritt) zusätzlich Lane-Filter anwenden, solange `isLaneActive(unit)` true ist: Dash-Zielspalte muss `|col - laneCol| <= tol` einhalten. Falls kein gültiger Dash → normaler Single-Step im Lane-Korridor.
-- Sobald Lane gebrochen (siehe Punkt 4) → Dash wieder frei.
+**`src/lib/battleGame.ts`**
+- Neue Konstante `PLACE_TIME_LIMIT = 30`.
+- `MAX_UNITS` bleibt bestehen, aber neuer Cap: `playerMaxUnits = 9` (Roster-Größe). Eliminations-Modus → keine Eskalation.
 
-### 3. Heiler / Lamb aus Lane ausnehmen
-- `LANE_EXEMPT_TYPES` bereits enthält `healer`, `lamb` – verifizieren.
-- Sicherstellen, dass `createUnit` für diese Typen `laneCol = null` setzt, damit `isLaneActive` sofort false liefert.
+**`src/hooks/useBattleGame.ts` (Singleplayer)**
+- `phase`-Modell vereinfachen: `'place'` (eine gemeinsame Phase) → `'battle'` → `'game_won'`/`'game_lost'`. `place_player`/`place_enemy`/`round_won`/`round_lost`/`round_draw` werden nicht mehr verwendet, bleiben im Typ erhalten für Rückwärtskompatibilität.
+- Beim Mount: KI generiert sofort `generateAIPlacement` und legt Einheiten in einem 10-Sekunden-Fenster gestaffelt (z.B. alle 1.1s eine) auf das Grid. Der Spieler sieht sie live erscheinen.
+- 30s-Countdown läuft sofort beim Eintritt in `'place'`. Spieler kann währenddessen platzieren/entfernen.
+- Bei `placeTimer === 0` → automatischer Übergang zu `'battle'` (`startBattle()`), kein Bereit-Button mehr.
+- `confirmPlacement` entfällt als sichtbare Aktion (Funktion bleibt als no-op für Multiplayer-Kompat).
+- `playerMaxUnits = 9` (kein Eskalations-Cap mehr).
 
-### 4. Lane-Break Trigger schärfen (dauerhaft)
-Zusätzlich zu „4 Ticks ohne Lane-Move":
-- **Schaden von außerhalb der Lane** → `laneBroken = true` (Notwehr / aktiv im Kampf).
-- **Eigener Angriff auf Ziel außerhalb der Lane** (z. B. weil `attackPattern` ein Out-of-Lane-Feld trifft) → `laneBroken = true`.
-- **Nahkampfkontakt erfolgt** (`dangerDist <= 1` und Angriff ausgeführt) → `laneBroken = true`.
+**`src/hooks/useMultiplayerGame.ts` (Multiplayer)**
+- Statt sequentiellem Placement (P1 platziert blind, P2 reagiert) → simultanes Placement.
+- Beide Spieler schreiben ihre Units kontinuierlich nach Supabase (`player1_units` / `player2_units` als JSONB), z.B. bei jedem Place/Remove.
+- Realtime-Subscription liest die gegnerischen Units live.
+- Host startet den Timer; beide Clients zeigen denselben Countdown (über `room.battle_started_at` oder `placement_started_at` Timestamp).
+- Bei Ablauf → beide Clients triggern automatisch `startBattle`.
 
-Einmal `true` → bleibt für Rest der Combat-Phase true. Nach dem Round-Reset wird `laneBroken` auf `false` zurückgesetzt und `laneCol` auf die neue Spawn-Spalte gesetzt.
+**Datenbank-Migration**
+- Neue Spalte `game_rooms.placement_started_at TIMESTAMPTZ` für synchronisierten Countdown.
 
-### 5. Round-Reset
-- Beim Start einer neuen Placement→Combat-Phase: für alle (nicht-exempten) Einheiten `laneCol = col`, `laneBroken = false`, `laneStuckTicks = 0` setzen.
+## SCHRITT 3 — Automatischer Kampfstart
 
-### 6. `headlessSim.ts` synchron halten
-- Prüfen, ob `headlessSim.ts` eigene Bewegungs-/Targeting-Kopie hat. Falls ja: gleiche Lane-Logik dort spiegeln, damit Balancing-Tool dieselbe Mechanik simuliert.
+**`useBattleGame.ts` / `useMultiplayerGame.ts`**
+- Beim Timer-Ablauf: kein User-Input nötig, `startBattle()` läuft automatisch.
+- KI-Platzierung (SP): innerhalb der ersten 10s zufällig auf den eigenen 4 Reihen. Implementiert via `setInterval`, das eine Einheit pro Tick legt, bis 9 platziert sind. Bestehende `generateAIPlacement` wird verwendet (Random-Pfad bzw. Difficulty-1-Pfad).
+- Formationslogik (`FORMATION_MODE`) bleibt vollständig aktiv (keine Änderung am Battle-Tick).
 
-## Technische Stellen (Dateien)
-- `src/lib/battleGame.ts` – Toleranz-Tabelle, Dash-Filter, Lane-Break-Trigger in `applyDamage`/Angriffsausführung, Round-Reset.
-- `src/lib/headlessSim.ts` – nur falls dort eigene Movement-Kopie vorhanden.
+## SCHRITT 4 — Eliminations-Match
 
-## Keine UI-Änderungen
-Placement-UI bleibt unverändert; Spaltenwahl wirkt jetzt automatisch durch das neue Verhalten.
+**`useBattleGame.ts`**
+- `roundNumber`/`playerScore`/`enemyScore` werden nicht mehr für Sieg verwendet.
+- Neuer Sieg-Check im `battleTick`: wenn alle gegnerischen Einheiten `dead || hp<=0` → `phase = 'round_won'`, `gameWon = true`, `gameOver = true`. Umgekehrt für Verlust. Bei beidseitiger Auslöschung im selben Tick → Unentschieden.
+- Fatigue-System, Overtime, Draw-Offer, `nextRound`, `getMaxUnits` werden im neuen Flow nicht mehr aufgerufen (bleiben im Code).
+- Kein Punktezähler-Update mehr.
+
+**`src/pages/Index.tsx`**
+- Scoreboard zeigt statt Punkten "Lebendige Einheiten" (z.B. `👤 N vs 💀 M`) ODER blendet Punkte aus und zeigt nur Rundenname "Eliminations-Match".
+- "Bereit"-Button und "Nächste Runde"-Button entfernen.
+- 30s-Countdown groß oben in der Mitte (eigene Komponente / overlay).
+- Gegnerische Einheiten während Placement-Phase mit leicht rotem Overlay (z.B. `bg-danger/20` über dem Sprite). Eigene Aura-Zonen bleiben sichtbar, gegnerische Aura wird NICHT berechnet (Filter in `computeAuraOverlay`).
+
+## Technische Details
+
+### Geänderte Dateien
+- `src/lib/battleGame.ts` (Konstanten, ggf. Sieg-Check-Helper)
+- `src/hooks/useBattleGame.ts` (kompletter Placement-Flow, KI-Drip, Auto-Start, Eliminations-Sieg)
+- `src/hooks/useMultiplayerGame.ts` (Live-Sync, gemeinsamer Timer, Auto-Start)
+- `src/components/battle/BattleGrid.tsx` (Zonentönung, Enemy-Overlay während Placement)
+- `src/pages/Index.tsx` (UI: Countdown oben, kein Bereit-Button, kein Next-Round-Button, Aura-Filter)
+- `supabase/migrations/...` (neue Spalte `placement_started_at`)
+
+### Was nicht angefasst wird
+- `src/lib/battleGame.ts` Combat-Engine (Stats, RPS, calcDamage, Formationen)
+- `src/lib/auraData.ts` (Aura-Zonen-Logik selbst)
+- `src/lib/formations.ts`
+- Admin-Interface (`AdminIcons.tsx`)
+- `UnitPicker.tsx`
+
+### Risiken
+- `useMultiplayerGame.ts` kenne ich noch nicht im Detail — bei der Implementierung lese ich es vollständig.
+- Realtime-Throughput: Bei jedem Place/Remove ein DB-Write → bei 30s und 9 Units pro Spieler ~9-20 Writes pro Spieler, unkritisch.
+- Bestehende Phasen `round_won`/`round_lost` bleiben für Kompatibilität, werden aber semantisch zu Match-Ende umgenutzt.
