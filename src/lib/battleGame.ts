@@ -2552,7 +2552,7 @@ export function tickObeliskAura(
 ): void {
   // Clear transient aura marks
   for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
-    grid[r][c].obeliskAura = 0;
+    grid[r][c].obeliskAura = undefined;
     grid[r][c].obeliskAuraTeam = undefined;
   }
   const obelisks = allUnits.filter(u => u.type === 'obelisk' && u.hp > 0 && !u.dead);
