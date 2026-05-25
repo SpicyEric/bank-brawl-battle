@@ -738,18 +738,24 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   </div>
                 );
               })()}
-              {/* Drag preview overlays */}
-              {showDragAttack && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-attack" />}
-              {showDragMove && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-move" />}
+              {/* Drag preview overlays — buff/nerf zones of dragged unit */}
+              {dragAuraKind && (
+                <div className={`absolute inset-0 z-20 pointer-events-none flex items-center justify-center rounded-sm ${dragAuraKind === 'buff' ? 'bg-green-500/35 ring-1 ring-green-400/70' : 'bg-red-500/35 ring-1 ring-red-400/70'} drag-aura-blink`}>
+                  <span className={`text-base font-black drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ${dragAuraKind === 'buff' ? 'text-green-200' : 'text-red-200'}`}>
+                    {dragAuraKind === 'buff' ? '+' : '−'}
+                  </span>
+                </div>
+              )}
               {isDragOrigin && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-origin" />}
               {/* Aura overlay (placement preview) */}
               {auraOverlay && (() => {
                 const k = auraOverlay.get(cellKey);
                 if (!k) return null;
                 const isBuff = k === 'buff';
+                const pulsing = !!pulseKind;
                 return (
                   <div
-                    className={`absolute inset-0 z-[6] pointer-events-none flex items-center justify-center rounded-sm ${isBuff ? 'bg-green-500/25 ring-1 ring-green-400/60' : 'bg-red-500/25 ring-1 ring-red-400/60'}`}
+                    className={`absolute inset-0 z-[6] pointer-events-none flex items-center justify-center rounded-sm ${isBuff ? 'bg-green-500/25 ring-1 ring-green-400/60' : 'bg-red-500/25 ring-1 ring-red-400/60'} ${pulsing ? 'placement-aura-pulse' : ''}`}
                   >
                     <span className={`text-base font-black drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] ${isBuff ? 'text-green-200' : 'text-red-200'}`}>
                       {isBuff ? '+' : '−'}
@@ -761,11 +767,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {selectedFormationCells?.has(cellKey) && (
                 <div className="absolute inset-0 z-[7] pointer-events-none rounded-sm ring-2 ring-primary/80 bg-primary/10 animate-pulse" />
               )}
-              {/* Placement attack/move flash overlays (transparent, don't replace cell bg) */}
-              {isFlashing && <div className="placement-attack-flash" />}
-              {isMoveFlashing && !isFlashing && <div className="placement-move-flash" />}
               {/* Placement impact */}
               {isImpact && <div className="placement-impact" />}
+
               {/* Terrain emoji (show when no unit or unit is dead) */}
               {hasTerrain && (!unit || isDead) && (
                 <span className="text-[11px] select-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]">{terrain === 'forest' && battlefield.id === 'desert' ? '🌵' : TERRAIN_DEFS[terrain].emoji}</span>
