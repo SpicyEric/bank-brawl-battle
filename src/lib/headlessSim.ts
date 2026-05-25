@@ -57,6 +57,8 @@ export interface SimReport {
   vsMatrix: Record<UnitType, Record<UnitType, { games: number; wins: number }>>;
   // Synergy matrix: synergy[a][b] = win rate when a & b on same team (a !== b)
   synergyMatrix: Record<UnitType, Record<UnitType, { games: number; wins: number }>>;
+  rosterP1?: UnitType[];
+  rosterP2?: UnitType[];
 }
 
 function emptyUnitStat(type: UnitType): UnitStat {
@@ -109,43 +111,27 @@ export type TeamMode = 'random' | 'pure' | 'roster';
 
 export interface SimOptions {
   teamSize?: number;          // units actually placed on the board (default 5)
-  rosterSize?: number;        // roster pool per side, drawn WITH replacement (default 9)
+  rosterSize?: number;        // roster pool per side, drawn WITHOUT replacement (default 9)
   mode?: TeamMode;
   rosterP1?: UnitType[];
   rosterP2?: UnitType[];
   pureType?: UnitType;
-  /** Guarantee at least one mono-vs-random battle per unit type at the start. */
-  monoSweep?: boolean;
   onProgress?: (done: number, total: number) => void;
   yieldEvery?: number;
 }
 
-// Draw a roster WITH replacement → matches the in-game picker where the
-// same unit can be chosen multiple times (e.g. 3 archers in a 9-slot roster).
-function drawRoster(n: number): UnitType[] {
+// Draw a roster of `n` UNIQUE units (no duplicates within a roster).
+// Mirrors the in-game team builder where each unit can only be picked once.
+function drawUniqueRoster(n: number): UnitType[] {
+  return shuffle([...UNIT_TYPES]).slice(0, Math.min(n, UNIT_TYPES.length));
+}
+
+// Pick `k` units WITH replacement from the roster — so the placed team can
+// contain duplicates (e.g. 5x the same unit if RNG hits it).
+function pickWithReplacement(roster: UnitType[], k: number): UnitType[] {
   const out: UnitType[] = [];
-  for (let i = 0; i < n; i++) out.push(UNIT_TYPES[Math.floor(Math.random() * UNIT_TYPES.length)]);
+  for (let i = 0; i < k; i++) out.push(roster[Math.floor(Math.random() * roster.length)]);
   return out;
-}
-
-// Pick `k` of the roster slots (without re-using a slot), so duplicates in the
-// roster naturally propagate to the placed team.
-function pickFromRoster(roster: UnitType[], k: number): UnitType[] {
-  const idx = shuffle(roster.map((_, i) => i)).slice(0, Math.min(k, roster.length));
-  return idx.map(i => roster[i]);
-}
-
-function buildTeams(opts: SimOptions): { p1: UnitType[]; p2: UnitType[] } {
-  const n = opts.teamSize ?? 5;
-  const rSize = opts.rosterSize ?? 9;
-  const mode = opts.mode ?? 'random';
-  if (mode === 'pure' && opts.pureType) {
-    return { p1: Array.from({ length: n }, () => opts.pureType!), p2: pickFromRoster(drawRoster(rSize), n) };
-  }
-  if (mode === 'roster' && opts.rosterP1 && opts.rosterP2) {
-    return { p1: pickFromRoster(opts.rosterP1, n), p2: pickFromRoster(opts.rosterP2, n) };
-  }
-  return { p1: pickFromRoster(drawRoster(rSize), n), p2: pickFromRoster(drawRoster(rSize), n) };
 }
 
 interface BattleResult {
@@ -508,23 +494,35 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
   const t0 = performance.now();
   const yieldEvery = opts.yieldEvery ?? 50;
 
-  const monoSweep = opts.monoSweep ?? true;
   const rSize = opts.rosterSize ?? 9;
   const n = opts.teamSize ?? 5;
-  // Build the mono-sweep queue: one mono-vs-random battle per unit type at the start.
-  const monoQueue: UnitType[] = monoSweep ? [...UNIT_TYPES] : [];
+  const mode = opts.mode ?? 'random';
+
+  // Build fixed per-simulation rosters of UNIQUE units (different for each player).
+  // These stay the same for ALL matches in this simulation run.
+  let rosterP1: UnitType[];
+  let rosterP2: UnitType[];
+  if (mode === 'roster' && opts.rosterP1 && opts.rosterP2) {
+    rosterP1 = [...opts.rosterP1];
+    rosterP2 = [...opts.rosterP2];
+  } else {
+    rosterP1 = drawUniqueRoster(rSize);
+    do { rosterP2 = drawUniqueRoster(rSize); }
+    while (UNIT_TYPES.length > rSize && rosterP1.every((u, i) => u === rosterP2[i]));
+  }
+  report.rosterP1 = [...rosterP1];
+  report.rosterP2 = [...rosterP2];
 
   for (let i = 0; i < battlesTotal; i++) {
     let p1: UnitType[]; let p2: UnitType[];
-    if (monoQueue.length > 0 && (opts.mode ?? 'random') === 'random') {
-      const t = monoQueue.shift()!;
-      // Alternate which side runs mono so both 'player' and 'enemy' sample positions get hit.
-      const enemyRoster = pickFromRoster(drawRoster(rSize), n);
-      if (i % 2 === 0) { p1 = Array.from({ length: n }, () => t); p2 = enemyRoster; }
-      else { p1 = enemyRoster; p2 = Array.from({ length: n }, () => t); }
+    if (mode === 'pure' && opts.pureType) {
+      p1 = Array.from({ length: n }, () => opts.pureType!);
+      p2 = pickWithReplacement(rosterP2, n);
     } else {
-      const built = buildTeams(opts);
-      p1 = built.p1; p2 = built.p2;
+      // Pick 5 (teamSize) WITH replacement from each player's fixed 9-unit roster.
+      // Duplicates → mono compositions naturally appear across many matches.
+      p1 = pickWithReplacement(rosterP1, n);
+      p2 = pickWithReplacement(rosterP2, n);
     }
     let result: BattleResult;
     try {

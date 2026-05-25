@@ -115,7 +115,7 @@ const Simulator = () => {
                 </button>
               ))}
             </div>
-            <p className="text-[11px] text-muted-foreground mt-2">Pro Match zieht jede Seite einen 9er-Roster (mit Wiederholung, also z.B. 3 Bogenschützen möglich) aus allen {UNIT_TYPES.length} Einheiten und stellt davon zufällig {teamSize} aufs Feld. Die ersten {UNIT_TYPES.length} Matches sind garantierte Mono-Tests (5× eine Einheit vs. Zufall), damit jede Einheit min. einmal solo geprüft wird.</p>
+            <p className="text-[11px] text-muted-foreground mt-2">Zu Beginn der Simulation zieht jeder Spieler einen festen {9}er-Roster aus 9 <b>unterschiedlichen</b> Einheiten (unterschiedlich pro Spieler). Pro Match werden dann zufällig {teamSize} Einheiten <b>mit Wiederholung</b> aus diesem Roster auf zufällige Positionen platziert – so kommen auch Mono-Teams (z.B. 5× Bogenschütze) ganz natürlich vor.</p>
           </div>
 
           <button onClick={run} disabled={running}
@@ -161,6 +161,30 @@ const Simulator = () => {
                 ))}
               </div>
             </div>
+
+            {report.rosterP1 && report.rosterP2 && (
+              <div className="bg-card/80 backdrop-blur-sm border border-border rounded-xl p-4">
+                <h3 className="font-bold text-foreground mb-2 text-sm">🎲 Feste Roster dieser Simulation</h3>
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Spieler 1</div>
+                    <div className="flex flex-wrap gap-1">
+                      {report.rosterP1.map((t, i) => (
+                        <span key={i} className="bg-secondary/60 px-2 py-0.5 rounded">{UNIT_DEFS[t].emoji} {UNIT_DEFS[t].label}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Spieler 2</div>
+                    <div className="flex flex-wrap gap-1">
+                      {report.rosterP2.map((t, i) => (
+                        <span key={i} className="bg-secondary/60 px-2 py-0.5 rounded">{UNIT_DEFS[t].emoji} {UNIT_DEFS[t].label}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 gap-4">
               <div className="bg-card/80 backdrop-blur-sm border border-border rounded-xl p-4">
