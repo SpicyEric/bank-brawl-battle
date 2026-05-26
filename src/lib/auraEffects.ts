@@ -218,6 +218,36 @@ export function applyAuraTick(allUnits: Unit[], logs: string[]): void {
   }
 }
 
+/** Per-tick source-driven side-effects (drain from source for doppelganger nerf). */
+export function applyAuraSourceEffects(
+  allUnits: Unit[], zones: AuraZoneMap, effects: AuraEffectMap, logs: string[],
+): void {
+  for (const src of allUnits) {
+    if (src.dead || src.hp <= 0) continue;
+    const eff = effects[src.type as UnitType];
+    const z = zones[src.type as UnitType];
+    if (!eff || !z) continue;
+    // Doppelganger nerf: lose 5 HP per ally currently in the nerf zone (per stack)
+    if (eff.nerf === 'lifedrain_5hp_per_tick_to_doppelganger') {
+      let stacks = 0;
+      for (const pos of ZONE_POSITIONS) {
+        if (z[pos] !== 'nerf') continue;
+        const { dr, dc } = ZONE_DELTA[pos];
+        const r = src.row + dr, c = src.col + dc;
+        const ally = allUnits.find(u => u.row === r && u.col === c && u.team === src.team && !u.dead && u.hp > 0);
+        if (ally) stacks++;
+      }
+      if (stacks > 0) {
+        const dmg = 5 * stacks;
+        src.hp = Math.max(0, src.hp - dmg);
+        src._justDrain = Date.now();
+        if (src.hp <= 0) { src.dead = true; logs.push(`💀 ${UNIT_DEFS[src.type].emoji} stirbt am Aura-Lebensentzug`); }
+      }
+    }
+  }
+}
+
+
 /** Multiplier applied to fire/lava/burn DoT damage based on defender's aura nerf. */
 export function fireLightningTakenMul(target: Unit): number {
   const s = target.auraStacks;
