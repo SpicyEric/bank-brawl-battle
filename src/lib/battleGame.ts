@@ -1234,6 +1234,9 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   }
 
   let baseAtk = attacker.attack + (attacker.judgeBonus || 0) + (attacker.permAtkBonus || 0);
+  // Aura: archer-DoT temporary ATK debuff/buff applied to this attacker
+  if (attacker.auraAtkDebuff) baseAtk = Math.max(0, baseAtk - attacker.auraAtkDebuff);
+  if (attacker.auraAtkBuff) baseAtk += attacker.auraAtkBuff;
   // Shadowpriest curse: −50% attack permanently on cursed attackers
   if ((attacker.curseAtkMul ?? 1) !== 1) baseAtk = Math.max(0, baseAtk * (attacker.curseAtkMul ?? 1));
   // Assassin: +4 damage against enemies below 50% HP
