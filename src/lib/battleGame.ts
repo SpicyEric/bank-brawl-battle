@@ -1924,54 +1924,60 @@ export function shouldSkipMove(unit: Unit): boolean {
 export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[]): Unit[] {
   const spawned: Unit[] = [];
   const cloners = allUnits.filter(u => u.type === 'cloner' && !u.isClone && u.hp > 0 && !u.dead);
-  const offsets = [
-    { r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 },
-    { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
-  ];
+  const rowCount = grid.length;
+  const colCount = grid[0]?.length ?? GRID_SIZE;
   for (const c of cloners) {
-    if ((c.clonesSpawnedTotal ?? 0) >= 3) continue; // lifetime limit reached
-    // First call: timer undefined → spawn immediately (this tick). Subsequent spawns every 6 ticks.
+    if ((c.clonesSpawnedTotal ?? 0) >= 3) continue;
     if (c.cloneTimer === undefined) c.cloneTimer = 1;
     c.cloneTimer -= 1;
     if (c.cloneTimer > 0) continue;
-    let didSpawn = false;
-    for (const o of offsets) {
-      const r = c.row + o.r, col = c.col + o.c;
-      if (r < 0 || r >= GRID_SIZE || col < 0 || col >= GRID_SIZE) continue;
-      const cell = grid[r][col];
-      if (cell.unit || cell.terrain === 'water') continue;
-      const clone: Unit = {
-        ...c,
-        id: crypto.randomUUID(),
-        row: r, col,
-        hp: 12,
-        maxHp: 12,
-        attack: 6,
-        isClone: true,
-        parentClonerId: c.id,
-        cloneTimer: undefined,
-        clonesSpawnedTotal: undefined,
-        skipNextMove: false,
-        cooldown: 0,
-        bondedToTankId: undefined,
-        movedWithTank: false,
-        slotIndex: undefined,
-        activationTurn: 0,
-        startRow: r,
-        stuckTurns: 0,
-        lastAttackedId: undefined,
-      };
-      grid[r][col].unit = clone;
-      spawned.push(clone);
-      c.clonesSpawnedTotal = (c.clonesSpawnedTotal ?? 0) + 1;
-      logs.push(`🧬 Kloner spawnt Klon (${c.clonesSpawnedTotal}/3)`);
-      didSpawn = true;
-      break;
+    // BFS from the cloner outward → first free non-water cell becomes spawn location.
+    let pick: { r: number; col: number } | null = null;
+    const visited = new Set<string>([`${c.row},${c.col}`]);
+    const queue: { r: number; col: number }[] = [{ r: c.row, col: c.col }];
+    while (queue.length && !pick) {
+      const cur = queue.shift()!;
+      for (const [dr, dc] of [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]] as const) {
+        const r = cur.r + dr, col = cur.col + dc;
+        if (r < 0 || r >= rowCount || col < 0 || col >= colCount) continue;
+        const k = `${r},${col}`;
+        if (visited.has(k)) continue;
+        visited.add(k);
+        const cell = grid[r]?.[col];
+        if (!cell) continue;
+        if (cell.terrain === 'water') continue;
+        if (!cell.unit) { pick = { r, col }; break; }
+        queue.push({ r, col });
+      }
     }
     c.cloneTimer = 6;
-    if (!didSpawn) {
-      // couldn't place this tick (no free adjacent cell) — try again next tick without consuming a charge
-    }
+    if (!pick) continue;
+    const clone: Unit = {
+      ...c,
+      id: crypto.randomUUID(),
+      row: pick.r, col: pick.col,
+      hp: 12,
+      maxHp: 12,
+      attack: 6,
+      isClone: true,
+      parentClonerId: c.id,
+      cloneTimer: undefined,
+      clonesSpawnedTotal: undefined,
+      skipNextMove: false,
+      cooldown: 0,
+      bondedToTankId: undefined,
+      movedWithTank: false,
+      slotIndex: undefined,
+      activationTurn: 0,
+      startRow: pick.r,
+      stuckTurns: 0,
+      lastAttackedId: undefined,
+      enteredArena: true,
+    };
+    grid[pick.r][pick.col].unit = clone;
+    spawned.push(clone);
+    c.clonesSpawnedTotal = (c.clonesSpawnedTotal ?? 0) + 1;
+    logs.push(`🧬 Kloner spawnt Klon (${c.clonesSpawnedTotal}/3)`);
   }
   allUnits.push(...spawned);
   return spawned;
