@@ -500,6 +500,12 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
 
+      // Visible 8x8 battlefield window = rows [GRID_SIZE .. 2*GRID_SIZE).
+      // Combat (targeting + attacks) only happens against units inside this window.
+      const VIEW_TOP = GRID_SIZE;
+      const VIEW_BOTTOM = GRID_SIZE * 2;
+      const inBattlefield = (u: Unit) => u.row >= VIEW_TOP && u.row < VIEW_BOTTOM;
+
       // Morale boost tick-down
       if (moralePhase.current !== 'none' && moraleTicksLeft.current > 0) {
         moraleTicksLeft.current -= 1;
