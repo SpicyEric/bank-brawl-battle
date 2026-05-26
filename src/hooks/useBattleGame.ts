@@ -716,7 +716,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         // (VIEW_TOP/VIEW_BOTTOM/inBattlefield hoisted above)
         const moveTeamFormations = (team: 'player' | 'enemy') => {
           const formations = findFormations(allUnits, team);
-          const opponentsAlive = allUnits.filter(u => u.team !== team && u.hp > 0 && !u.dead && inBattlefield(u));
+          const opponentsAlive = allUnits.filter(u => u.team !== team && u.hp > 0 && !u.dead);
           for (const grp of formations) {
             if (grp.length === 0 || opponentsAlive.length === 0) continue;
           let target: Unit | null = null;
