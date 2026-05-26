@@ -1337,7 +1337,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       })}
 
       {/* Rider horn: yellow square flash on each cell of the inner 3×3 then outer 5×5 ring */}
-      {hornFlashes.map(f => (
+      {hornFlashes.filter(f => isVisibleRow(f.row)).map(f => (
         <div
           key={f.id}
           className={f.kind === 'inner' ? 'horn-flash-inner' : 'horn-flash-outer'}
