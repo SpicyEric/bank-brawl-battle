@@ -1598,7 +1598,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     acceptDraw: () => {},
     continueOvertime: () => {},
     playerBannedUnits,
-    playerBannedSlots: [] as number[],
+    playerBannedSlots: (hasRoster && safeOwnHandicap > 0
+      ? Array.from({ length: safeOwnHandicap }, (_, i) => 9 - 1 - i)
+      : []) as number[],
     selectedSlot,
     setSelectedSlot,
     roster: hasRoster ? roster! : undefined,
