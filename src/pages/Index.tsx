@@ -100,42 +100,29 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
   const [matchId, setMatchId] = useState(0);
   const prevGameOver = useRef(game.gameOver);
 
-  // === Spy: hold a button during placement to peek at opponent for up to 3s, once per match ===
+  // === Spy: single tap during placement reveals the AI's fully built formation.
+  // Once per placement phase. Resets every new placement phase.
   const [spyUsed, setSpyUsed] = useState(false);
-  const [spying, setSpying] = useState(false);
-  const spyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startSpy = () => {
-    if (spyUsed || spying || isMultiplayer) return;
+  const [spying, setSpying] = useState(false); // true after spy was triggered for this phase
+  const triggerSpy = () => {
+    if (spyUsed || isMultiplayer) return;
+    if (game.phase !== 'place_player') return;
+    // Flush all pending AI placements so player sees the final formation immediately.
+    game.revealAIPlacement?.();
     setSpying(true);
-    spyTimerRef.current = setTimeout(() => {
-      setSpying(false);
-      setSpyUsed(true);
-      spyTimerRef.current = null;
-    }, 3000);
-  };
-  const stopSpy = () => {
-    if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
-    setSpying(false);
     setSpyUsed(true);
   };
-  // Reset spy state on each new match
+  // Reset spy state on every new placement phase (and on new match).
   useEffect(() => {
-    setSpyUsed(false);
-    setSpying(false);
-    if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
-  }, [matchId]);
-  // Auto-stop spy whenever we leave the placement phase, regardless of
-  // whether the user is still holding the button. This prevents the spy
-  // reveal (and the resulting "build area" view) from bleeding into the
-  // battle phase when the placement timer expires mid-hold.
-  useEffect(() => {
-    if (game.phase !== 'place_player') {
-      if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
+    if (game.phase === 'place_player') {
+      setSpyUsed(false);
+      setSpying(false);
+    } else {
+      // Hide enemies again as soon as placement ends.
       setSpying(false);
     }
-  }, [game.phase]);
-  // Only hide enemies during placement AND when not spying. Outside of
-  // placement we never hide enemies, even if `spying` somehow lingered.
+  }, [game.phase, matchId]);
+  // Hide enemies during placement unless the spy was used this phase.
   const hideEnemyUnits = !isMultiplayer && game.phase === 'place_player' && !spying;
 
   // Aura zones (loaded once from DB), recomputed overlay each render based on placed units
