@@ -292,7 +292,18 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
       {/* Grid */}
       <div className="px-4 relative">
         <BattleGrid
-          grid={game.grid}
+          grid={(() => {
+            // MP spy: overlay opponent snapshot onto an empty board for 3s.
+            if (isMultiplayer && spying && (game as any).opponentSnapshot) {
+              const snap = (game as any).opponentSnapshot as Array<{ row: number; col: number; team?: string }>;
+              const g = game.grid.map(r => r.map(c => ({ ...c, unit: null as any })));
+              for (const u of snap) {
+                if (g[u.row]?.[u.col]) g[u.row][u.col].unit = u as any;
+              }
+              return g;
+            }
+            return game.grid;
+          })()}
           phase={game.phase}
           flipped={flipped}
           matchId={matchId}
