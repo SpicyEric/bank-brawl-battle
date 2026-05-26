@@ -377,21 +377,15 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
             {!isMultiplayer && (
               <div className="flex gap-2">
                 <button
-                  onPointerDown={(e) => { e.preventDefault(); startSpy(); }}
-                  onPointerUp={stopSpy}
-                  onPointerLeave={stopSpy}
-                  onPointerCancel={stopSpy}
-                  onContextMenu={(e) => e.preventDefault()}
-                  disabled={spyUsed && !spying}
-                  className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all select-none touch-none active:scale-[0.98] ${
-                    spying
-                      ? 'bg-primary text-primary-foreground shadow-[0_0_14px_hsl(var(--primary)/0.6)] animate-pulse'
-                      : spyUsed
+                  onClick={triggerSpy}
+                  disabled={spyUsed}
+                  className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all select-none active:scale-[0.98] ${
+                    spyUsed
                       ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
                       : 'bg-card border border-primary/50 text-primary hover:bg-primary/10'
                   }`}
                 >
-                  {spying ? '👁️ SPIONIERE…' : spyUsed ? '👁️ verbraucht' : '👁️ Spionieren (halten)'}
+                  {spyUsed ? '👁️ Spioniert' : '👁️ Spionieren'}
                 </button>
                 <button
                   onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
