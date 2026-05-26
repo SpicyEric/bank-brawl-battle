@@ -671,46 +671,136 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       // calcDamage() preserves color RPS + crit/variance. Player and enemy
       // formations both shift one cell toward the nearest opposing unit each tick.
       if (FORMATION_MODE) {
-        // 1) Auto-attack range 1
+        // 1) Per-unit attack honoring each unit's attackRange (Chebyshev distance).
+        //    Includes status effects (vampire bleed, arsonist burn, frost freeze,
+        //    healer heal, shadowpriest curse) + applyPostAttackEffects + applyDeathEffects.
         for (const unit of acting) {
           if (unit.hp <= 0 || unit.dead) continue;
+          if (unit.webbed && unit.webbed > 0) { unit.webbed -= 1; continue; }
           unit.cooldown = Math.max(0, unit.cooldown - 1);
           if (unit.cooldown > 0) continue;
+
+          // Healer: heal lowest-HP ally in range first; only attack if nothing to heal.
+          if (unit.type === 'healer') {
+            const range = UNIT_DEFS.healer.attackRange ?? 1;
+            let healTarget: Unit | null = null;
+            let healPriority = Infinity;
+            for (const ally of allUnits) {
+              if (ally === unit || ally.team !== unit.team) continue;
+              if (ally.hp <= 0 || ally.dead || ally.unhealable) continue;
+              if (ally.hp >= ally.maxHp) continue;
+              const adr = Math.abs(ally.row - unit.row);
+              const adc = Math.abs(ally.col - unit.col);
+              if (Math.max(adr, adc) > range) continue;
+              const p = ally.hp / ally.maxHp;
+              if (p < healPriority) { healPriority = p; healTarget = ally; }
+            }
+            if (healTarget) {
+              const healAmt = Math.min(28, healTarget.maxHp - healTarget.hp);
+              healTarget.hp += healAmt;
+              unit.cooldown = unit.maxCooldown;
+              logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[healTarget.type].emoji} +${healAmt} ❤️`);
+              events.push({
+                type: 'heal',
+                attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col,
+                attackerEmoji: '🌿', attackerType: unit.type,
+                targetId: healTarget.id, targetRow: healTarget.row, targetCol: healTarget.col,
+                damage: 0, isStrong: false, isWeak: false,
+                isRanged: Math.max(Math.abs(unit.row - healTarget.row), Math.abs(unit.col - healTarget.col)) > 1,
+                healAmount: healAmt,
+              });
+              continue;
+            }
+          }
+
+          const range = UNIT_DEFS[unit.type].attackRange ?? 1;
           let best: Unit | null = null;
+          let bestDist = Infinity;
           for (const other of allUnits) {
             if (other === unit || other.team === unit.team) continue;
             if (other.hp <= 0 || other.dead) continue;
-            if (!inBattlefield(other)) continue; // can't strike enemies off the visible 8x8
+            if (!inBattlefield(other)) continue; // off-field foes can't be struck
+            if (other.isPhantom && (other.phantom ?? 0) > 0) continue;
             const adr = Math.abs(other.row - unit.row);
             const adc = Math.abs(other.col - unit.col);
-            if (adr <= 1 && adc <= 1 && (adr + adc) > 0) {
-              if (!best || other.hp < best.hp) best = other;
+            const d = Math.max(adr, adc);
+            if (d > range) continue;
+            // Prefer lowest HP, tie-break by closest.
+            if (!best || other.hp < best.hp || (other.hp === best.hp && d < bestDist)) {
+              best = other; bestDist = d;
             }
           }
           if (!best) continue;
-          let dmg = calcDamage(unit, best, newGrid);
+          // Frozen attackers deal reduced damage.
+          const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
+          const frozenMul = isFrozenNow ? (unit.frozenDmgMul ?? 0.5) : 1;
+          if (isFrozenNow) {
+            unit.frozen = (unit.frozen || 0) - 1;
+            if ((unit.frozen || 0) <= 0) unit.frozenDmgMul = undefined;
+          }
+          let dmg = Math.round(calcDamage(unit, best, newGrid) * frozenMul);
           if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
           else {
             dmg = Math.round(dmg * enemyDmgMod);
             if (best.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
           }
           best.hp = Math.max(0, best.hp - dmg);
-          unit.cooldown = unit.maxCooldown;
+          unit.cooldown = effectiveCooldown(unit, newGrid);
+          unit.lastAttackedId = best.id;
+
+          // Color RPS flags for event display.
+          const uColor = unit.color || UNIT_COLOR_GROUPS[unit.type];
+          const tColor = best.color || UNIT_COLOR_GROUPS[best.type];
+          const isStrong = (uColor === 'red' && tColor === 'green') || (uColor === 'green' && tColor === 'blue') || (uColor === 'blue' && tColor === 'red');
+          const isWeak = (tColor === 'red' && uColor === 'green') || (tColor === 'green' && uColor === 'blue') || (tColor === 'blue' && uColor === 'red');
+
+          // Status effects on hit.
+          if (unit.type === 'vampire' && dmg > 0) {
+            const heal = Math.round(dmg * 0.3);
+            const before = unit.hp;
+            unit.hp = Math.min(unit.maxHp, unit.hp + heal);
+            if (unit.hp - before > 0) logs.push(`🧛 Vampir saugt ${unit.hp - before} ❤️`);
+            if (best.hp > 0) {
+              best.bleeding = [10, 5, 3, 1];
+              logs.push(`🩸 ${UNIT_DEFS[best.type].emoji} blutet!`);
+            }
+          }
+          if (unit.type === 'arsonist' && best.hp > 0 && !isImmuneToFire(best, newGrid)) {
+            best.burning = [...(best.burning || []), { dmg: 5, turns: 4 }];
+          }
+          if (unit.type === 'frost' && best.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(best, newGrid)) {
+            best.frozen = 3;
+            best.frozenDmgMul = 0.5;
+          }
+          if (unit.type === 'shadowpriest' && best.hp > 0) {
+            applyShadowpriestCurse(unit, best, logs, events);
+          }
+
+          // Generic post-attack effects (mirror reflect, icegolem freeze, spider web, vulkanit lava, shadowblade bonus).
+          applyPostAttackEffects(unit, best, dmg, newGrid, logs);
+
+          const def = UNIT_DEFS[unit.type];
+          const tDef = UNIT_DEFS[best.type];
+          const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
+          logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${best.frozen ? ' 🧊' : ''}${best.hp <= 0 ? ' ☠️' : ''}`);
+
           events.push({
             type: best.hp <= 0 ? 'kill' : 'hit',
-            attackerId: unit.id,
-            attackerRow: unit.row,
-            attackerCol: unit.col,
-            attackerEmoji: UNIT_DEFS[unit.type].emoji,
-            attackerType: unit.type,
-            targetId: best.id,
-            targetRow: best.row,
-            targetCol: best.col,
-            damage: dmg,
-            isStrong: false, isWeak: false,
-            isRanged: false,
+            attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col,
+            attackerEmoji: UNIT_DEFS[unit.type].emoji, attackerType: unit.type,
+            targetId: best.id, targetRow: best.row, targetCol: best.col,
+            damage: dmg, isStrong, isWeak,
+            isRanged: bestDist > 1,
           });
-          if (best.hp <= 0) (best as any).dead = true;
+
+          if (best.hp <= 0) {
+            const survived = applyDeathEffects(best, allUnits, newGrid, logs, events);
+            if (!survived) (best as any).dead = true;
+          }
+          if (unit.hp <= 0) {
+            const survived = applyDeathEffects(unit, allUnits, newGrid, logs, events);
+            if (!survived) (unit as any).dead = true;
+          }
         }
         // 2) Formations move one cell toward the nearest opposing formation.
         // (VIEW_TOP/VIEW_BOTTOM/inBattlefield hoisted above)
