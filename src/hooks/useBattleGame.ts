@@ -53,6 +53,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const turnCountRef = useRef(0);
+  // Stalemate detection: if total HP across all units does not change for N ticks,
+  // force every unit to rush one step toward the nearest enemy.
+  const stalemateHpRef = useRef<number>(-1);
+  const stalemateTicksRef = useRef<number>(0);
+  const stalemateRushRef = useRef<number>(0); // remaining ticks of forced rush
 
   // Placement timer: always-on 30s simultaneous live-placement
   const hasPlaceTimer = true;
