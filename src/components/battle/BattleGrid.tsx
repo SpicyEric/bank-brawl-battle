@@ -35,6 +35,8 @@ interface BattleGridProps {
   selectedFormationCells?: Set<string>;
   /** Hide enemy units from view (used during full-grid placement; spy button temporarily reveals them). */
   hideEnemyUnits?: boolean;
+  /** Hide own player units (used briefly while spy reveals the enemy formation). */
+  hidePlayerUnits?: boolean;
 }
 
 interface UnitPos { row: number; col: number }
