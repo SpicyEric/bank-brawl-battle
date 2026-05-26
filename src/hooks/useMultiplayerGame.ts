@@ -721,6 +721,66 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     });
   }, [shieldWallUsed, phase, myTeam]);
 
+  // Activate flank: same logic as SP — 3-tick burst (back, sideways, forward)
+  // applied to my team only. Host: applied locally + via flankActiveRef.
+  // Guest: broadcasts to host, host applies on enemy team.
+  const activateFlank = useCallback((dir: -1 | 1) => {
+    if (phase !== 'battle') return;
+    if (dir === -1 && flankLeftUsed) return;
+    if (dir === 1 && flankRightUsed) return;
+    if (dir === -1) setFlankLeftUsed(true); else setFlankRightUsed(true);
+    setFlankActive(dir === -1 ? 'left' : 'right');
+    if (isHost) {
+      flankActiveRef.current = { dir, step: 0 };
+    }
+    setBattleLog(prev => [`🏃 FLANKE ${dir === -1 ? '←' : '→'}! Alle Einheiten umfassen den Gegner!`, ...prev]);
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'game_sync',
+      payload: { action: 'flank', data: { dir } },
+    });
+  }, [phase, flankLeftUsed, flankRightUsed, isHost]);
+
+  // Helper: apply one flank step to a single team's units in-place.
+  const applyFlankStep = (
+    grid: Cell[][],
+    units: Unit[],
+    dir: -1 | 1,
+    step: number,
+    team: 'player' | 'enemy'
+  ) => {
+    // Mirror axes for enemy team (host's perspective: enemy starts on rows 0-2).
+    const sign = team === 'player' ? 1 : -1;
+    let dr = 0, dc = 0, maxSteps = 0;
+    if (step === 0) { dr = 1 * sign;  dc = 0;          maxSteps = 2; }
+    else if (step === 1) { dr = 0;     dc = dir * sign; maxSteps = 5; }
+    else if (step === 2) { dr = -1 * sign; dc = 0;     maxSteps = 5; }
+    if (dr === 0 && dc === 0) return;
+    const teamUnits = units.filter(u => u.team === team && u.hp > 0 && !u.dead);
+    const sorted = [...teamUnits].sort((a, b) => {
+      if (dr > 0) return b.row - a.row;
+      if (dr < 0) return a.row - b.row;
+      if (dc > 0) return b.col - a.col;
+      if (dc < 0) return a.col - b.col;
+      return 0;
+    });
+    for (const u of sorted) {
+      for (let s = 0; s < maxSteps; s++) {
+        const nr = u.row + dr;
+        const nc = u.col + dc;
+        if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) break;
+        const tgt = grid[nr]?.[nc];
+        if (!tgt) break;
+        if (tgt.terrain === 'water') break;
+        if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
+        if (grid[u.row]?.[u.col]?.unit?.id === u.id) grid[u.row][u.col].unit = null;
+        u.row = nr; u.col = nc;
+        grid[u.row][u.col].unit = u;
+      }
+    }
+  };
+
+
   // Battle tick - only host runs this
   const battleTick = useCallback(() => {
     if (!isHost) return;
