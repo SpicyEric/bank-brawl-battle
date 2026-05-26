@@ -345,6 +345,13 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     setShieldWallUsed(false);
     setShieldWallActive(false);
     shieldWallTicksLeft.current = 0;
+    setShieldWallUsed(false);
+    setShieldWallActive(false);
+    shieldWallTicksLeft.current = 0;
+    setFlankLeftUsed(false);
+    setFlankRightUsed(false);
+    setFlankActive(null);
+    flankActiveRef.current = null;
     aiMoraleUsed.current = false;
     aiMoralePhase.current = 'none';
     aiMoraleTicksLeft.current = 0;
