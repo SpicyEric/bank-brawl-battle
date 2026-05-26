@@ -3,16 +3,20 @@ import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
-  GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, ROUNDS_TO_WIN, ROUND_TIME_LIMIT,
   MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
   processLavaTick, processGhostTick, tickPhantomTimers,
   tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest,
+  spawnDoppelgangerPhantoms, applyPostAttackEffects, applyDeathEffects, applyChainAttack, applyShadowpriestCurse,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { updateRoom, ensureAnonymousSession } from '@/lib/multiplayer';
 import { matchRecorder } from '@/lib/matchRecorder';
+import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
+import { applyAuraStacks, applyAuraTick, applyAuraSourceEffects } from '@/lib/auraEffects';
+import { findFormations, applyFormationMove } from '@/lib/formations';
 
 interface MultiplayerConfig {
   roomId: string;
@@ -23,11 +27,43 @@ interface MultiplayerConfig {
 
 // Slot color layout matches UnitRoster: slots 0-2 red, 3-5 green, 6-8 blue
 const SLOT_COLORS: ('red' | 'green' | 'blue')[] = ['red','red','red','green','green','green','blue','blue','blue'];
+const BATTLE_WORLD_ROWS = GRID_SIZE * 3;
+
+function createBattleWorldGrid(): Cell[][] {
+  return Array.from({ length: BATTLE_WORLD_ROWS }, (_, row) =>
+    Array.from({ length: GRID_SIZE }, (_, col) => ({ row, col, unit: null, terrain: 'none' as const }))
+  );
+}
+
+function getRoundUnitLimit(roundNumber: number): number {
+  return Math.min(9 + (roundNumber - 1) * 2, 17);
+}
 
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning, bleeding: u.bleeding, bombPlaceTimer: (u as any).bombPlaceTimer, bombSpecialTimer: (u as any).bombSpecialTimer, obeliskBeamTimer: (u as any).obeliskBeamTimer, obeliskBeamLeft: (u as any).obeliskBeamLeft, obeliskBuff: (u as any).obeliskBuff, color: (u as any).color, slotIndex: (u as any).slotIndex };
+  return {
+    id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack,
+    row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown,
+    dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, webbed: u.webbed,
+    stuckTurns: u.stuckTurns, enteredArena: u.enteredArena, activationTurn: u.activationTurn,
+    startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId,
+    bondBroken: u.bondBroken, burning: u.burning, bleeding: u.bleeding,
+    ghost: u.ghost, reviveIn: u.reviveIn, bansheeRevived: u.bansheeRevived,
+    isClone: u.isClone, cloneTimer: u.cloneTimer, clonesSpawnedTotal: u.clonesSpawnedTotal,
+    parentClonerId: u.parentClonerId, isPhantom: u.isPhantom, phantom: u.phantom,
+    doppelSpawned: u.doppelSpawned, phantomId: u.phantomId,
+    frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff,
+    volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft,
+    spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise,
+    laneCol: u.laneCol, laneBroken: u.laneBroken,
+    bombPlaceTimer: (u as any).bombPlaceTimer, bombSpecialTimer: (u as any).bombSpecialTimer,
+    obeliskBeamTimer: (u as any).obeliskBeamTimer, obeliskBeamLeft: (u as any).obeliskBeamLeft,
+    obeliskBuff: (u as any).obeliskBuff, curseStacks: u.curseStacks, cursed: u.cursed,
+    unhealable: u.unhealable, curseAtkMul: u.curseAtkMul, soulHarvestTimer: u.soulHarvestTimer,
+    permAtkBonus: u.permAtkBonus, auraStacks: u.auraStacks,
+    color: (u as any).color, slotIndex: (u as any).slotIndex,
+  };
 }
 
 function serializeGrid(grid: Cell[][]) {
