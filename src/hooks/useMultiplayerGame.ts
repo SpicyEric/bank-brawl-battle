@@ -1184,6 +1184,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
               // Focus fire states
               playerFocusFire: focusFireTicksLeft.current > 0,
               enemyFocusFire: opponentFocusFireTicksLeft.current > 0,
+              // Flank active state (host's player team = player1; enemy team = player2/guest)
+              playerFlankActive: flankActiveRef.current?.dir ?? null,
+              enemyFlankActive: opponentFlankRef.current?.dir ?? null,
             },
           },
         });
