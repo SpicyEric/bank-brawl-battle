@@ -1,59 +1,74 @@
 // ============================================================
-// Stackable aura buff/nerf engine — Phase 1 (core stats)
+// Stackable aura buff/nerf engine (Phase 1 + Phase 2)
 // ------------------------------------------------------------
-// Reads the per-unit-type aura zones + aura_effect keys from
-// the DB (loaded via loadAuraData) and converts adjacent
-// buff/nerf zones into a per-unit `auraStacks` runtime field.
-//
-// All effects stack additively across sources (e.g. two
-// warriors both buffing the same cell → +100% atk).
+// Phase 1: passive stat stacks (atk%, hp%, cd, dodge, crit,
+//          lifesteal, incoming dmg, dmg-mali, regen/drain).
+// Phase 2: on-attack & on-death triggers (splash, chain,
+//          bleed, burn, freeze, web, reflect, permanent atk
+//          drain, weaken/strengthen DoT, self-burn/-damage,
+//          poison, curse stack, first-attack penalty,
+//          damage-only-below-70%, double dmg from fire/lit).
 // ============================================================
-import type { Unit, UnitType } from './battleGame';
+import type { Unit, UnitType, Cell } from './battleGame';
+import { GRID_SIZE, UNIT_DEFS, applyShadowpriestCurse } from './battleGame';
 import { ZONE_POSITIONS, ZONE_DELTA, type AuraZoneMap, type AuraEffectMap } from './auraData';
+import type { BattleEvent } from './battleEvents';
 
-/** Runtime per-unit stack counters. Every field is a *number of stacks*
- *  unless the field name ends in `Pct` in which case it's an already-
- *  combined fractional value (0..n). */
+/** Runtime per-unit stack counters. */
 export interface AuraStacks {
-  // raw stack counts
-  atkPlus50: number;          // warrior buff
-  atkMinus50: number;         // warrior nerf
-  maxHpPlus15: number;        // sniper buff (+15% max HP)
-  maxHpMinus10: number;       // blitzmagier nerf (-10% max HP)
-  cdMinus1: number;           // cooldown −1
-  cdPlus1: number;            // cooldown +1
-  dodge30: number;            // rider buff (30% dodge / stack)
-  crit20Dmg100: number;       // mage buff (20% crit / +100% dmg per stack)
-  lifesteal30: number;        // vampire buff
-  incomingMinus60: number;    // shieldbearer / tank buff
-  ownDmgMinus20: number;      // banshee/mage nerf (-20%)
-  ownDmgMinus50: number;      // shadowblade nerf (-50%)
-  weaken60: number;           // shadowpriest nerf (-60% dmg)
-  hpRegen3: number;           // shaman buff (+3 HP / tick)
-  hpDrain3: number;           // rider nerf (−3 HP / tick)
-  doubleFromLightningFire: number; // blitzmagier nerf
+  // === Phase 1 — passive stats ===
+  atkPlus50: number; atkMinus50: number;
+  maxHpPlus15: number; maxHpMinus10: number;
+  cdMinus1: number; cdPlus1: number;
+  dodge30: number; crit20Dmg100: number;
+  lifesteal30: number; incomingMinus60: number;
+  ownDmgMinus20: number; ownDmgMinus50: number; weaken60: number;
+  hpRegen3: number; hpDrain3: number;
+  doubleFromLightningFire: number;
+  // === Phase 2 — triggers ===
+  splash7: number;          // sprengmeister buff: +7 splash on attack
+  chain20: number;          // chaindancer-style: 20% chain per stack
+  chain30Then10: number;    // chain 30%→10% (legacy compound key)
+  chainOnAttack: number;    // guaranteed mini-chain per stack
+  bleedOnAttack: number;    // assassin: bleed DoT on hit
+  fireOnAttack: number;     // arsonist: burn DoT on hit
+  freeze50: number;         // frost: 50% freeze chance per stack
+  webTrap5: number;         // spider: 5% web chance per stack
+  permAtkDrain2: number;    // banshee: −2 permanent ATK per hit
+  reflect20: number;        // mirror: 20% reflect per stack
+  weaken50_2t: number;      // lamb: enemy −50% dmg 2 ticks
+  archerDebuffEnemy: number;// archer buff: target ATK −40 for 3t
+  archerBuffEnemy: number;  // archer nerf: target ATK +10 for 3t (yes, helping enemy)
+  selfBurn20: number;       // 20% chance to self-ignite on attack
+  selfDamage5: number;      // −5 self-HP per hit
+  lavaSplash: number;       // vulkanit buff: 5 splash + 3 DoT around target
+  selfFreeze20: number;     // 20% self-freeze on attack
+  poisonOnAttack: number;   // poison: 2 dmg/tick + ATK−10%
+  curseOnAttack: number;    // shadowpriest: +1 curse stack on hit
+  firstAttack10: number;    // tank nerf: first attack only 10% dmg
+  damageBelow70: number;    // shaman nerf: can only damage tgt < 70% HP
+  immuneFFP: number;        // cloner buff: immune to fire/frost/poison
+  lightning50Bonus: number; // waterwalker buff: +50% damage with lightning aura
   // aggregate counts for UI
-  totalBuff: number;
-  totalNerf: number;
+  totalBuff: number; totalNerf: number;
 }
 
 const EMPTY: AuraStacks = {
-  atkPlus50: 0, atkMinus50: 0,
-  maxHpPlus15: 0, maxHpMinus10: 0,
-  cdMinus1: 0, cdPlus1: 0,
-  dodge30: 0, crit20Dmg100: 0,
-  lifesteal30: 0, incomingMinus60: 0,
-  ownDmgMinus20: 0, ownDmgMinus50: 0,
-  weaken60: 0, hpRegen3: 0, hpDrain3: 0,
-  doubleFromLightningFire: 0,
+  atkPlus50: 0, atkMinus50: 0, maxHpPlus15: 0, maxHpMinus10: 0,
+  cdMinus1: 0, cdPlus1: 0, dodge30: 0, crit20Dmg100: 0,
+  lifesteal30: 0, incomingMinus60: 0, ownDmgMinus20: 0, ownDmgMinus50: 0,
+  weaken60: 0, hpRegen3: 0, hpDrain3: 0, doubleFromLightningFire: 0,
+  splash7: 0, chain20: 0, chain30Then10: 0, chainOnAttack: 0,
+  bleedOnAttack: 0, fireOnAttack: 0, freeze50: 0, webTrap5: 0,
+  permAtkDrain2: 0, reflect20: 0, weaken50_2t: 0,
+  archerDebuffEnemy: 0, archerBuffEnemy: 0, selfBurn20: 0, selfDamage5: 0,
+  lavaSplash: 0, selfFreeze20: 0, poisonOnAttack: 0, curseOnAttack: 0,
+  firstAttack10: 0, damageBelow70: 0, immuneFFP: 0, lightning50Bonus: 0,
   totalBuff: 0, totalNerf: 0,
 };
 
 function emptyStacks(): AuraStacks { return { ...EMPTY }; }
 
-/** Translate an aura_effect string key + buff/nerf kind into the
- *  corresponding AuraStacks field name. Phase 1 only — unknown
- *  keys are silently ignored (will arrive in Phase 2). */
 function fieldFor(effectKey: string | null | undefined, kind: 'buff' | 'nerf'): (keyof AuraStacks) | null {
   if (!effectKey) return null;
   if (kind === 'buff') {
@@ -68,6 +83,21 @@ function fieldFor(effectKey: string | null | undefined, kind: 'buff' | 'nerf'): 
       case 'lifesteal_30percent': return 'lifesteal30';
       case 'incoming_dmg_minus60': return 'incomingMinus60';
       case 'hp_regen_3_per_tick': return 'hpRegen3';
+      case 'explosion_splash_7dmg_on_attack': return 'splash7';
+      case 'chain_lightning_30percent_then_10percent': return 'chain30Then10';
+      case 'chain_lightning_on_attack': return 'chainOnAttack';
+      case 'bleed_dot_on_attack': return 'bleedOnAttack';
+      case 'fire_on_attack_5dmg_3ticks': return 'fireOnAttack';
+      case 'freeze_chance_50_3ticks': return 'freeze50';
+      case 'reflect_damage_20percent': return 'reflect20';
+      case 'weaken_enemy_50percent_2ticks': return 'weaken50_2t';
+      case 'weaken_enemy_atk_minus40_3ticks': return 'archerDebuffEnemy';
+      case 'lava_splash_5plus3': return 'lavaSplash';
+      case 'curse_stack_on_attack': return 'curseOnAttack';
+      case 'immune_to_fire_frost_poison': return 'immuneFFP';
+      case 'fire_immune_plus_lightning_50percent_bonus': return 'lightning50Bonus';
+      case 'web_trap_5percent_on_hit_10percent_dmg_3ticks': return 'webTrap5';
+      case 'poison_on_attack_2dmg_per_tick_minus10percent_atk': return 'poisonOnAttack';
     }
   } else {
     switch (effectKey) {
@@ -80,33 +110,32 @@ function fieldFor(effectKey: string | null | undefined, kind: 'buff' | 'nerf'): 
       case 'weaken_60percent': return 'weaken60';
       case 'hp_drain_3_per_tick': return 'hpDrain3';
       case 'double_dmg_from_lightning_and_fire': return 'doubleFromLightningFire';
+      case 'permanent_atk_drain_2_per_hit': return 'permAtkDrain2';
+      case 'self_burn_20percent_chance_5dmg_3ticks': return 'selfBurn20';
+      case 'self_damage_5_per_hit': return 'selfDamage5';
+      case 'self_freeze_20percent_on_attack': return 'selfFreeze20';
+      case 'first_attack_only_10percent': return 'firstAttack10';
+      case 'can_only_damage_below_70percent_hp': return 'damageBelow70';
+      case 'strengthen_enemy_atk_plus10_3ticks': return 'archerBuffEnemy';
     }
   }
   return null;
 }
 
-/** Recompute auraStacks for every alive unit. Only counts auras from
- *  *friendly* sources (a warrior buffs his own team only). Adjusts
- *  effective maxHp on the fly while preserving the baseline. */
+/** Recompute auraStacks for every alive unit. */
 export function applyAuraStacks(
-  allUnits: Unit[],
-  zones: AuraZoneMap,
-  effects: AuraEffectMap,
+  allUnits: Unit[], zones: AuraZoneMap, effects: AuraEffectMap,
 ): void {
-  // Pass 1 — clear stacks & build the source list.
   for (const u of allUnits) {
     if (u.dead || u.hp <= 0) continue;
     u.auraStacks = emptyStacks();
   }
-
-  // Pass 2 — every source projects its zone onto neighbouring allied cells.
   for (const src of allUnits) {
     if (src.dead || src.hp <= 0) continue;
     const z = zones[src.type as UnitType];
     if (!z) continue;
     const eff = effects[src.type as UnitType];
     if (!eff) continue;
-
     for (const pos of ZONE_POSITIONS) {
       const kind = z[pos];
       if (!kind) continue;
@@ -115,7 +144,6 @@ export function applyAuraStacks(
       const { dr, dc } = ZONE_DELTA[pos];
       const r = src.row + dr;
       const c = src.col + dc;
-      // Find allied unit on that cell
       const tgt = allUnits.find(u => u.row === r && u.col === c && u.team === src.team && !u.dead && u.hp > 0);
       if (!tgt || !tgt.auraStacks) continue;
       (tgt.auraStacks[key] as number) += 1;
@@ -123,8 +151,6 @@ export function applyAuraStacks(
       else tgt.auraStacks.totalNerf += 1;
     }
   }
-
-  // Pass 3 — dynamic maxHp adjustment based on stacks (preserve baseline)
   for (const u of allUnits) {
     if (u.dead || u.hp <= 0 || !u.auraStacks) continue;
     if (!u._baseMaxHp || u._baseMaxHp <= 0) u._baseMaxHp = u.maxHp;
@@ -140,27 +166,282 @@ export function applyAuraStacks(
   }
 }
 
-/** Per-tick HP regen / drain pass — also applied here so the math
- *  lives next to the stack engine. */
+/** Per-tick HP regen / drain pass. */
 export function applyAuraTick(allUnits: Unit[], logs: string[]): void {
   for (const u of allUnits) {
     if (u.dead || u.hp <= 0 || !u.auraStacks) continue;
     const s = u.auraStacks;
     if (s.hpRegen3 > 0 && u.hp < u.maxHp) {
       const heal = Math.min(u.maxHp - u.hp, 3 * s.hpRegen3);
-      if (heal > 0) {
-        u.hp += heal;
-        u._justRegen = Date.now();
-      }
+      if (heal > 0) { u.hp += heal; u._justRegen = Date.now(); }
     }
     if (s.hpDrain3 > 0) {
       const dmg = 3 * s.hpDrain3;
       u.hp = Math.max(0, u.hp - dmg);
       u._justDrain = Date.now();
-      if (u.hp <= 0) {
-        u.dead = true;
-        logs.push(`💀 ${u.type} verblutet durch Aura-Nerf`);
-      }
+      if (u.hp <= 0) { u.dead = true; logs.push(`💀 ${UNIT_DEFS[u.type].emoji} verblutet durch Aura-Nerf`); }
+    }
+    // Decrement temporary debuffs we apply via aura triggers
+    if (u.auraWeakenTicks && u.auraWeakenTicks > 0) {
+      u.auraWeakenTicks -= 1;
+      if (u.auraWeakenTicks <= 0) u.auraDmgTakenMul = undefined;
+    }
+    if (u.auraAtkDebuffTicks && u.auraAtkDebuffTicks > 0) {
+      u.auraAtkDebuffTicks -= 1;
+      if (u.auraAtkDebuffTicks <= 0) u.auraAtkDebuff = undefined;
+    }
+    if (u.auraAtkBuffTicks && u.auraAtkBuffTicks > 0) {
+      u.auraAtkBuffTicks -= 1;
+      if (u.auraAtkBuffTicks <= 0) u.auraAtkBuff = undefined;
     }
   }
+}
+
+/** Multiplier applied to fire/lava/burn DoT damage based on defender's aura nerf. */
+export function fireLightningTakenMul(target: Unit): number {
+  const s = target.auraStacks;
+  if (!s || s.doubleFromLightningFire <= 0) return 1;
+  return 1 + 1 * s.doubleFromLightningFire;
+}
+
+/** Returns true if the unit is currently immune to fire/frost/poison via aura buff. */
+export function hasImmuneFFP(u: Unit): boolean {
+  return !!(u.auraStacks && u.auraStacks.immuneFFP > 0);
+}
+
+/** Adjust calc'd dmg for first-attack-only nerf + damage-only-below-70 nerf. Returns adjusted dmg. */
+export function applyAttackerNerfs(attacker: Unit, defender: Unit, dmg: number): number {
+  const s = attacker.auraStacks;
+  if (!s) return dmg;
+  if (s.firstAttack10 > 0 && !attacker.firstAttackUsed) {
+    dmg = Math.round(dmg * Math.pow(0.10, s.firstAttack10));
+  }
+  if (s.damageBelow70 > 0 && defender.hp > defender.maxHp * 0.7) {
+    dmg = 0;
+  }
+  return dmg;
+}
+
+/** Apply all on-attack aura triggers. Called AFTER damage is dealt.
+ *  Returns extra battle events to display (chain/splash visuals). */
+export function applyAuraOnAttack(params: {
+  attacker: Unit;
+  defender: Unit;
+  dmg: number;
+  allUnits: Unit[];
+  grid: Cell[][];
+  logs: string[];
+  events?: BattleEvent[];
+}): void {
+  const { attacker, defender, dmg, allUnits, grid, logs, events } = params;
+  if (dmg <= 0) return;
+  const s = attacker.auraStacks;
+  if (!s) return;
+
+  // Mark first-attack used (after dmg has been applied)
+  if (s.firstAttack10 > 0 && !attacker.firstAttackUsed) attacker.firstAttackUsed = true;
+
+  // === Splash (sprengmeister buff): per-stack 7 dmg to enemies adjacent to defender ===
+  if (s.splash7 > 0) {
+    const splashDmg = 7 * s.splash7;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = defender.row + dr, c = defender.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const cu = grid[r][c].unit;
+      if (!cu || cu.dead || cu.hp <= 0 || cu.team === attacker.team) continue;
+      cu.hp = Math.max(0, cu.hp - splashDmg);
+      logs.push(`💥 Aura-Splash → ${UNIT_DEFS[cu.type].emoji} ${splashDmg}`);
+      events?.push({
+        type: cu.hp <= 0 ? 'kill' : 'hit',
+        attackerId: attacker.id, attackerRow: attacker.row, attackerCol: attacker.col,
+        attackerEmoji: '💥', attackerType: attacker.type,
+        targetId: cu.id, targetRow: cu.row, targetCol: cu.col,
+        targetEmoji: UNIT_DEFS[cu.type].emoji, targetType: cu.type,
+        damage: splashDmg, ts: Date.now(),
+      } as any);
+      if (cu.hp <= 0) cu.dead = true;
+    }
+  }
+
+  // === Chain lightning (chain_lightning_on_attack / chain20 / chain30Then10) ===
+  const chainStacks = s.chainOnAttack + s.chain20 + s.chain30Then10;
+  if (chainStacks > 0) {
+    const chainDmg = Math.max(1, Math.round(dmg * (0.3 + 0.1 * (chainStacks - 1))));
+    let cur = { row: defender.row, col: defender.col };
+    const hit = new Set<string>([defender.id]);
+    const hops = Math.min(3, chainStacks);
+    for (let i = 0; i < hops; i++) {
+      let best: { u: Unit; d: number } | null = null;
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+        if (dr === 0 && dc === 0) continue;
+        const r = cur.row + dr, c = cur.col + dc;
+        if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+        const cu = grid[r][c].unit;
+        if (!cu || cu.dead || cu.hp <= 0 || cu.team === attacker.team || hit.has(cu.id)) continue;
+        if (cu.isPhantom && (cu.phantom ?? 0) > 0) continue;
+        const dist = Math.max(Math.abs(dr), Math.abs(dc));
+        if (!best || dist < best.d) best = { u: cu, d: dist };
+      }
+      if (!best) break;
+      const target = best.u;
+      // Defender's double-from-fire/lightning nerf doubles the hop dmg
+      const hopDmg = Math.max(1, Math.round(chainDmg * fireLightningTakenMul(target)));
+      target.hp = Math.max(0, target.hp - hopDmg);
+      hit.add(target.id);
+      logs.push(`⚡ Aura-Blitz → ${UNIT_DEFS[target.type].emoji} ${hopDmg}`);
+      events?.push({
+        type: target.hp <= 0 ? 'kill' : 'hit',
+        attackerId: attacker.id, attackerRow: attacker.row, attackerCol: attacker.col,
+        attackerEmoji: '⚡', attackerType: attacker.type,
+        targetId: target.id, targetRow: target.row, targetCol: target.col,
+        targetEmoji: UNIT_DEFS[target.type].emoji, targetType: target.type,
+        damage: hopDmg, ts: Date.now(),
+      } as any);
+      if (target.hp <= 0) target.dead = true;
+      cur = { row: target.row, col: target.col };
+    }
+  }
+
+  // === Bleed on attack ===
+  if (s.bleedOnAttack > 0 && defender.hp > 0) {
+    const base = [10, 5, 3, 1].map(v => v * s.bleedOnAttack);
+    defender.bleeding = base;
+    logs.push(`🩸 Aura-Blutung an ${UNIT_DEFS[defender.type].emoji}`);
+  }
+
+  // === Fire on attack ===
+  if (s.fireOnAttack > 0 && defender.hp > 0 && !hasImmuneFFP(defender)) {
+    defender.burning = [...(defender.burning || []), { dmg: 5 * s.fireOnAttack, turns: 3 }];
+    logs.push(`🔥 Aura-Brand an ${UNIT_DEFS[defender.type].emoji}`);
+  }
+
+  // === Freeze chance ===
+  if (s.freeze50 > 0 && defender.hp > 0 && !hasImmuneFFP(defender) && !defender.frozen) {
+    const chance = Math.min(0.95, 0.50 * s.freeze50);
+    if (Math.random() < chance) {
+      defender.frozen = 3;
+      defender.frozenDmgMul = 0.5;
+      logs.push(`🧊 Aura-Frost friert ${UNIT_DEFS[defender.type].emoji} ein`);
+    }
+  }
+
+  // === Web trap ===
+  if (s.webTrap5 > 0 && defender.hp > 0) {
+    const chance = Math.min(0.95, 0.05 * s.webTrap5);
+    if (Math.random() < chance) {
+      defender.webbed = 3;
+      const webDmg = Math.round(dmg * 0.10);
+      if (webDmg > 0) defender.hp = Math.max(0, defender.hp - webDmg);
+      logs.push(`🕸️ Aura-Netz fängt ${UNIT_DEFS[defender.type].emoji}`);
+    }
+  }
+
+  // === Permanent ATK drain (banshee aura) ===
+  if (s.permAtkDrain2 > 0 && defender.hp > 0) {
+    const drain = 2 * s.permAtkDrain2;
+    defender.attack = Math.max(0, defender.attack - drain);
+    logs.push(`💀 Aura-Drain: ${UNIT_DEFS[defender.type].emoji} −${drain} ATK permanent`);
+  }
+
+  // === Reflect (defender aura) — reflect 20% per stack back to attacker ===
+  const ds = defender.auraStacks;
+  if (ds && ds.reflect20 > 0 && attacker.hp > 0) {
+    const ref = Math.round(dmg * Math.min(1, 0.20 * ds.reflect20));
+    if (ref > 0) {
+      attacker.hp = Math.max(0, attacker.hp - ref);
+      logs.push(`🪞 Aura-Reflex → ${UNIT_DEFS[attacker.type].emoji} ${ref}`);
+      if (attacker.hp <= 0) attacker.dead = true;
+    }
+  }
+
+  // === Weaken 50% 2 ticks (lamb aura) — defender takes +50% dmg for 2 ticks ===
+  if (s.weaken50_2t > 0 && defender.hp > 0) {
+    defender.auraDmgTakenMul = 1 + 0.5 * s.weaken50_2t;
+    defender.auraWeakenTicks = 2;
+  }
+
+  // === Archer debuff: enemy ATK −40 for 3 ticks (per stack) ===
+  if (s.archerDebuffEnemy > 0 && defender.hp > 0) {
+    defender.auraAtkDebuff = (defender.auraAtkDebuff || 0) + 40 * s.archerDebuffEnemy;
+    defender.auraAtkDebuffTicks = 3;
+  }
+  // === Archer nerf (buff enemy by mistake): enemy ATK +10 for 3 ticks ===
+  if (s.archerBuffEnemy > 0 && defender.hp > 0) {
+    defender.auraAtkBuff = (defender.auraAtkBuff || 0) + 10 * s.archerBuffEnemy;
+    defender.auraAtkBuffTicks = 3;
+  }
+
+  // === Self-burn 20% chance ===
+  if (s.selfBurn20 > 0 && !hasImmuneFFP(attacker)) {
+    const chance = Math.min(0.95, 0.20 * s.selfBurn20);
+    if (Math.random() < chance) {
+      attacker.burning = [...(attacker.burning || []), { dmg: 5, turns: 3 }];
+      logs.push(`🔥 Selbst-Brand bei ${UNIT_DEFS[attacker.type].emoji}`);
+    }
+  }
+  // === Self-damage 5 per hit ===
+  if (s.selfDamage5 > 0) {
+    const sd = 5 * s.selfDamage5;
+    attacker.hp = Math.max(0, attacker.hp - sd);
+    logs.push(`🩹 ${UNIT_DEFS[attacker.type].emoji} verliert ${sd} HP (Aura-Selbstschaden)`);
+    if (attacker.hp <= 0) attacker.dead = true;
+  }
+  // === Self-freeze 20% ===
+  if (s.selfFreeze20 > 0 && !attacker.frozen) {
+    const chance = Math.min(0.95, 0.20 * s.selfFreeze20);
+    if (Math.random() < chance) {
+      attacker.frozen = 2;
+      attacker.frozenDmgMul = 0.5;
+      logs.push(`🧊 ${UNIT_DEFS[attacker.type].emoji} friert sich selbst ein`);
+    }
+  }
+
+  // === Lava splash (vulkanit buff): 5 dmg + 3-tick lava around defender ===
+  if (s.lavaSplash > 0 && grid[defender.row]) {
+    const sd = 5 * s.lavaSplash;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = defender.row + dr, c = defender.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const cu = grid[r][c].unit;
+      if (cu && !cu.dead && cu.hp > 0 && cu.team !== attacker.team) {
+        cu.hp = Math.max(0, cu.hp - sd);
+        if (cu.hp <= 0) cu.dead = true;
+      }
+      // Lay short lava
+      const cell = grid[r][c];
+      cell.lavaTicks = Math.max(cell.lavaTicks || 0, 3);
+      cell.lavaOwnerTeam = attacker.team;
+      cell.lavaDmg = 3;
+    }
+    logs.push(`🌋 Aura-Lava um ${UNIT_DEFS[defender.type].emoji}`);
+  }
+
+  // === Poison on attack ===
+  if (s.poisonOnAttack > 0 && defender.hp > 0 && !hasImmuneFFP(defender)) {
+    defender.bleeding = [2, 2, 2, 2].map(v => v * s.poisonOnAttack);
+    defender.attack = Math.max(0, Math.round(defender.attack * Math.pow(0.9, s.poisonOnAttack)));
+    logs.push(`☠️ Aura-Gift an ${UNIT_DEFS[defender.type].emoji}`);
+  }
+
+  // === Curse stack ===
+  if (s.curseOnAttack > 0 && defender.hp > 0) {
+    for (let i = 0; i < s.curseOnAttack; i++) applyShadowpriestCurse(attacker, defender, logs, events);
+  }
+
+  // === Mark trigger visual ===
+  if (s.splash7 + chainStacks + s.bleedOnAttack + s.fireOnAttack + s.freeze50
+      + s.webTrap5 + s.permAtkDrain2 + s.lavaSplash + s.poisonOnAttack
+      + s.curseOnAttack + s.selfBurn20 + s.selfDamage5 + s.selfFreeze20 > 0) {
+    attacker._justAuraTrigger = Date.now();
+  }
+}
+
+/** On-death aura triggers (sniper death bonus, splash on death, etc.). */
+export function applyAuraOnDeath(deadUnit: Unit, allUnits: Unit[], grid: Cell[][], logs: string[]): void {
+  // We don't track on_death effects via stacks (these are properties of the dying unit itself,
+  // not auras projected on it). They live in the unit's own effect key set — handled by
+  // existing hardcoded death logic for now. Reserved for future expansion.
+  void deadUnit; void allUnits; void grid; void logs;
 }
