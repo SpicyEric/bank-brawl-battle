@@ -1168,8 +1168,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
               roundNumber: newRound,
               playerScore: enemyScore,
               enemyScore: playerScore,
-              placingPlayer: whoFirst, // absolute player number, no swap needed
             },
+
           },
         });
       }, 300);
