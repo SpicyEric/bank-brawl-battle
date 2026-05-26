@@ -26,29 +26,35 @@ export interface AuraStacks {
   hpRegen3: number; hpDrain3: number;
   doubleFromLightningFire: number;
   // === Phase 2 — triggers ===
-  splash7: number;          // sprengmeister buff: +7 splash on attack
-  chain20: number;          // chaindancer-style: 20% chain per stack
-  chain30Then10: number;    // chain 30%→10% (legacy compound key)
-  chainOnAttack: number;    // guaranteed mini-chain per stack
-  bleedOnAttack: number;    // assassin: bleed DoT on hit
-  fireOnAttack: number;     // arsonist: burn DoT on hit
-  freeze50: number;         // frost: 50% freeze chance per stack
-  webTrap5: number;         // spider: 5% web chance per stack
-  permAtkDrain2: number;    // banshee: −2 permanent ATK per hit
-  reflect20: number;        // mirror: 20% reflect per stack
-  weaken50_2t: number;      // lamb: enemy −50% dmg 2 ticks
-  archerDebuffEnemy: number;// archer buff: target ATK −40 for 3t
-  archerBuffEnemy: number;  // archer nerf: target ATK +10 for 3t (yes, helping enemy)
-  selfBurn20: number;       // 20% chance to self-ignite on attack
-  selfDamage5: number;      // −5 self-HP per hit
-  lavaSplash: number;       // vulkanit buff: 5 splash + 3 DoT around target
-  selfFreeze20: number;     // 20% self-freeze on attack
-  poisonOnAttack: number;   // poison: 2 dmg/tick + ATK−10%
-  curseOnAttack: number;    // shadowpriest: +1 curse stack on hit
-  firstAttack10: number;    // tank nerf: first attack only 10% dmg
-  damageBelow70: number;    // shaman nerf: can only damage tgt < 70% HP
-  immuneFFP: number;        // cloner buff: immune to fire/frost/poison
-  lightning50Bonus: number; // waterwalker buff: +50% damage with lightning aura
+  splash7: number;
+  chain20: number;
+  chain30Then10: number;
+  chainOnAttack: number;
+  bleedOnAttack: number;
+  fireOnAttack: number;
+  freeze50: number;
+  webTrap5: number;
+  permAtkDrain2: number;
+  reflect20: number;
+  weaken50_2t: number;
+  archerDebuffEnemy: number;
+  archerBuffEnemy: number;
+  selfBurn20: number;
+  selfDamage5: number;
+  lavaSplash: number;
+  selfFreeze20: number;
+  poisonOnAttack: number;
+  curseOnAttack: number;
+  firstAttack10: number;
+  damageBelow70: number;
+  immuneFFP: number;
+  lightning50Bonus: number;
+  // === Phase 3 — aggro / share / death ===
+  forceAggro: number;           // enemies prioritise this unit
+  tauntDmgRed50: number;        // magnetiker: −50% incoming dmg while taunting
+  missChance10: number;         // obelisk nerf: 10% miss chance per stack
+  damageShareToIce: number;     // icegolem: 50% redirect of incoming dmg
+  doppelChance50Plus5: number;  // doppel buff: 50% chance +5 ATK + aggro
   // aggregate counts for UI
   totalBuff: number; totalNerf: number;
 }
@@ -64,6 +70,8 @@ const EMPTY: AuraStacks = {
   archerDebuffEnemy: 0, archerBuffEnemy: 0, selfBurn20: 0, selfDamage5: 0,
   lavaSplash: 0, selfFreeze20: 0, poisonOnAttack: 0, curseOnAttack: 0,
   firstAttack10: 0, damageBelow70: 0, immuneFFP: 0, lightning50Bonus: 0,
+  forceAggro: 0, tauntDmgRed50: 0, missChance10: 0,
+  damageShareToIce: 0, doppelChance50Plus5: 0,
   totalBuff: 0, totalNerf: 0,
 };
 
