@@ -1515,6 +1515,16 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       }
 
 
+
+
+      // === Phase-3 on-death aura sweep (sniper-death, bomber-death-splash) ===
+      for (const u of allUnits) {
+        if (u.dead && !(u as any)._auraDeathHandled) {
+          (u as any)._auraDeathHandled = true;
+          applyAuraOnDeath(u, allUnits, newGrid, auraRef.current.zones, auraRef.current.effects, logs);
+        }
+      }
+
       if (logs.length > 0) {
         setBattleLog(prev => [...logs, ...prev].slice(0, 40));
       }
