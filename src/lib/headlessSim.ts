@@ -563,6 +563,14 @@ function simulateOneBattle(
       }
     }
 
+    // === Aura on-death sweep ===
+    for (const u of allUnits) {
+      if (u.dead && !(u as { _auraDeathHandled?: boolean })._auraDeathHandled) {
+        (u as { _auraDeathHandled?: boolean })._auraDeathHandled = true;
+        applyAuraOnDeath(u, allUnits, grid, zones, effects, logs);
+      }
+    }
+
     // Judge bonus
     for (const u of allUnits) {
       if (u.type !== 'judge' || u.hp <= 0) continue;
