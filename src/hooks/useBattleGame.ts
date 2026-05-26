@@ -15,6 +15,8 @@ import { BattleEvent } from '@/lib/battleEvents';
 import { findFormations, applyFormationMove, findFormationContaining } from '@/lib/formations';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 import { matchRecorder } from '@/lib/matchRecorder';
+import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
+import { applyAuraStacks, applyAuraTick } from '@/lib/auraEffects';
 
 // Roster slots: 0..2 = red, 3..5 = green, 6..8 = blue
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
