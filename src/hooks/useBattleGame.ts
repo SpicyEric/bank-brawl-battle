@@ -573,6 +573,30 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const VIEW_BOTTOM = GRID_SIZE * 2;
       const inBattlefield = (u: Unit) => u.row >= VIEW_TOP && u.row < VIEW_BOTTOM;
 
+      // Safety net: if an already-entered unit somehow got pushed/retreated outside
+      // the visible arena in an older tick, immediately put it back on-screen.
+      for (const u of allUnits) {
+        if (!u.enteredArena || inBattlefield(u)) continue;
+        const preferredRow = u.row < VIEW_TOP ? VIEW_TOP : VIEW_BOTTOM - 1;
+        const rowOrder = Array.from({ length: VIEW_BOTTOM - VIEW_TOP }, (_, i) => VIEW_TOP + i)
+          .sort((a, b) => Math.abs(a - preferredRow) - Math.abs(b - preferredRow));
+        const colOrder = Array.from({ length: GRID_SIZE }, (_, i) => i)
+          .sort((a, b) => Math.abs(a - u.col) - Math.abs(b - u.col));
+        let placed = false;
+        for (const r of rowOrder) {
+          for (const c of colOrder) {
+            const cell = newGrid[r]?.[c];
+            if (!cell || cell.unit || cell.terrain === 'water') continue;
+            if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
+            u.row = r; u.col = c;
+            newGrid[r][c].unit = u;
+            placed = true;
+            break;
+          }
+          if (placed) break;
+        }
+      }
+
       // === Stalemate detection: if no HP changes for 15 ticks, force a rush ===
       {
         const totalHp = allUnits.reduce((s, u) => s + u.hp, 0);
