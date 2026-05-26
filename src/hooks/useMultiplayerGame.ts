@@ -106,6 +106,18 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Live snapshot of opponent's current placement (for spy button).
   const [opponentSnapshot, setOpponentSnapshot] = useState<Unit[]>([]);
 
+  // Flank state (mine + opponent indicator)
+  const [flankLeftUsed, setFlankLeftUsed] = useState(false);
+  const [flankRightUsed, setFlankRightUsed] = useState(false);
+  const [flankActive, setFlankActive] = useState<'left' | 'right' | null>(null);
+  const flankActiveRef = useRef<{ dir: -1 | 1; step: number } | null>(null);
+  const opponentFlankRef = useRef<{ dir: -1 | 1; step: number } | null>(null);
+
+  // Battlefield background ID — host picks, both display the same.
+  const [battlefieldId, setBattlefieldId] = useState<'grass' | 'desert'>(() =>
+    Math.random() < 0.5 ? 'grass' : 'desert'
+  );
+
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const placeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
