@@ -69,9 +69,14 @@ export function canMoveFormation(formation: Unit[], dr: number, dc: number, grid
  *  the same unit objects referenced inside `grid`. Returns true on success. */
 export function applyFormationMove(formation: Unit[], dr: number, dc: number, grid: Cell[][]): boolean {
   if (!canMoveFormation(formation, dr, dc, grid)) return false;
-  // Lift all formation units off the grid first
+  // Lift all formation units off the grid first; arsonists leave a 15-tick burning trail.
   for (const u of formation) {
     if (grid[u.row]?.[u.col]?.unit?.id === u.id) {
+      if (u.type === 'arsonist' && grid[u.row][u.col].terrain !== 'water') {
+        grid[u.row][u.col].lavaTicks = 15;
+        grid[u.row][u.col].lavaOwnerTeam = u.team;
+        grid[u.row][u.col].lavaDmg = 4;
+      }
       grid[u.row][u.col].unit = null;
     }
   }
