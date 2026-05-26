@@ -492,8 +492,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Place unit on my side
   const placeUnit = useCallback((row: number, col: number, overrideSlot?: number) => {
     if (phase !== 'place_player' || !isMyTurnToPlace) return;
-    if (!myRows.includes(row)) return;
-    if (playerUnits.length >= getMaxUnits(playerScore, enemyScore, roundNumber)) return;
+    if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return;
+    if (playerUnits.length >= playerMaxUnits) return;
     if (grid[row][col].unit) return;
     if (grid[row][col].terrain === 'water') return;
 
@@ -520,7 +520,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
-  }, [phase, isMyTurnToPlace, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, myRows, myTeam, playerBannedUnits, playerScore, enemyScore, roundNumber]);
+  }, [phase, isMyTurnToPlace, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, myTeam, playerBannedUnits, playerMaxUnits]);
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
@@ -593,32 +593,46 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
     if (!room || !room.player1_units || !room.player2_units) return;
 
-    // Build full grid
-    const newGrid = grid.map(r => r.map(c => ({ ...c, unit: null as Unit | null })));
-    // Preserve terrain
-    for (let r = 0; r < GRID_SIZE; r++) {
-      for (let c = 0; c < GRID_SIZE; c++) {
-        newGrid[r][c].terrain = grid[r][c].terrain;
-      }
-    }
-
-    const allNewUnits: Unit[] = [];
-    for (const u of room.player1_units as any[]) {
-      const unit: Unit = { ...u, team: 'player', activationTurn: u.activationTurn ?? getActivationTurn(u.row, 'player'), startRow: u.startRow ?? u.row };
-      newGrid[unit.row][unit.col].unit = unit;
-      allNewUnits.push(unit);
-    }
-    for (const u of room.player2_units as any[]) {
-      const unit: Unit = { ...u, team: 'enemy', activationTurn: u.activationTurn ?? getActivationTurn(u.row, 'enemy'), startRow: u.startRow ?? u.row };
-      newGrid[unit.row][unit.col].unit = unit;
-      allNewUnits.push(unit);
-    }
-
-    // Set tank bonds for all units
+    const battlePlayers: Unit[] = (room.player1_units as any[]).map((u: any) => ({
+      ...u,
+      team: 'player' as const,
+      row: u.row + GRID_SIZE * 2,
+      startRow: u.row + GRID_SIZE * 2,
+      laneCol: u.col,
+      activationTurn: undefined,
+      enteredArena: false,
+    }));
+    const battleEnemies: Unit[] = (room.player2_units as any[]).map((u: any) => ({
+      ...u,
+      team: 'enemy' as const,
+      row: u.row,
+      startRow: u.row,
+      laneCol: u.col,
+      activationTurn: undefined,
+      enteredArena: false,
+    }));
+    const allNewUnits: Unit[] = [...battlePlayers, ...battleEnemies];
     setBondsForPlacement(allNewUnits);
 
+    const newGrid = createBattleWorldGrid();
+    for (let r = 0; r < GRID_SIZE; r++) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        newGrid[r + GRID_SIZE][c].terrain = grid[r][c].terrain;
+      }
+    }
+    for (const u of battlePlayers) newGrid[u.row][u.col].unit = u;
+    for (const u of battleEnemies) newGrid[u.row][u.col].unit = u;
+
+    const logs: string[] = [];
+    const phantoms = spawnDoppelgangerPhantoms(allNewUnits, newGrid, logs);
+    if (phantoms.length > 0) allNewUnits.push(...phantoms);
+
     setGrid(newGrid);
+    setPlayerUnits(allNewUnits.filter(u => u.team === 'player'));
+    setEnemyUnits(allNewUnits.filter(u => u.team === 'enemy'));
     setPhase('battle');
+    setTurnCount(0);
+    turnCountRef.current = 0;
     setBattleTimer(ROUND_TIME_LIMIT);
     setMyReady(false);
     setOpponentReady(false);
@@ -641,12 +655,20 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setShieldWallUsed(false);
     setShieldWallActive(false);
     shieldWallTicksLeft.current = 0;
+    if (logs.length > 0) setBattleLog(logs);
 
     // Broadcast battle start
     channelRef.current?.send({
       type: 'broadcast',
       event: 'game_sync',
-      payload: { action: 'battle_start', data: { grid: serializeGrid(newGrid) } },
+      payload: {
+        action: 'battle_start',
+        data: {
+          grid: serializeGrid(newGrid),
+          playerUnits: allNewUnits.filter(u => u.team === 'player').map(serializeUnit),
+          enemyUnits: allNewUnits.filter(u => u.team === 'enemy').map(serializeUnit),
+        },
+      },
     });
 
     await updateRoom(roomId, { status: 'playing' });
