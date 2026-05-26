@@ -23,6 +23,8 @@ interface MultiplayerConfig {
   role: 'player1' | 'player2';
   roster?: UnitType[];
   opponentRoster?: UnitType[];
+  ownHandicap?: number;
+  opponentHandicap?: number;
 }
 
 // Slot color layout matches UnitRoster: slots 0-2 red, 3-5 green, 6-8 blue
@@ -35,8 +37,9 @@ function createBattleWorldGrid(): Cell[][] {
   );
 }
 
-function getRoundUnitLimit(roundNumber: number): number {
-  return Math.min(9 + (roundNumber - 1) * 2, 17);
+function getRoundUnitLimit(roundNumber: number, handicap: number = 0): number {
+  const base = Math.min(9 + (roundNumber - 1) * 2, 17);
+  return Math.max(1, base - Math.max(0, Math.min(3, handicap | 0)));
 }
 
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
@@ -85,11 +88,13 @@ function getDeterministicFirstPlacer(roomId: string, roundNumber: number): 1 | 2
 }
 
 export function useMultiplayerGame(config: MultiplayerConfig) {
-  const { roomId, role, roster, opponentRoster } = config;
+  const { roomId, role, roster, opponentRoster, ownHandicap = 0, opponentHandicap = 0 } = config;
   const hasRoster = !!(roster && roster.length === 9);
   const isHost = role === 'player1';
   const myRows = isHost ? PLAYER_ROWS : ENEMY_ROWS;
   const myTeam = isHost ? 'player' as const : 'enemy' as const;
+  const safeOwnHandicap = Math.max(0, Math.min(3, ownHandicap | 0));
+  const safeOppHandicap = Math.max(0, Math.min(3, opponentHandicap | 0));
 
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
@@ -104,8 +109,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const playerScoreRef = useRef(0);
   const enemyScoreRef = useRef(0);
   const [roundNumber, setRoundNumber] = useState(1);
-  const playerMaxUnits = getRoundUnitLimit(roundNumber);
-  const enemyMaxUnits = playerMaxUnits;
+  const playerMaxUnits = getRoundUnitLimit(roundNumber, safeOwnHandicap);
+  const enemyMaxUnits = getRoundUnitLimit(roundNumber, safeOppHandicap);
   const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
   const [opponentLeft, setOpponentLeft] = useState(false);
@@ -1593,7 +1598,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     acceptDraw: () => {},
     continueOvertime: () => {},
     playerBannedUnits,
-    playerBannedSlots: [] as number[],
+    playerBannedSlots: (hasRoster && safeOwnHandicap > 0
+      ? Array.from({ length: safeOwnHandicap }, (_, i) => 9 - 1 - i)
+      : []) as number[],
     selectedSlot,
     setSelectedSlot,
     roster: hasRoster ? roster! : undefined,

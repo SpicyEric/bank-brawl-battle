@@ -29,8 +29,9 @@ function createBattleWorldGrid(): Cell[][] {
   );
 }
 
-export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
+export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handicap: number = 0) {
   const hasRoster = !!(roster && roster.length === 9);
+  const safeHandicap = Math.max(0, Math.min(3, handicap | 0));
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
   // Slot-based selection (when roster present). Otherwise legacy type-based.
@@ -85,8 +86,15 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   // - Legacy mode: key = unit type.
   const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
   const [enemyFatigue, setEnemyFatigue] = useState<Record<string, number>>({});
+  // Handicap locks the last `handicap` roster slots for the entire match.
+  const handicapBannedSlots: number[] = hasRoster && safeHandicap > 0
+    ? Array.from({ length: safeHandicap }, (_, i) => 9 - 1 - i)
+    : [];
   const playerBannedSlots: number[] = hasRoster
-    ? roster!.map((_, i) => i).filter(i => (playerFatigue[i] || 0) >= 1)
+    ? Array.from(new Set([
+        ...roster!.map((_, i) => i).filter(i => (playerFatigue[i] || 0) >= 1),
+        ...handicapBannedSlots,
+      ]))
     : [];
   const playerBannedUnits: UnitType[] = hasRoster
     ? [] // not used in slot mode (picker uses bannedSlots)
@@ -218,9 +226,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const confirmPlacementRef = useRef<(() => void) | null>(null);
 
   // Rundenskalierung: Runde 1 = 9 Einheiten, +2 pro Runde bis Runde 5 = 17.
-  const rosterMaxUnits = Math.min(9 + (roundNumber - 1) * 2, 17);
+  // Handicap zieht von der eigenen Einheitenzahl ab (Mindestens 1).
+  const rosterMaxUnitsBase = Math.min(9 + (roundNumber - 1) * 2, 17);
+  const rosterMaxUnits = hasRoster ? Math.max(1, rosterMaxUnitsBase - safeHandicap) : rosterMaxUnitsBase;
   const playerMaxUnits = hasRoster ? rosterMaxUnits : getMaxUnits(playerScore, enemyScore, roundNumber);
-  const enemyMaxUnits = hasRoster ? rosterMaxUnits : playerMaxUnits;
+  const enemyMaxUnits = hasRoster ? rosterMaxUnitsBase : playerMaxUnits;
 
   // Slot mode: slots can be reused on the battlefield (mono comps allowed).
   // placedSlots is kept empty so the picker never disables a slot during placement.

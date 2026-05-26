@@ -18,11 +18,13 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          player1_handicap: number
           player1_id: string | null
           player1_ready: boolean | null
           player1_roster: Json | null
           player1_roster_ready: boolean
           player1_units: Json | null
+          player2_handicap: number
           player2_id: string | null
           player2_ready: boolean | null
           player2_roster: Json | null
@@ -36,11 +38,13 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          player1_handicap?: number
           player1_id?: string | null
           player1_ready?: boolean | null
           player1_roster?: Json | null
           player1_roster_ready?: boolean
           player1_units?: Json | null
+          player2_handicap?: number
           player2_id?: string | null
           player2_ready?: boolean | null
           player2_roster?: Json | null
@@ -54,11 +58,13 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          player1_handicap?: number
           player1_id?: string | null
           player1_ready?: boolean | null
           player1_roster?: Json | null
           player1_roster_ready?: boolean
           player1_units?: Json | null
+          player2_handicap?: number
           player2_id?: string | null
           player2_ready?: boolean | null
           player2_roster?: Json | null

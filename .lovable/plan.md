@@ -1,57 +1,102 @@
-# Plan: Multiplayer auf SP-Parität bringen
+# Slot-Machine Roster mit Handicap
 
-## Ziel
-Multiplayer soll sich exakt wie der Einzelspieler-Modus anfühlen — gleiche Bewegungen, Aura, Buffs, Buttons (Schrei/Flanke/Opfer/Aufgeben/Spionage). Raum-Erstellung/Beitritt bleibt unangetastet.
+Komplette Neugestaltung von `/roster` (SP + MP) als Casino-Slot-Machine. Bestehende Unit-Daten, `UNIT_TYPES`, Aura-Logik, Kampfflow bleiben unverändert.
 
-## Änderungen
+## 1. Screen-Umbau `src/pages/UnitRoster.tsx`
 
-### 1. Doppelgänger-Nerf (klein)
-`src/lib/battleGame.ts` → `spawnDoppelgangerPhantoms`: Phantom-HP/maxHp = 20, attack = 10. Bleibt sofort angreifbar (`phantom: 0`).
+Komplett ersetzt (alter Picker/Slot-Code entfällt). Aufbau:
 
-### 2. Spionage hebt eigene Aura-Anzeige auf (SP + MP)
-`src/components/battle/BattleGrid.tsx`: Während `spying` aktiv ist, die grünen Aura-Overlays (+2/+3) des eigenen Boards ausblenden, damit nur das gespiegelte Gegner-Feld sichtbar ist.
+```text
+┌─────────────────────────────────────┐
+│ ←  Stelle deinen Trupp auf          │
+├─────────────────────────────────────┤
+│ Handicap  ● ● ●                     │
+├─────────────────────────────────────┤
+│   Links     Mitte     Rechts        │
+│  ┌────┐   ┌────┐    ┌────┐          │
+│  │ ?  │   │ ?  │    │ ?  │          │
+│  └────┘   └────┘    └────┘          │
+│   …3×3 Slot-Grid mit Icon/Name/HP   │
+├─────────────────────────────────────┤
+│       [   Drehen!   ]               │
+└─────────────────────────────────────┘
+```
 
-### 3. Multiplayer: Gleichzeitiges Bauen statt Alternierend
-`src/hooks/useMultiplayerGame.ts` umstellen:
-- Entfernen: `placingPlayer`, `placingPhase` ('first'/'second'), `getDeterministicFirstPlacer`, `first_placement_done`-Broadcast.
-- Neu: Beide Spieler bauen parallel mit eigenem 60s-Timer (`MULTI_PLACE_TIME_LIMIT` → 60 oder neuer Constant).
-- Bereit-Flag pro Spieler über `updateRoom` (`player1_ready`, `player2_ready` existieren bereits).
-- Broadcast `placement_ready` → wenn beide ready ODER beide Timer abgelaufen → Host startet Battle.
-- Host sammelt beide Unit-Listen aus DB-Feldern (`player1_units`, `player2_units`), baut finales Grid, broadcastet `battle_start` mit komplettem Grid.
-- Wer bereit ist, sieht „Warten auf Gegner…" — kann aber nicht mehr bauen.
+**State-Maschine**
 
-### 4. Multiplayer: Spionage-Button
-- Neuer Broadcast `spy_request` ist nicht nötig — Spy zeigt nur lokal das gegnerische Feld an. Während Battle: gegnerisches Grid ist bereits im State (`grid` ist gespiegelt für Guest). Während Bauphase: Gegner-Bauten müssen live via Broadcast `placement_update` (throttled, alle ~1s) propagiert werden, sonst hat Spy nichts zu zeigen.
-- Beim Klick: 3s lang gespiegelte Gegnerseite anzeigen, dann zurück. Logik analog zu SP.
+- `idle` → Button „Drehen!" (groß, primary)
+- `spinning` → Walzen rotieren Icons schnell durch (`setInterval ~60 ms`, Random aus `UNIT_TYPES`); Button wird „Stopp!" (rot)
+  - 1. Tap → linke Spalte stoppt (3 Slots nacheinander mit ~120 ms Delay), „Klonk"-Sound pro Slot
+  - 2. Tap → mittlere Spalte stoppt
+  - 3. Tap → rechte Spalte stoppt, Fanfare-Sound
+- `stopped` → zwei Buttons: „Neu drehen +1 Handicap" (links, secondary, disabled wenn `handicap === 3`) und „Bestätigen" (rechts, success/grün)
 
-### 5. Multiplayer: Aktive Buttons (Schrei/Flanke/Opfer/Aufgeben)
-- `useMultiplayerGame` exportiert dieselben Funktionen wie SP: `warCry`, `focusFire` (Flanke?), `sacrifice`, `shieldWall`, `surrenderRound`. Großteils schon vorhanden — sicherstellen, dass jede über Broadcast zum Gegner gespiegelt wird.
-- `surrenderRound` neu: Broadcast `surrender` → Gegner bekommt Punkt, Host beendet Runde.
-- `src/pages/Index.tsx`: UI ist generisch via `game`-Prop — keine Änderung nötig, sofern MP-Hook dieselben Callbacks bereitstellt.
+**Ziehen ohne Duplikate**: einmaliger `shuffle(UNIT_TYPES).slice(0, 9)` beim Start jedes Spins. Während des Drehens werden zufällige Icons angezeigt; beim Stoppen jeder Spalte werden die zuvor gezogenen Final-Units in die Slots dieser Spalte gesetzt (Reihenfolge: Spalten-Spalten-Spalten, Top-Bottom).
 
-### 6. Terrain-Hintergrund-Sync
-`src/lib/battleGame.ts` → `generateTerrain` nutzt evtl. `Math.random`. Im MP muss der Host das Terrain inkl. Sand/Gras-Wahl generieren und per `terrain`-Broadcast (existiert) an Guest schicken. Sicherstellen, dass der Untergrund-Typ (Sand vs. Wiese) Teil des Grid-States ist und nicht clientseitig zufällig neu gewählt wird. `BattleGrid` darf den Hintergrund nicht aus `Math.random()` wählen — falls doch, in `Cell` ein Feld `biome` ergänzen und vom Host gesetzt synchronisieren.
+**Handicap-Dots**: 3 Kreise oben links, leuchten rot je nach `handicap`-Wert (0–3). Kein „X/9"-Zähler mehr rechts oben.
+
+## 2. Sound (`src/lib/sfx.ts`)
+
+Drei neue Web-Audio-Funktionen:
+- `sfxSlotSpin()` — looped Klick-Rattern (kurze Square-Wave-Pulse, gestartet/gestoppt manuell)
+- `sfxSlotKlonk()` — kurzer Tief-Frequenz-Pop (~80 ms)
+- `sfxSlotFanfare()` — kurze 3-Ton-Aufwärts-Sequenz
+
+## 3. Handicap-Übergabe an `/game`
+
+**Single-Player**: URL wird erweitert um `&handicap=N`:
+`/game?roster=archer,…&handicap=2`
+
+**Multiplayer**: neue Spalten in `game_rooms`:
+- `player1_handicap integer not null default 0`
+- `player2_handicap integer not null default 0`
+
+Beim „Bestätigen" wird `updateRoom(roomId, { [rosterField]: slots, [readyField]: true, [handicapField]: handicap })` aufgerufen. `Index.tsx` (`MultiplayerGame`) liest beide Handicaps aus dem Room.
+
+## 4. Per-Round Limit-Anpassung
+
+Aktuelle Logik in `useBattleGame.ts` und `useMultiplayerGame.ts` (`getRoundUnitLimit` → 9/11/13/15/17). Wir erweitern beide auf `getRoundUnitLimit(round, handicap) = max(1, base - handicap)`. Handicap wird per Hook-Option reingereicht (`useBattleGame({ handicap })`, `useMultiplayerGame({ …, ownHandicap, opponentHandicap })`).
+
+Im Picker (`UnitPicker`) werden die letzten `handicap` Einträge des Rosters mit Schloss-Icon + ausgegraut dargestellt und sind nicht wählbar. Hinweis oberhalb des Pickers: „Du hast X von 9 Einheiten zur Verfügung" mit `X = 9 - handicap`.
+
+## 5. Pre-Match-Overview (nur MP)
+
+Kurzer Splash-Screen (2–3 s, automatisch weiter) direkt vor dem ersten Placement, der beide Spielerinfos zeigt:
+
+```text
+Spieler A: 9 Einheiten — kein Handicap
+Spieler B: 7 Einheiten — Handicap ●●○
+```
+
+Implementiert als überlagerndes Modal in `Index.tsx`, das beim ersten Mount erscheint und durch Tap oder Timeout schließt.
+
+## 6. Migration
+
+```sql
+ALTER TABLE public.game_rooms
+  ADD COLUMN player1_handicap integer not null default 0,
+  ADD COLUMN player2_handicap integer not null default 0;
+```
+
+Keine neuen Tabellen, keine RLS-Änderungen nötig (Policies decken alle Spalten ab). Alte Rooms laufen mit `handicap = 0` weiter.
+
+## 7. Aufräumen
+
+- `LONG_PRESS_MS`, Picker-Grid, `selectedUnit`, `handleSlotClick` werden aus `UnitRoster.tsx` entfernt.
+- `UnitInfoModal` bleibt nicht mehr nötig auf diesem Screen (Info-Long-Press entfällt).
+- Bestehende Routen, MP-Subscribe-Logik (`subscribeToRoom`, `getRoomById`), Navigation zu `/game` bleiben strukturell gleich.
 
 ## Technische Details
 
-**Bereit-Sync-Flow:**
-```
-Spieler1 klickt Bereit → updateRoom({player1_ready:true}) + Broadcast 'ready'
-Spieler2 klickt Bereit → updateRoom({player2_ready:true}) + Broadcast 'ready'
-Host-Effect beobachtet beide Ready-Flags ODER Timer=0 →
-  liest player1_units + player2_units aus DB →
-  baut Grid (eigene Einheiten in PLAYER_ROWS, Gegner-Einheiten gespiegelt in ENEMY_ROWS) →
-  Broadcast 'battle_start' mit serialisiertem Grid
-```
+- Spinner-Animation: `useEffect` mit `setInterval` startet beim Wechsel nach `spinning`, schreibt pro Spalte einen zufälligen `UnitType` ins Display-State. Beim Stop einer Spalte werden für deren 3 Slots final festgelegte Werte gesetzt (mit kleinem `setTimeout`-Versatz für sequenzielles „Einrasten").
+- Determinismus: Nur die 9 finalen Einheiten zählen — was während der Animation flackert ist rein optisch.
+- Mobile: Buttons groß genug für Touch, Layout passt in 390×844 ohne Scroll.
 
-**Spy-Bauphase:** alle 1.5s `placement_snapshot` broadcasten mit aktuellen `playerUnits` (serialisiert). Guest cached das in `opponentBuildSnapshot` und Spy rendert daraus.
+## Reihenfolge der Umsetzung
 
-## Reihenfolge der Implementation
-1. Doppelgänger-Nerf + Spy-Aura-Fix (kleine, isolierte Edits)
-2. MP: gleichzeitiges Bauen + Ready-Sync
-3. MP: Spy-Snapshot-Broadcast
-4. MP: Buttons-Parität prüfen + Surrender
-5. Terrain-Sync verifizieren
-
-## Risiko
-Raumerstellung/Beitritt (`Multiplayer.tsx`, `multiplayer.ts`) bleibt unangetastet. Nur `useMultiplayerGame.ts` wird substanziell umgebaut.
+1. Migration für `game_rooms.player1_handicap` / `player2_handicap`
+2. SFX-Funktionen erweitern
+3. `UnitRoster.tsx` komplett neu
+4. `useBattleGame` + `useMultiplayerGame` um `handicap` erweitern
+5. `Index.tsx`: Handicap aus URL/Room lesen, an Hooks weitergeben, Overview-Splash (MP), Picker-Sperrung der letzten Einheiten
+6. Test im Preview (SP-Flow + MP-Flow)
