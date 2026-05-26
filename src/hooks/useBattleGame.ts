@@ -97,6 +97,13 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const [shieldWallActive, setShieldWallActive] = useState(false);
   const shieldWallTicksLeft = useRef(0);
 
+  // Flank state (left=-1, right=+1). One-shot per side per match.
+  const [flankLeftUsed, setFlankLeftUsed] = useState(false);
+  const [flankRightUsed, setFlankRightUsed] = useState(false);
+  const [flankActive, setFlankActive] = useState<'left' | 'right' | null>(null);
+  const flankActiveRef = useRef<{ dir: -1 | 1; step: number } | null>(null);
+
+
   // AI ability state
   const aiMoraleUsed = useRef(false);
   const aiMoralePhase = useRef<'none' | 'buff' | 'debuff'>('none');
@@ -143,6 +150,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     setShieldWallUsed(false);
     setShieldWallActive(false);
     shieldWallTicksLeft.current = 0;
+    setFlankLeftUsed(false);
+    setFlankRightUsed(false);
+    setFlankActive(null);
+    flankActiveRef.current = null;
     aiMoraleUsed.current = false;
     aiMoralePhase.current = 'none';
     aiMoraleTicksLeft.current = 0;
@@ -334,6 +345,13 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     setShieldWallUsed(false);
     setShieldWallActive(false);
     shieldWallTicksLeft.current = 0;
+    setShieldWallUsed(false);
+    setShieldWallActive(false);
+    shieldWallTicksLeft.current = 0;
+    setFlankLeftUsed(false);
+    setFlankRightUsed(false);
+    setFlankActive(null);
+    flankActiveRef.current = null;
     aiMoraleUsed.current = false;
     aiMoralePhase.current = 'none';
     aiMoraleTicksLeft.current = 0;
@@ -461,6 +479,19 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     shieldWallTicksLeft.current = 3;
     setBattleLog(prev => ['🛡️ SCHILDWALL! Rückzug zur Base – 50% Schadensreduktion für 3 Züge!', ...prev]);
   }, [shieldWallUsed, phase]);
+
+  // Activate flank maneuver: 2 cells back, then 5 sideways (dir), then 5 forward.
+  // One battleTick = one cell shift. Movement clamped at grid edges, blocked by water/units.
+  const activateFlank = useCallback((dir: -1 | 1) => {
+    if (phase !== 'battle') return;
+    if (flankActiveRef.current) return;
+    if (dir === -1 && flankLeftUsed) return;
+    if (dir === 1 && flankRightUsed) return;
+    if (dir === -1) setFlankLeftUsed(true); else setFlankRightUsed(true);
+    flankActiveRef.current = { dir, step: 0 };
+    setFlankActive(dir === -1 ? 'left' : 'right');
+    setBattleLog(prev => [`🏃 FLANKE ${dir === -1 ? '←' : '→'}! Alle Einheiten umfassen den Gegner!`, ...prev]);
+  }, [phase, flankLeftUsed, flankRightUsed]);
 
   // Run one battle tick
   const battleTick = useCallback(() => {
@@ -701,7 +732,48 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             }
           }
         };
-        moveTeamFormations('player');
+        // === Flank maneuver: forced player shift, suppresses normal player formation move this tick ===
+        let flankShifting = false;
+        if (flankActiveRef.current) {
+          flankShifting = true;
+          const { dir, step } = flankActiveRef.current;
+          let dr = 0, dc = 0;
+          if (step < 2) dr = 1;            // 2 cells back (toward player base = +row)
+          else if (step < 7) dc = dir;     // 5 cells sideways
+          else if (step < 12) dr = -1;     // 5 cells forward (toward enemy = -row)
+          if (dr !== 0 || dc !== 0) {
+            const playerAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
+            const sorted = [...playerAlive].sort((a, b) => {
+              if (dr > 0) return b.row - a.row;
+              if (dr < 0) return a.row - b.row;
+              if (dc > 0) return b.col - a.col;
+              if (dc < 0) return a.col - b.col;
+              return 0;
+            });
+            const rowCount = newGrid.length;
+            const colCount = newGrid[0]?.length ?? GRID_SIZE;
+            for (const u of sorted) {
+              const nr = u.row + dr;
+              const nc = u.col + dc;
+              if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) continue;
+              const tgt = newGrid[nr]?.[nc];
+              if (!tgt) continue;
+              if (tgt.terrain === 'water') continue;
+              if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) continue;
+              if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
+              u.row = nr; u.col = nc;
+              newGrid[u.row][u.col].unit = u;
+            }
+          }
+          const nextStep = step + 1;
+          if (nextStep >= 12) {
+            flankActiveRef.current = null;
+            setFlankActive(null);
+          } else {
+            flankActiveRef.current = { dir, step: nextStep };
+          }
+        }
+        if (!flankShifting) moveTeamFormations('player');
         moveTeamFormations('enemy');
       } else {
 
@@ -1385,6 +1457,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     setShieldWallUsed(false);
     setShieldWallActive(false);
     shieldWallTicksLeft.current = 0;
+    setFlankLeftUsed(false);
+    setFlankRightUsed(false);
+    setFlankActive(null);
+    flankActiveRef.current = null;
     aiMoraleUsed.current = false;
     aiMoralePhase.current = 'none';
     aiMoraleTicksLeft.current = 0;
@@ -1522,6 +1598,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     focusFireUsed, focusFireActive, activateFocusFire,
     sacrificeUsed, activateSacrifice,
     shieldWallUsed, shieldWallActive, activateShieldWall,
+    flankLeftUsed, flankRightUsed, flankActive, activateFlank,
     waitingForOpponent: false,
     aiMoraleActive,
     inOvertime: false,
