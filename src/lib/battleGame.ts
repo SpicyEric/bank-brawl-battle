@@ -1307,6 +1307,21 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
     dmg *= Math.max(0, 1 - 0.60 * defStacks.incomingMinus60);
   }
 
+  // --- Aura: weaken_50%_2t multiplier on defender's incoming dmg
+  if (defender.auraDmgTakenMul && defender.auraDmgTakenMul !== 1) {
+    dmg *= defender.auraDmgTakenMul;
+  }
+
+  // --- Attacker nerfs: first-attack-only, damage-only-below-70
+  if (aStacks) {
+    if (aStacks.firstAttack10 > 0 && !attacker.firstAttackUsed) {
+      dmg *= Math.pow(0.10, aStacks.firstAttack10);
+    }
+    if (aStacks.damageBelow70 > 0 && defender.hp > defender.maxHp * 0.7) {
+      dmg = 0;
+    }
+  }
+
   return Math.floor(dmg);
 }
 
