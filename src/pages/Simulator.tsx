@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Download, Loader2, Zap } from 'lucide-react';
-import { runSimulation, rankUnits, flattenMatchups, flattenSynergies, reportToCsv, type SimReport, type TeamMode } from '@/lib/headlessSim';
+import { runSimulation, rankUnits, flattenMatchups, flattenSynergies, reportToCsv, type SimReport } from '@/lib/headlessSim';
 import { UNIT_DEFS, UNIT_TYPES } from '@/lib/battleGame';
 import { toast } from 'sonner';
 import menuBg from '@/assets/menu-bg.png';
