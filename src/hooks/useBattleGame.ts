@@ -65,6 +65,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   // Track if AI drip-placement already kicked off for this match
   const aiDripStartedRef = useRef(false);
   const aiDripTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Plan of all AI drip placements for this placement phase (so spy can flush them instantly).
+  const aiDripPendingRef = useRef<{ type: UnitType; row: number; col: number }[]>([]);
 
   // Aura data (loaded once)
   const auraRef = useRef<{ zones: AuraZoneMap; effects: AuraEffectMap }>({ zones: {}, effects: {} });
