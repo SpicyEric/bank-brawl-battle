@@ -680,6 +680,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           for (const other of allUnits) {
             if (other === unit || other.team === unit.team) continue;
             if (other.hp <= 0 || other.dead) continue;
+            if (!inBattlefield(other)) continue; // can't strike enemies off the visible 8x8
             const adr = Math.abs(other.row - unit.row);
             const adc = Math.abs(other.col - unit.col);
             if (adr <= 1 && adc <= 1 && (adr + adc) > 0) {
