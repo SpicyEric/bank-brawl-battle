@@ -52,10 +52,15 @@ export function canMoveFormation(formation: Unit[], dr: number, dc: number, grid
   const ids = new Set(formation.map(u => u.id));
   const rowCount = grid.length;
   const colCount = grid[0]?.length ?? GRID_SIZE;
+  // Arena window: rows [GRID_SIZE .. 2*GRID_SIZE). Once a unit entered the arena
+  // it can never leave it (one-way lock — no retreat into either build area).
+  const ARENA_TOP = GRID_SIZE;
+  const ARENA_BOTTOM = GRID_SIZE * 2;
   for (const u of formation) {
     const r = u.row + dr;
     const c = u.col + dc;
     if (r < 0 || r >= rowCount || c < 0 || c >= colCount) return false;
+    if (u.enteredArena && (r < ARENA_TOP || r >= ARENA_BOTTOM)) return false;
     const cell = grid[r]?.[c];
     if (!cell) return false;
     if (cell.terrain === 'water') return false;
@@ -69,6 +74,8 @@ export function canMoveFormation(formation: Unit[], dr: number, dc: number, grid
  *  the same unit objects referenced inside `grid`. Returns true on success. */
 export function applyFormationMove(formation: Unit[], dr: number, dc: number, grid: Cell[][]): boolean {
   if (!canMoveFormation(formation, dr, dc, grid)) return false;
+  const ARENA_TOP = GRID_SIZE;
+  const ARENA_BOTTOM = GRID_SIZE * 2;
   // Lift all formation units off the grid first; arsonists leave a 15-tick burning trail.
   for (const u of formation) {
     if (grid[u.row]?.[u.col]?.unit?.id === u.id) {
@@ -80,10 +87,11 @@ export function applyFormationMove(formation: Unit[], dr: number, dc: number, gr
       grid[u.row][u.col].unit = null;
     }
   }
-  // Then place at new positions
+  // Then place at new positions, marking arena entry (one-way lock).
   for (const u of formation) {
     u.row += dr;
     u.col += dc;
+    if (u.row >= ARENA_TOP && u.row < ARENA_BOTTOM) u.enteredArena = true;
     grid[u.row][u.col].unit = u;
   }
   return true;
