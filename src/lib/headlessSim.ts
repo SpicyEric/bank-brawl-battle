@@ -272,6 +272,9 @@ function simulateOneBattle(
   };
   for (const u of [...pUnits, ...eUnits]) ensureStats(u.id);
 
+  // Per-battle aura source attribution: targetId -> Map<src|eff|kind, {…, maxStacks}>
+  const auraSources: BattleResult['auraSources'] = {};
+
   let turn = 0;
   let winner: 'player' | 'enemy' | 'draw' = 'draw';
 
@@ -288,6 +291,12 @@ function simulateOneBattle(
 
     const events: BattleEvent[] = [];
     const logs: string[] = [];
+
+    // === Aura engine: recompute per tick + record per-unit attribution ===
+    applyAuraStacks(allUnits, zones, effects);
+    applyAuraTick(allUnits, logs);
+    applyAuraSourceEffects(allUnits, zones, effects, logs);
+    recordAuraSources(allUnits, zones, effects, auraSources);
 
     // === DoTs ===
     for (const u of allUnits) {
