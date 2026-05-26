@@ -179,10 +179,61 @@ interface BattleResult {
     survivedHpPct: number; died: boolean;
   }>;
   finalAlive: { player: Unit[]; enemy: Unit[] };
+  // For each unit id, the MAX stacks observed for each (sourceType|effectKey|kind)
+  // during the whole battle. Used to attribute "who buffed whom" in the report.
+  auraSources: Record<string, Map<string, { source: UnitType; effectKey: string; kind: 'buff' | 'nerf'; stacks: number }>>;
+}
+
+// Per-tick recorder: walks aura zones (same logic as applyAuraStacks) and pushes
+// 1 stack per affected target into `sink`. We then take the per-(target,src,eff)
+// MAX across all ticks to get the recipient's peak buff exposure for this battle.
+function recordAuraSources(
+  units: Unit[],
+  zones: AuraZoneMap,
+  effects: AuraEffectMap,
+  sink: Record<string, Map<string, { source: UnitType; effectKey: string; kind: 'buff' | 'nerf'; stacks: number }>>,
+): void {
+  // Per-tick scratch: targetId -> key -> stacks-this-tick
+  const tick: Record<string, Map<string, { source: UnitType; effectKey: string; kind: 'buff' | 'nerf'; stacks: number }>> = {};
+  for (const src of units) {
+    if (src.dead || src.hp <= 0) continue;
+    const z = zones[src.type as UnitType];
+    if (!z) continue;
+    const eff = effects[src.type as UnitType];
+    if (!eff) continue;
+    for (const pos of ZONE_POSITIONS) {
+      const kind = z[pos];
+      if (!kind) continue;
+      const ek = kind === 'buff' ? eff.buff : eff.nerf;
+      if (!ek) continue;
+      const { dr, dc } = ZONE_DELTA[pos];
+      const r = src.row + dr, c = src.col + dc;
+      const tgt = units.find(u => u.row === r && u.col === c && u.team === src.team && !u.dead && u.hp > 0);
+      if (!tgt) continue;
+      const key = `${src.type}|${ek}|${kind}`;
+      let m = tick[tgt.id];
+      if (!m) { m = new Map(); tick[tgt.id] = m; }
+      const cur = m.get(key);
+      if (cur) cur.stacks += 1;
+      else m.set(key, { source: src.type, effectKey: ek, kind, stacks: 1 });
+    }
+  }
+  // Merge into sink with MAX per key
+  for (const [id, m] of Object.entries(tick)) {
+    let agg = sink[id];
+    if (!agg) { agg = new Map(); sink[id] = agg; }
+    for (const [k, v] of m) {
+      const prev = agg.get(k);
+      if (!prev || v.stacks > prev.stacks) agg.set(k, { ...v });
+    }
+  }
 }
 
 // ============== The full headless tick loop ==============
-function simulateOneBattle(teamSize: number, difficultyP1: number, difficultyP2: number): BattleResult {
+function simulateOneBattle(
+  teamSize: number, difficultyP1: number, difficultyP2: number,
+  zones: AuraZoneMap, effects: AuraEffectMap,
+): BattleResult {
   const grid = generateTerrain(createEmptyGrid());
   const colorOf = (i: number): ColorGroup => (i < 3 ? 'red' : i < 6 ? 'green' : 'blue');
 
