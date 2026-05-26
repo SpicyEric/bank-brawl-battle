@@ -1266,6 +1266,15 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
           }
           target.hp = Math.max(0, target.hp - dmg);
+          // Aura: generic lifesteal from stacks (independent of vampire-specific block below)
+          if (dmg > 0 && unit.auraStacks && unit.auraStacks.lifesteal30 > 0 && unit.hp < unit.maxHp) {
+            const pct = Math.min(1, 0.30 * unit.auraStacks.lifesteal30);
+            const heal = Math.min(unit.maxHp - unit.hp, Math.round(dmg * pct));
+            if (heal > 0) {
+              unit.hp += heal;
+              unit._justRegen = Date.now();
+            }
+          }
           // Reset terrain-seeker idle counter on successful damage
           if (dmg > 0 && unit.type === 'waterwalker') {
             unit.seekerIdleTicks = 0;
