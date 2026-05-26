@@ -396,7 +396,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                       : 'bg-card border border-primary/50 text-primary hover:bg-primary/10'
                   }`}
                 >
-                  {spyUsed ? '👁️ Spioniert' : '👁️ Spionieren'}
+                  {spying ? '👁️ Gegner sichtbar…' : spyUsed ? '👁️ Spioniert' : '👁️ Spionieren'}
                 </button>
                 <button
                   onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
