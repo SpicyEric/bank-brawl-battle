@@ -161,6 +161,15 @@ export function applyAuraStacks(
       (tgt.auraStacks[key] as number) += 1;
       if (kind === 'buff') tgt.auraStacks.totalBuff += 1;
       else tgt.auraStacks.totalNerf += 1;
+      // Aggro implications: taunt + doppel buff also pull enemy attention
+      if (key === 'tauntDmgRed50' || key === 'doppelChance50Plus5') {
+        tgt.auraStacks.forceAggro += 1;
+      }
+    }
+    // === Source-self nerfs: force_aggro_on_self → the SOURCE becomes priority target ===
+    if (src.auraStacks && eff.nerf === 'force_aggro_on_self') {
+      src.auraStacks.forceAggro = Math.max(src.auraStacks.forceAggro, 1);
+      if (src.auraStacks.totalNerf === 0) src.auraStacks.totalNerf = 1;
     }
   }
   for (const u of allUnits) {
