@@ -253,8 +253,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setRoundNumber(data.roundNumber);
         setPlayerScore(data.playerScore);
         setEnemyScore(data.enemyScore);
-        setPlacingPlayer(data.placingPlayer);
-        setPlacingPhase('first');
+        setMyReady(false);
+        setOpponentReady(false);
+        myReadyRef.current = false;
+        opponentReadyRef.current = false;
+        setOpponentSnapshot([]);
         setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
         setPlayerUnits([]);
         setEnemyUnits([]);
@@ -262,7 +265,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setTurnCount(0);
         setSelectedUnit('warrior'); // will be corrected by fatigue check in UI
         setBattleTimer(ROUND_TIME_LIMIT);
-        setOpponentUnitsVisible([]);
         // Reset morale for new round
         setMoraleBoostUsed(false);
         setMoraleBoostActive(null);
