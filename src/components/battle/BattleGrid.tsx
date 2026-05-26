@@ -103,15 +103,24 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     { id: 'grass' as const, url: battlefieldGrass },
     { id: 'desert' as const, url: battlefieldDesert },
   ], []);
-  const [battlefield, setBattlefield] = useState(() => BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+  const [battlefield, setBattlefield] = useState(() => {
+    if (battlefieldId) return BATTLEFIELDS.find(b => b.id === battlefieldId) ?? BATTLEFIELDS[0];
+    return BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)];
+  });
   const battlefieldBg = battlefield.url;
   const prevMatchIdRef = useRef<number | undefined>(matchId);
   useEffect(() => {
+    if (battlefieldId) {
+      const bf = BATTLEFIELDS.find(b => b.id === battlefieldId);
+      if (bf && bf.id !== battlefield.id) setBattlefield(bf);
+      prevMatchIdRef.current = matchId;
+      return;
+    }
     if (matchId !== undefined && matchId !== prevMatchIdRef.current) {
       setBattlefield(BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
       prevMatchIdRef.current = matchId;
     }
-  }, [matchId, BATTLEFIELDS]);
+  }, [matchId, BATTLEFIELDS, battlefieldId, battlefield.id]);
 
 
   // War cry flash animation (own or opponent)
