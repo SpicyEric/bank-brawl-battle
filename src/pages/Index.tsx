@@ -578,7 +578,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
             </div>
 
             {/* Aufgeben Button (mit Ja/Nein-Bestätigung) */}
-            {!isMultiplayer && game.surrenderRound && (
+            {game.surrenderRound && (
               surrenderConfirm ? (
                 <div className="grid grid-cols-2 gap-1.5">
                   <button
