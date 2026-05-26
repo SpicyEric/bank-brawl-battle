@@ -511,6 +511,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
 
       // === Aura stacks: recompute every tick from current positions ===
       applyAuraStacks(allUnits, auraRef.current.zones, auraRef.current.effects);
+      // Apply per-tick regen / drain auras
+      applyAuraTick(allUnits, []);
+
 
 
 
