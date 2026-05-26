@@ -1,17 +1,15 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Loader2 } from 'lucide-react';
-import { UNIT_TYPES, UNIT_DEFS, UnitType, ColorGroup } from '@/lib/battleGame';
-import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
+import { ArrowLeft, Loader2, Lock } from 'lucide-react';
+import { UNIT_TYPES, UNIT_DEFS, UnitType } from '@/lib/battleGame';
 import { UnitGlyph } from '@/components/UnitGlyph';
-import { supabase } from '@/integrations/supabase/client';
 import { getRoomById, subscribeToRoom, updateRoom } from '@/lib/multiplayer';
 import { toast } from 'sonner';
+import { sfxSlotSpin, stopSlotSpin, sfxSlotKlonk, sfxSlotFanfare, sfxConfirm } from '@/lib/sfx';
 
-// Slot layout: row 0 = red (slots 0-2), row 1 = green (slots 3-5), row 2 = blue (slots 6-8)
-const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
 const ROSTER_SIZE = 9;
-const LONG_PRESS_MS = 800;
+const MAX_HANDICAP = 3;
+const COLUMN_LABELS = ['Links', 'Mitte', 'Rechts'];
 
 function shuffle<T>(arr: readonly T[]): T[] {
   const out = arr.slice();
@@ -22,16 +20,21 @@ function shuffle<T>(arr: readonly T[]): T[] {
   return out;
 }
 
-const COLOR_RING: Record<ColorGroup, string> = {
-  red: 'border-unit-red/40 bg-unit-red/15',
-  green: 'border-unit-green/40 bg-unit-green/15',
-  blue: 'border-unit-blue/40 bg-unit-blue/15',
-};
-const COLOR_EMPTY: Record<ColorGroup, string> = {
-  red: 'border-unit-red/30 bg-unit-red/10',
-  green: 'border-unit-green/30 bg-unit-green/10',
-  blue: 'border-unit-blue/30 bg-unit-blue/10',
-};
+// Pick 9 unique units from the pool. If pool < 9, allow duplicates as filler.
+function drawRoster(): UnitType[] {
+  const pool = shuffle(UNIT_TYPES);
+  const out = pool.slice(0, ROSTER_SIZE);
+  while (out.length < ROSTER_SIZE) out.push(pool[out.length % pool.length]);
+  return out;
+}
+
+type Status = 'idle' | 'spinning' | 'stopping' | 'stopped';
+
+// Grid index → column (0=left,1=middle,2=right) and row (0..2)
+// Layout: row-major. idx 0,1,2 = top row; 3,4,5 = middle row; 6,7,8 = bottom row.
+// Column of idx = idx % 3.
+const colOf = (i: number) => i % 3;
+const indicesOfColumn = (col: number) => [col, col + 3, col + 6];
 
 export default function UnitRoster() {
   const navigate = useNavigate();
@@ -41,63 +44,93 @@ export default function UnitRoster() {
   const role = (searchParams.get('role') as 'player1' | 'player2' | null);
   const isHost = role === 'player1';
 
-  const [slots, setSlots] = useState<(UnitType | null)[]>(Array(ROSTER_SIZE).fill(null));
-  const [selectedUnit, setSelectedUnit] = useState<UnitType | null>(null);
-  const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
-  // Randomize the picker order once per mount so players don't always reach
-  // for the same units in the same spots.
-  const pickerOrder = useMemo(() => shuffle(UNIT_TYPES), []);
+  // 9-slot display state. During spinning shows random flickering units.
+  const [display, setDisplay] = useState<(UnitType | null)[]>(Array(ROSTER_SIZE).fill(null));
+  // Final roster (locked-in units once a column stops).
+  const finalRef = useRef<(UnitType | null)[]>(Array(ROSTER_SIZE).fill(null));
+  const [, forceRender] = useState(0);
+  const bump = () => forceRender(x => x + 1);
 
-  // Multiplayer state
+  const [status, setStatus] = useState<Status>('idle');
+  // Which column to stop next on tap (0,1,2).
+  const stopColRef = useRef(0);
+  const spinIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // The 9 units pre-drawn for the current spin (deterministic per spin).
+  const drawnRef = useRef<UnitType[]>([]);
+
+  const [handicap, setHandicap] = useState(0);
+
+  // MP state
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [opponentReady, setOpponentReady] = useState(false);
   const hasNavigatedRef = useRef(false);
 
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const didLongPress = useRef(false);
-
-  const startPress = useCallback((type: UnitType) => {
-    didLongPress.current = false;
-    longPressTimer.current = setTimeout(() => {
-      didLongPress.current = true;
-      setInfoUnit(type);
-    }, LONG_PRESS_MS);
+  // ─── Spinner control ────────────────────────────────────────
+  const startSpinning = useCallback(() => {
+    finalRef.current = Array(ROSTER_SIZE).fill(null);
+    drawnRef.current = drawRoster();
+    setDisplay(Array(ROSTER_SIZE).fill(null));
+    stopColRef.current = 0;
+    setStatus('spinning');
+    sfxSlotSpin();
+    // Flicker random unit icons across all 9 slots
+    spinIntervalRef.current = setInterval(() => {
+      setDisplay(prev => prev.map((_, i) => {
+        if (finalRef.current[i]) return finalRef.current[i];
+        return UNIT_TYPES[Math.floor(Math.random() * UNIT_TYPES.length)];
+      }));
+    }, 70);
   }, []);
-  const cancelPress = useCallback(() => {
-    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+
+  const stopAllSpin = useCallback(() => {
+    if (spinIntervalRef.current) { clearInterval(spinIntervalRef.current); spinIntervalRef.current = null; }
+    stopSlotSpin();
   }, []);
 
-  const placedUnits = new Set(slots.filter(Boolean) as UnitType[]);
+  // Stop a column: snap its 3 slots one by one to the pre-drawn final values.
+  const stopColumn = useCallback((col: number) => {
+    const indices = indicesOfColumn(col);
+    indices.forEach((idx, k) => {
+      setTimeout(() => {
+        finalRef.current[idx] = drawnRef.current[idx];
+        setDisplay(prev => prev.map((v, i) => (i === idx ? drawnRef.current[idx] : v)));
+        sfxSlotKlonk();
+        // After last column's last slot snaps: fanfare + transition to stopped
+        if (col === 2 && k === indices.length - 1) {
+          stopAllSpin();
+          setStatus('stopped');
+          sfxSlotFanfare();
+        }
+      }, k * 130);
+    });
+  }, [stopAllSpin]);
 
-  const handlePickerClick = (type: UnitType) => {
-    if (didLongPress.current) { didLongPress.current = false; return; }
-    if (placedUnits.has(type)) return;
-    setSelectedUnit(prev => (prev === type ? null : type));
-  };
-
-  const handleSlotClick = (slotIdx: number) => {
-    if (submitted) return;
-    const current = slots[slotIdx];
-    if (current) {
-      setSlots(prev => prev.map((s, i) => (i === slotIdx ? null : s)));
+  const handleMainButton = useCallback(() => {
+    if (status === 'idle') {
+      startSpinning();
       return;
     }
-    if (!selectedUnit) return;
-    setSlots(prev => prev.map((s, i) => (i === slotIdx ? selectedUnit : s)));
-    setSelectedUnit(null);
-  };
+    if (status === 'spinning') {
+      const col = stopColRef.current;
+      stopColumn(col);
+      stopColRef.current = col + 1;
+      if (col === 2) {
+        setStatus('stopping'); // disables further taps until fanfare flips to 'stopped'
+      }
+    }
+  }, [status, startSpinning, stopColumn]);
 
-  const ready = slots.every(s => s !== null);
-  const filledCount = slots.filter(Boolean).length;
+  const handleReroll = useCallback(() => {
+    if (handicap >= MAX_HANDICAP) return;
+    setHandicap(h => h + 1);
+    startSpinning();
+  }, [handicap, startSpinning]);
 
-  const rows: { color: ColorGroup; indices: number[] }[] = [
-    { color: 'red', indices: [0,1,2] },
-    { color: 'green', indices: [3,4,5] },
-    { color: 'blue', indices: [6,7,8] },
-  ];
+  // Cleanup
+  useEffect(() => () => { stopAllSpin(); }, [stopAllSpin]);
 
-  // Multiplayer: subscribe to room state and navigate when both ready
+  // ─── MP: subscribe & navigate ───────────────────────────────
   useEffect(() => {
     if (!mpMode || !roomId || !role) return;
     let disposed = false;
@@ -125,10 +158,14 @@ export default function UnitRoster() {
     return () => { disposed = true; unsub(); window.clearInterval(pollId); };
   }, [mpMode, roomId, role, isHost, navigate]);
 
-  const handleReady = async () => {
-    if (!ready) return;
+  // ─── Confirm ────────────────────────────────────────────────
+  const handleConfirm = async () => {
+    if (status !== 'stopped') return;
+    const roster = finalRef.current as UnitType[];
+    if (roster.some(r => !r)) return;
+    sfxConfirm();
     if (!mpMode) {
-      navigate(`/game?roster=${slots.join(',')}`);
+      navigate(`/game?roster=${roster.join(',')}&handicap=${handicap}`);
       return;
     }
     if (submitted || submitting) return;
@@ -136,9 +173,11 @@ export default function UnitRoster() {
     try {
       const rosterField = isHost ? 'player1_roster' : 'player2_roster';
       const readyField = isHost ? 'player1_roster_ready' : 'player2_roster_ready';
+      const handicapField = isHost ? 'player1_handicap' : 'player2_handicap';
       await updateRoom(roomId, {
-        [rosterField]: slots,
+        [rosterField]: roster,
         [readyField]: true,
+        [handicapField]: handicap,
       });
       setSubmitted(true);
     } catch (e: any) {
@@ -146,6 +185,12 @@ export default function UnitRoster() {
       setSubmitting(false);
     }
   };
+
+  // Lock-icon overlay on the last `handicap` slots after stop (they are sperrt im Match).
+  const slotIsLocked = (idx: number) => status === 'stopped' && handicap > 0 && idx >= ROSTER_SIZE - handicap;
+
+  const showButton = status === 'idle' || status === 'spinning' || status === 'stopping';
+  const stopMode = status === 'spinning' || status === 'stopping';
 
   return (
     <div className="min-h-[100dvh] max-h-[100dvh] bg-background flex flex-col max-w-md mx-auto overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
@@ -157,94 +202,81 @@ export default function UnitRoster() {
         <h1 className="font-bold text-foreground text-sm flex-1">
           {mpMode ? `Trupp aufstellen ${isHost ? '(Host)' : '(Gast)'}` : 'Stelle deinen Trupp auf'}
         </h1>
-        <span className="text-[11px] text-muted-foreground font-mono">{filledCount}/{ROSTER_SIZE}</span>
       </div>
 
-      {/* Top: 3 colored rows × 3 slots */}
-      <div className="p-3 pt-2">
-        <div className="space-y-1.5">
-          {rows.map(({ color, indices }) => (
-            <div key={color} className="flex items-center gap-1.5">
-              <div className="grid grid-cols-3 gap-1.5 flex-1">
-                {indices.map(i => {
-                  const t = slots[i];
-                  const def = t ? UNIT_DEFS[t] : null;
-                  const canDrop = !t && !!selectedUnit && !submitted;
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => handleSlotClick(i)}
-                      disabled={submitted}
-                      className={`aspect-square rounded-lg border-2 flex flex-col items-center justify-center transition-all relative ${
-                        t ? `${COLOR_RING[color]} ${submitted ? '' : 'active:scale-[0.95]'}`
-                          : canDrop ? `border-primary bg-primary/10 ring-1 ring-primary animate-pulse`
-                          : `${COLOR_EMPTY[color]} border-dashed`
-                      } ${submitted ? 'opacity-90' : ''}`}
-                    >
-                      {def ? (
-                        <>
-                          <UnitGlyph type={t!} className="w-7 h-7" />
-                          <span className="text-[9px] font-semibold text-foreground mt-0.5">{def.label}</span>
-                        </>
-                      ) : (
-                        <span className="text-[10px] text-muted-foreground/60">{canDrop ? 'Hier' : 'Leer'}</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+      {/* Handicap dots */}
+      <div className="px-3 pt-2 flex items-center gap-2">
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Handicap</span>
+        <div className="flex gap-1.5">
+          {Array.from({ length: MAX_HANDICAP }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-2.5 h-2.5 rounded-full transition-all ${
+                i < handicap
+                  ? 'bg-danger shadow-[0_0_6px_hsl(var(--danger))]'
+                  : 'bg-muted/40 border border-border'
+              }`}
+            />
           ))}
         </div>
       </div>
 
-      {/* Bottom: scrollable picker of all units (color-neutral) */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3">
-        <p className="text-[10px] text-muted-foreground text-center mb-1.5 opacity-60">
-          Gedrückt halten = Info
-        </p>
-        <div className="grid grid-cols-3 gap-1.5">
-          {pickerOrder.map(t => {
-            const def = UNIT_DEFS[t];
-            const isPlaced = placedUnits.has(t);
-            const isSelected = selectedUnit === t;
-            const disabled = isPlaced || submitted;
+      {/* Column labels */}
+      <div className="px-3 pt-3">
+        <div className="grid grid-cols-3 gap-2 mb-1.5">
+          {COLUMN_LABELS.map(l => (
+            <div key={l} className="text-center text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{l}</div>
+          ))}
+        </div>
+
+        {/* 3×3 slot grid */}
+        <div className="grid grid-cols-3 gap-2">
+          {display.map((t, idx) => {
+            const def = t ? UNIT_DEFS[t] : null;
+            const locked = slotIsLocked(idx);
+            const isFinal = !!finalRef.current[idx];
+            const isFlickering = status === 'spinning' && !isFinal;
             return (
-              <button
-                key={t}
-                onClick={() => handlePickerClick(t)}
-                onTouchStart={() => !disabled && startPress(t)}
-                onTouchEnd={cancelPress}
-                onTouchCancel={cancelPress}
-                onMouseDown={() => !disabled && startPress(t)}
-                onMouseUp={cancelPress}
-                onMouseLeave={cancelPress}
-                onContextMenu={(e) => e.preventDefault()}
-                disabled={disabled}
-                className={`relative p-1.5 rounded-lg border-2 bg-card transition-all text-center select-none ${
-                  isPlaced
-                    ? 'border-border opacity-30 grayscale cursor-not-allowed'
-                    : isSelected
-                    ? 'border-primary ring-2 ring-primary bg-primary/10 scale-[0.97]'
-                    : 'border-border active:scale-[0.95] hover:border-primary/40'
-                } ${submitted && !isPlaced ? 'opacity-50' : ''}`}
+              <div
+                key={idx}
+                className={`aspect-square rounded-xl border-2 flex flex-col items-center justify-center transition-all relative overflow-hidden ${
+                  locked
+                    ? 'border-danger/60 bg-danger/10'
+                    : isFinal
+                    ? 'border-primary/60 bg-primary/10 shadow-[0_0_10px_hsl(var(--primary)/0.3)]'
+                    : isFlickering
+                    ? 'border-warning/50 bg-warning/5'
+                    : 'border-border bg-card/60'
+                }`}
               >
-                {isPlaced && (
-                  <div className="absolute inset-0 flex items-center justify-center z-10">
-                    <span className="text-base">✓</span>
+                {def ? (
+                  <div className={`flex flex-col items-center ${isFlickering ? 'animate-pulse' : ''}`}>
+                    <UnitGlyph type={t!} className="w-10 h-10" />
+                    {isFinal && (
+                      <>
+                        <span className="text-[9px] font-semibold text-foreground mt-0.5 leading-none">{def.label}</span>
+                        <span className="text-[8px] text-muted-foreground">❤️{def.hp}</span>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-2xl font-black text-muted-foreground/40">?</span>
+                )}
+                {locked && (
+                  <div className="absolute top-1 right-1 bg-danger/90 rounded-full p-0.5">
+                    <Lock size={10} className="text-danger-foreground" />
                   </div>
                 )}
-                <UnitGlyph type={t} className="w-6 h-6 mx-auto block" />
-                <p className="text-[9px] font-semibold text-foreground leading-tight mt-0.5">{def.label}</p>
-                <p className="text-[8px] text-muted-foreground">❤️{def.hp} ⚔️{def.attack}</p>
-              </button>
+              </div>
             );
           })}
         </div>
       </div>
 
-      {/* Ready button / waiting */}
-      <div className="p-3 border-t border-border space-y-2">
+      <div className="flex-1" />
+
+      {/* Buttons */}
+      <div className="p-3 border-t border-border">
         {mpMode && submitted ? (
           <div className="w-full py-3 rounded-xl bg-card border border-border text-center">
             <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -252,23 +284,41 @@ export default function UnitRoster() {
               {opponentReady ? 'Starte Kampf…' : 'Warte auf Gegner…'}
             </div>
           </div>
-        ) : (
+        ) : showButton ? (
           <button
-            onClick={handleReady}
-            disabled={!ready || submitting}
-            className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+            onClick={handleMainButton}
+            disabled={status === 'stopping'}
+            className={`w-full py-4 rounded-xl font-extrabold text-base active:scale-[0.97] transition-all disabled:opacity-50 ${
+              stopMode
+                ? 'bg-danger text-danger-foreground shadow-[0_0_18px_hsl(var(--danger)/0.5)]'
+                : 'bg-primary text-primary-foreground shadow-[0_0_18px_hsl(var(--primary)/0.5)]'
+            }`}
           >
-            {ready
-              ? (mpMode ? (submitting ? 'Sende…' : '✅ Bereit') : `⚔️ Bereit (${filledCount}/${ROSTER_SIZE})`)
-              : `Fülle noch ${ROSTER_SIZE - filledCount} Slots…`}
+            {stopMode ? '⏹ Stopp!' : '🎰 Drehen!'}
           </button>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleReroll}
+              disabled={handicap >= MAX_HANDICAP}
+              className="py-3 rounded-xl bg-secondary text-secondary-foreground font-bold text-xs active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed flex flex-col items-center justify-center leading-tight"
+            >
+              <span>🔄 Neu drehen</span>
+              <span className="text-[10px] opacity-80">+1 Handicap {handicap >= MAX_HANDICAP ? '(max)' : ''}</span>
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={submitting}
+              className="py-3 rounded-xl bg-success text-success-foreground font-bold text-sm active:scale-[0.97] transition-all disabled:opacity-50"
+            >
+              {submitting ? 'Sende…' : '✅ Bestätigen'}
+            </button>
+          </div>
         )}
-        {mpMode && !submitted && opponentReady && (
-          <p className="text-[11px] text-center text-success">Gegner ist bereit – wartet auf dich.</p>
+        {mpMode && !submitted && status === 'stopped' && opponentReady && (
+          <p className="text-[11px] text-center text-success mt-2">Gegner ist bereit – wartet auf dich.</p>
         )}
       </div>
-
-      {infoUnit && <UnitInfoModal unitType={infoUnit} hideColorInfo onClose={() => setInfoUnit(null)} />}
     </div>
   );
 }
