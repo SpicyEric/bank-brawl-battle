@@ -787,6 +787,12 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                 </div>
               )}
               {isDragOrigin && <div className="absolute inset-0 z-20 pointer-events-none drag-preview-origin" />}
+              {/* Drag preview: show the dragged unit's icon at the actual target cell so it lines up with the +/- aura. */}
+              {isDragOrigin && dragPreview && (
+                <div className="absolute inset-0 z-[21] pointer-events-none flex items-center justify-center">
+                  <UnitGlyph type={dragPreview.type} className="block w-6 h-6 drop-shadow-[0_2px_3px_rgba(0,0,0,0.8)] opacity-90 drag-preview-icon-pulse" />
+                </div>
+              )}
               {/* Aura overlay (placement preview) */}
               {auraOverlay && (() => {
                 const k = auraOverlay.get(cellKey);
