@@ -500,6 +500,12 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
 
+      // Visible 8x8 battlefield window = rows [GRID_SIZE .. 2*GRID_SIZE).
+      // Combat (targeting + attacks) only happens against units inside this window.
+      const VIEW_TOP = GRID_SIZE;
+      const VIEW_BOTTOM = GRID_SIZE * 2;
+      const inBattlefield = (u: Unit) => u.row >= VIEW_TOP && u.row < VIEW_BOTTOM;
+
       // Morale boost tick-down
       if (moralePhase.current !== 'none' && moraleTicksLeft.current > 0) {
         moraleTicksLeft.current -= 1;
@@ -674,6 +680,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           for (const other of allUnits) {
             if (other === unit || other.team === unit.team) continue;
             if (other.hp <= 0 || other.dead) continue;
+            if (!inBattlefield(other)) continue; // can't strike enemies off the visible 8x8
             const adr = Math.abs(other.row - unit.row);
             const adc = Math.abs(other.col - unit.col);
             if (adr <= 1 && adc <= 1 && (adr + adc) > 0) {
@@ -706,9 +713,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           if (best.hp <= 0) (best as any).dead = true;
         }
         // 2) Formations move one cell toward the nearest opposing formation.
+        // (VIEW_TOP/VIEW_BOTTOM/inBattlefield hoisted above)
         const moveTeamFormations = (team: 'player' | 'enemy') => {
           const formations = findFormations(allUnits, team);
-          const opponentsAlive = allUnits.filter(u => u.team !== team && u.hp > 0 && !u.dead);
+          const opponentsAlive = allUnits.filter(u => u.team !== team && u.hp > 0 && !u.dead && inBattlefield(u));
           for (const grp of formations) {
             if (grp.length === 0 || opponentsAlive.length === 0) continue;
           let target: Unit | null = null;
@@ -732,15 +740,18 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             }
           }
         };
-        // === Flank maneuver: forced player shift, suppresses normal player formation move this tick ===
+        // === Flank maneuver: 3-tick burst — Tick1: 2 back, Tick2: up to 5 sideways, Tick3: up to 5 forward.
+        // Each unit shifts as far as it can per tick, clamped by edges/water/other units.
         let flankShifting = false;
         if (flankActiveRef.current) {
           flankShifting = true;
           const { dir, step } = flankActiveRef.current;
-          let dr = 0, dc = 0;
-          if (step < 2) dr = 1;            // 2 cells back (toward player base = +row)
-          else if (step < 7) dc = dir;     // 5 cells sideways
-          else if (step < 12) dr = -1;     // 5 cells forward (toward enemy = -row)
+          const rowCount = newGrid.length;
+          const colCount = newGrid[0]?.length ?? GRID_SIZE;
+          let dr = 0, dc = 0, maxSteps = 0;
+          if (step === 0) { dr = 1;  dc = 0;   maxSteps = 2; }   // 2 back
+          else if (step === 1) { dr = 0;  dc = dir; maxSteps = 5; } // up to 5 sideways
+          else if (step === 2) { dr = -1; dc = 0;   maxSteps = 5; } // up to 5 forward
           if (dr !== 0 || dc !== 0) {
             const playerAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
             const sorted = [...playerAlive].sort((a, b) => {
@@ -750,23 +761,23 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
               if (dc < 0) return a.col - b.col;
               return 0;
             });
-            const rowCount = newGrid.length;
-            const colCount = newGrid[0]?.length ?? GRID_SIZE;
             for (const u of sorted) {
-              const nr = u.row + dr;
-              const nc = u.col + dc;
-              if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) continue;
-              const tgt = newGrid[nr]?.[nc];
-              if (!tgt) continue;
-              if (tgt.terrain === 'water') continue;
-              if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) continue;
-              if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
-              u.row = nr; u.col = nc;
-              newGrid[u.row][u.col].unit = u;
+              for (let s = 0; s < maxSteps; s++) {
+                const nr = u.row + dr;
+                const nc = u.col + dc;
+                if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
+                const tgt = newGrid[nr]?.[nc];
+                if (!tgt) break;
+                if (tgt.terrain === 'water') break;
+                if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
+                if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
+                u.row = nr; u.col = nc;
+                newGrid[u.row][u.col].unit = u;
+              }
             }
           }
           const nextStep = step + 1;
-          if (nextStep >= 12) {
+          if (nextStep >= 3) {
             flankActiveRef.current = null;
             setFlankActive(null);
           } else {
@@ -775,6 +786,37 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         }
         if (!flankShifting) moveTeamFormations('player');
         moveTeamFormations('enemy');
+
+        // === Fast retreat: if no enemy is on the visible 8x8, units back off 3 cells/tick.
+        // Suppressed during flank maneuver so the forced sideways/forward shifts aren't undone.
+        if (!flankShifting) {
+          const rowCount = newGrid.length;
+          const colCount = newGrid[0]?.length ?? GRID_SIZE;
+          const retreatTeam = (team: 'player' | 'enemy') => {
+            const enemiesOnField = allUnits.some(u => u.team !== team && u.hp > 0 && !u.dead && inBattlefield(u));
+            if (enemiesOnField) return;
+            const backDr = team === 'player' ? 1 : -1;
+            const myUnits = allUnits.filter(u => u.team === team && u.hp > 0 && !u.dead);
+            // Sort so units closest to their base move first → no self-blocking.
+            const sorted = [...myUnits].sort((a, b) => backDr > 0 ? b.row - a.row : a.row - b.row);
+            for (const u of sorted) {
+              for (let s = 0; s < 3; s++) {
+                const nr = u.row + backDr;
+                const nc = u.col;
+                if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
+                const tgt = newGrid[nr]?.[nc];
+                if (!tgt) break;
+                if (tgt.terrain === 'water') break;
+                if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
+                if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
+                u.row = nr; u.col = nc;
+                newGrid[u.row][u.col].unit = u;
+              }
+            }
+          };
+          retreatTeam('player');
+          retreatTeam('enemy');
+        }
       } else {
 
 
@@ -947,11 +989,36 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           // No allies to heal → fall through to normal attack logic below
         }
 
-        // Focus fire override: player units target lowest HP enemy, AI units target highest HP player
-        const target = (focusTarget && unit.team === 'player') ? focusTarget
-          : (aiFocusTarget && unit.team === 'enemy') ? aiFocusTarget
-          : findTarget(unit, allUnits);
-        if (!target) continue;
+        // Focus fire override: player units target lowest HP enemy, AI units target highest HP player.
+        // Targets must be inside the visible 8x8 battlefield (rows VIEW_TOP..VIEW_BOTTOM).
+        const battlefieldUnits = allUnits.filter(u => u.team === unit.team || inBattlefield(u));
+        const fT = focusTarget && inBattlefield(focusTarget) ? focusTarget : null;
+        const afT = aiFocusTarget && inBattlefield(aiFocusTarget) ? aiFocusTarget : null;
+        const target = (fT && unit.team === 'player') ? fT
+          : (afT && unit.team === 'enemy') ? afT
+          : findTarget(unit, battlefieldUnits);
+        if (!target) {
+          // No reachable enemy on the battlefield → fast retreat (up to 3 cells toward own base).
+          const backDr = unit.team === 'player' ? 1 : -1;
+          const rowCount = newGrid.length;
+          const colCount = newGrid[0]?.length ?? GRID_SIZE;
+          if (!isFrozenNow && !seekerHolds && !shouldSkipMove(unit)) {
+            for (let s = 0; s < 3; s++) {
+              const nr = unit.row + backDr;
+              const nc = unit.col;
+              if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
+              const tgt = newGrid[nr]?.[nc];
+              if (!tgt) break;
+              if (tgt.terrain === 'water') break;
+              if (tgt.unit && tgt.unit.id !== unit.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
+              if (newGrid[unit.row]?.[unit.col]?.unit?.id === unit.id) newGrid[unit.row][unit.col].unit = null;
+              unit.row = nr;
+              newGrid[unit.row][unit.col].unit = unit;
+            }
+          }
+          continue;
+        }
+
 
         if (!canAttack(unit, target)) {
           // Track stuck turns for anti-stalemate
