@@ -691,7 +691,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isEnemyZone = false;
           const unit = cell.unit;
           // Hide enemy units during placement (unless spying via hideEnemyUnits=false).
+          // Hide own units briefly while spy reveals the enemy formation.
           const isHiddenEnemy = !!(unit && unit.team === 'enemy' && hideEnemyUnits && isPlacing);
+          const isHiddenPlayer = !!(unit && unit.team === 'player' && hidePlayerUnits && isPlacing);
           const def = unit ? UNIT_DEFS[unit.type] : null;
           const colorGroup = unit && !unit.dead ? (unit.color || UNIT_COLOR_GROUPS[unit.type]) : null;
           const showColorDot = colorGroup && (alwaysShowColorDots || phase === 'place_player' || phase === 'place_enemy') && !isHiddenEnemy;
