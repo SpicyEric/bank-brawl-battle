@@ -416,3 +416,63 @@ export function sfxShieldWall() {
     playTone(180, 0.12, 'square', 0.1);
   }, 250);
 }
+
+// --- Slot machine SFX ---
+
+let slotSpinInterval: ReturnType<typeof setInterval> | null = null;
+
+/** Casino slot reel – fast rattling clicks (loops until stopSlotSpin()). */
+export function sfxSlotSpin() {
+  if (sfxMuted) return;
+  stopSlotSpin();
+  const tick = () => {
+    if (sfxMuted) return;
+    const ctx = getCtx();
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1800 + Math.random() * 400, t);
+    gain.gain.setValueAtTime(0.05, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.04);
+  };
+  tick();
+  slotSpinInterval = setInterval(tick, 60);
+}
+
+export function stopSlotSpin() {
+  if (slotSpinInterval) { clearInterval(slotSpinInterval); slotSpinInterval = null; }
+}
+
+/** Reel snap – short low-freq klonk (~80 ms). */
+export function sfxSlotKlonk() {
+  if (sfxMuted) return;
+  const ctx = getCtx();
+  const t = ctx.currentTime;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(220, t);
+  osc.frequency.exponentialRampToValueAtTime(80, t + 0.08);
+  gain.gain.setValueAtTime(0.25, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(t);
+  osc.stop(t + 0.1);
+  playNoise(0.05, 0.06);
+}
+
+/** Final stop – cheerful 3-tone ascending fanfare/ding. */
+export function sfxSlotFanfare() {
+  if (sfxMuted) return;
+  const notes = [784, 988, 1319]; // G5 B5 E6
+  notes.forEach((freq, i) => {
+    setTimeout(() => playTone(freq, 0.18, 'triangle', 0.14), i * 90);
+  });
+  setTimeout(() => playTone(1568, 0.3, 'sine', 0.1), 300);
+}
