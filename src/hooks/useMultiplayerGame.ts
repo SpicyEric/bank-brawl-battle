@@ -1241,6 +1241,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const nextRound = useCallback(async () => {
     const newRound = roundNumber + 1;
     const newGrid = generateTerrain(createEmptyGrid());
+    // Host re-picks the battlefield biome each round; guest follows via broadcast.
+    const newBattlefieldId: 'grass' | 'desert' = isHost
+      ? (Math.random() < 0.5 ? 'grass' : 'desert')
+      : battlefieldId;
+    if (isHost) setBattlefieldId(newBattlefieldId);
 
     // Update fatigue before resetting units
     setPlayerFatigue(prev => {
@@ -1275,6 +1280,12 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     opponentReadyRef.current = false;
     setOpponentSnapshot([]);
     setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
+    // Reset flank
+    setFlankLeftUsed(false);
+    setFlankRightUsed(false);
+    setFlankActive(null);
+    flankActiveRef.current = null;
+    opponentFlankRef.current = null;
 
     await updateRoom(roomId, {
       player1_units: null, player2_units: null,
@@ -1294,13 +1305,14 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
               roundNumber: newRound,
               playerScore: enemyScore,
               enemyScore: playerScore,
+              battlefieldId: newBattlefieldId,
             },
 
           },
         });
       }, 300);
     }
-  }, [roundNumber, roomId, isHost, playerScore, enemyScore, playerUnits, playerBannedUnits]);
+  }, [roundNumber, roomId, isHost, playerScore, enemyScore, playerUnits, playerBannedUnits, battlefieldId, hasRoster, roster]);
 
   const resetGame = useCallback(() => {}, []);
   const startBattle = useCallback(() => {}, []);
