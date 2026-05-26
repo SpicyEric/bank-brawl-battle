@@ -247,8 +247,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       if (action === 'battle_start') {
         setGrid(data.grid as Cell[][]);
+        setPlayerUnits(data.enemyUnits || []);
+        setEnemyUnits(data.playerUnits || []);
         setPhase('battle');
         setBattleTimer(ROUND_TIME_LIMIT);
+        setTurnCount(0);
         setMyReady(false);
         setOpponentReady(false);
         setOpponentSnapshot([]);
@@ -1306,8 +1309,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     return () => { if (battleRef.current) clearInterval(battleRef.current); };
   }, [phase, isHost, battleTick]);
 
-  const gameOver = playerScore >= POINTS_TO_WIN || enemyScore >= POINTS_TO_WIN;
-  const gameWon = playerScore >= POINTS_TO_WIN;
+  const gameOver = playerScore >= ROUNDS_TO_WIN || enemyScore >= ROUNDS_TO_WIN;
+  const gameWon = playerScore >= ROUNDS_TO_WIN;
 
   // Next round
   const nextRound = useCallback(async () => {
