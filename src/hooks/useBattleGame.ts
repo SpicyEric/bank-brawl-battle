@@ -882,10 +882,16 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         const moveTeamFormations = (team: 'player' | 'enemy') => {
           const formations = findFormations(allUnits, team);
           const opponentsAlive = allUnits.filter(u => u.team !== team && u.hp > 0 && !u.dead);
+          // Forward direction: player marches up (-1), enemy marches down (+1).
+          const forwardDr = team === 'player' ? -1 : 1;
           for (const grp of formations) {
             if (grp.length === 0 || opponentsAlive.length === 0) continue;
-          let target: Unit | null = null;
-          let bestDist = Infinity;
+            // Sideways movement is only unlocked once at least one of our units
+            // shares a row with an opposing unit (regardless of column distance).
+            const rowsInGrp = new Set(grp.map(u => u.row));
+            const sharesRow = opponentsAlive.some(o => rowsInGrp.has(o.row));
+            let target: Unit | null = null;
+            let bestDist = Infinity;
             for (const u of grp) for (const opponent of opponentsAlive) {
               const d = Math.abs(opponent.row - u.row) + Math.abs(opponent.col - u.col);
               if (d < bestDist) { bestDist = d; target = opponent; }
@@ -897,9 +903,15 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             const ddr = Math.sign(target.row - cr);
             const ddc = Math.sign(target.col - cc);
             const tries: Array<[number, number]> = [];
-            if (ddr !== 0 && ddc !== 0) tries.push([ddr, ddc]);
-            if (ddr !== 0) tries.push([ddr, 0]);
-            if (ddc !== 0) tries.push([0, ddc]);
+            if (sharesRow) {
+              // Engagement mode: free to move diagonally / sideways toward the target.
+              if (ddr !== 0 && ddc !== 0) tries.push([ddr, ddc]);
+              if (ddr !== 0) tries.push([ddr, 0]);
+              if (ddc !== 0) tries.push([0, ddc]);
+            } else {
+              // Approach mode: march straight forward only.
+              tries.push([forwardDr, 0]);
+            }
             for (const [mdr, mdc] of tries) {
               if (applyFormationMove(grp, mdr, mdc, newGrid)) break;
             }
