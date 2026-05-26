@@ -35,6 +35,8 @@ interface BattleGridProps {
   selectedFormationCells?: Set<string>;
   /** Hide enemy units from view (used during full-grid placement; spy button temporarily reveals them). */
   hideEnemyUnits?: boolean;
+  /** Hide own player units (used briefly while spy reveals the enemy formation). */
+  hidePlayerUnits?: boolean;
 }
 
 interface UnitPos { row: number; col: number }
@@ -51,7 +53,7 @@ interface RiderHornFlash { id: string; row: number; col: number; kind: 'inner' |
 interface DragonSpinFlame { id: string; row: number; col: number; delayMs: number }
 interface TeleportEffect { id: string; row: number; col: number; kind: 'out' | 'in' }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview, matchId, auraOverlay, auraZones, selectedFormationCells, hideEnemyUnits }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview, matchId, auraOverlay, auraZones, selectedFormationCells, hideEnemyUnits, hidePlayerUnits }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -689,7 +691,9 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isEnemyZone = false;
           const unit = cell.unit;
           // Hide enemy units during placement (unless spying via hideEnemyUnits=false).
+          // Hide own units briefly while spy reveals the enemy formation.
           const isHiddenEnemy = !!(unit && unit.team === 'enemy' && hideEnemyUnits && isPlacing);
+          const isHiddenPlayer = !!(unit && unit.team === 'player' && hidePlayerUnits && isPlacing);
           const def = unit ? UNIT_DEFS[unit.type] : null;
           const colorGroup = unit && !unit.dead ? (unit.color || UNIT_COLOR_GROUPS[unit.type]) : null;
           const showColorDot = colorGroup && (alwaysShowColorDots || phase === 'place_player' || phase === 'place_enemy') && !isHiddenEnemy;
@@ -828,7 +832,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {isDead && (
                 <span className="text-sm opacity-40 select-none">💀</span>
               )}
-              {unit && !isDead && !isHiddenEnemy && (() => {
+              {unit && !isDead && !isHiddenEnemy && !isHiddenPlayer && (() => {
                 // Row-by-row marching entry: uniform offset that ticks down.
                 // Player marches up from below: visual offset = +entryStep rows.
                 // Enemy marches down from above: visual offset = -entryStep rows.
