@@ -480,6 +480,19 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     setBattleLog(prev => ['🛡️ SCHILDWALL! Rückzug zur Base – 50% Schadensreduktion für 3 Züge!', ...prev]);
   }, [shieldWallUsed, phase]);
 
+  // Activate flank maneuver: 2 cells back, then 5 sideways (dir), then 5 forward.
+  // One battleTick = one cell shift. Movement clamped at grid edges, blocked by water/units.
+  const activateFlank = useCallback((dir: -1 | 1) => {
+    if (phase !== 'battle') return;
+    if (flankActiveRef.current) return;
+    if (dir === -1 && flankLeftUsed) return;
+    if (dir === 1 && flankRightUsed) return;
+    if (dir === -1) setFlankLeftUsed(true); else setFlankRightUsed(true);
+    flankActiveRef.current = { dir, step: 0 };
+    setFlankActive(dir === -1 ? 'left' : 'right');
+    setBattleLog(prev => [`🏃 FLANKE ${dir === -1 ? '←' : '→'}! Alle Einheiten umfassen den Gegner!`, ...prev]);
+  }, [phase, flankLeftUsed, flankRightUsed]);
+
   // Run one battle tick
   const battleTick = useCallback(() => {
     setGrid(prevGrid => {
