@@ -321,7 +321,8 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 ? (game.selectedSlot !== null && !game.placedSlots?.includes(game.selectedSlot) && !game.playerBannedSlots?.includes(game.selectedSlot))
                 : !!game.selectedUnit;
               const existing = game.grid[row][col].unit;
-              const cellBlocked = (existing && existing.team === 'player') || game.grid[row][col].terrain === 'water';
+              const ownTeam = isMultiplayer && flipped ? 'enemy' : 'player';
+              const cellBlocked = (existing && existing.team === ownTeam) || game.grid[row][col].terrain === 'water';
               if (canPlace && !cellBlocked) {
                 const type = roster && game.selectedSlot !== null ? roster[game.selectedSlot] : game.selectedUnit;
                 game.placeUnit(row, col);
@@ -433,13 +434,10 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               placedSlots={game.placedSlots}
               onDragHover={(row, col, type) => {
                 if (row === null || col === null || !type) { setDragPreview(null); return; }
-                // SP: full grid is buildable. MP: keep the 4-row half restriction.
-                const isPlayerRow = isMultiplayer
-                  ? (roster ? (flipped ? row < 4 : [4, 5, 6, 7].includes(row)) : [4, 5, 6, 7].includes(row))
-                  : true;
                 const targetCell = game.grid[row]?.[col];
-                const blocked = !targetCell || targetCell.terrain === 'water' || (targetCell.unit && targetCell.unit.team === 'player');
-                if (!isPlayerRow || blocked) {
+                const ownTeam = isMultiplayer && flipped ? 'enemy' : 'player';
+                const blocked = !targetCell || targetCell.terrain === 'water' || (targetCell.unit && targetCell.unit.team === ownTeam);
+                if (blocked) {
                   setDragPreview(null);
                   return;
                 }
@@ -449,11 +447,8 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 setDragPreview(null);
                 if (!roster) return;
                 const cell = game.grid[row]?.[col];
-                if (!cell || cell.terrain === 'water' || (cell.unit && cell.unit.team === 'player')) return;
-                if (isMultiplayer) {
-                  const playerRows = flipped ? [0, 1, 2, 3] : [4, 5, 6, 7];
-                  if (!playerRows.includes(row)) return;
-                }
+                const ownTeam = isMultiplayer && flipped ? 'enemy' : 'player';
+                if (!cell || cell.terrain === 'water' || (cell.unit && cell.unit.team === ownTeam)) return;
                 const type = roster[slotIdx];
                 game.setSelectedSlot(slotIdx);
                 game.placeUnit(row, col, slotIdx);

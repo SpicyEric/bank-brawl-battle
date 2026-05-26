@@ -3,16 +3,20 @@ import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
   generateTerrain, getActivationTurn, setBondsForPlacement,
-  GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, POINTS_TO_WIN, BASE_UNITS, ROUND_TIME_LIMIT,
+  GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, ROUNDS_TO_WIN, ROUND_TIME_LIMIT,
   MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
   processLavaTick, processGhostTick, tickPhantomTimers,
   tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest,
+  spawnDoppelgangerPhantoms, applyPostAttackEffects, applyDeathEffects, applyChainAttack, applyShadowpriestCurse,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { updateRoom, ensureAnonymousSession } from '@/lib/multiplayer';
 import { matchRecorder } from '@/lib/matchRecorder';
+import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
+import { applyAuraStacks, applyAuraTick, applyAuraSourceEffects } from '@/lib/auraEffects';
+import { findFormations, applyFormationMove } from '@/lib/formations';
 
 interface MultiplayerConfig {
   roomId: string;
@@ -23,11 +27,43 @@ interface MultiplayerConfig {
 
 // Slot color layout matches UnitRoster: slots 0-2 red, 3-5 green, 6-8 blue
 const SLOT_COLORS: ('red' | 'green' | 'blue')[] = ['red','red','red','green','green','green','blue','blue','blue'];
+const BATTLE_WORLD_ROWS = GRID_SIZE * 3;
+
+function createBattleWorldGrid(): Cell[][] {
+  return Array.from({ length: BATTLE_WORLD_ROWS }, (_, row) =>
+    Array.from({ length: GRID_SIZE }, (_, col) => ({ row, col, unit: null, terrain: 'none' as const }))
+  );
+}
+
+function getRoundUnitLimit(roundNumber: number): number {
+  return Math.min(9 + (roundNumber - 1) * 2, 17);
+}
 
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
 
 function serializeUnit(u: Unit) {
-  return { id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack, row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown, dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff, volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft, spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise, stuckTurns: u.stuckTurns, activationTurn: u.activationTurn, startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId, bondBroken: u.bondBroken, burning: u.burning, bleeding: u.bleeding, bombPlaceTimer: (u as any).bombPlaceTimer, bombSpecialTimer: (u as any).bombSpecialTimer, obeliskBeamTimer: (u as any).obeliskBeamTimer, obeliskBeamLeft: (u as any).obeliskBeamLeft, obeliskBuff: (u as any).obeliskBuff, color: (u as any).color, slotIndex: (u as any).slotIndex };
+  return {
+    id: u.id, type: u.type, team: u.team, hp: u.hp, maxHp: u.maxHp, attack: u.attack,
+    row: u.row, col: u.col, cooldown: u.cooldown, maxCooldown: u.maxCooldown,
+    dead: u.dead, frozen: u.frozen, frozenDmgMul: u.frozenDmgMul, webbed: u.webbed,
+    stuckTurns: u.stuckTurns, enteredArena: u.enteredArena, activationTurn: u.activationTurn,
+    startRow: u.startRow, lastAttackedId: u.lastAttackedId, bondedToTankId: u.bondedToTankId,
+    bondBroken: u.bondBroken, burning: u.burning, bleeding: u.bleeding,
+    ghost: u.ghost, reviveIn: u.reviveIn, bansheeRevived: u.bansheeRevived,
+    isClone: u.isClone, cloneTimer: u.cloneTimer, clonesSpawnedTotal: u.clonesSpawnedTotal,
+    parentClonerId: u.parentClonerId, isPhantom: u.isPhantom, phantom: u.phantom,
+    doppelSpawned: u.doppelSpawned, phantomId: u.phantomId,
+    frostNovaTimer: u.frostNovaTimer, hornTimer: u.hornTimer, hornBuff: u.hornBuff,
+    volleyTimer: u.volleyTimer, spinTimer: u.spinTimer, spinTicksLeft: u.spinTicksLeft,
+    spinDirIdx: u.spinDirIdx, spinClockwise: u.spinClockwise,
+    laneCol: u.laneCol, laneBroken: u.laneBroken,
+    bombPlaceTimer: (u as any).bombPlaceTimer, bombSpecialTimer: (u as any).bombSpecialTimer,
+    obeliskBeamTimer: (u as any).obeliskBeamTimer, obeliskBeamLeft: (u as any).obeliskBeamLeft,
+    obeliskBuff: (u as any).obeliskBuff, curseStacks: u.curseStacks, cursed: u.cursed,
+    unhealable: u.unhealable, curseAtkMul: u.curseAtkMul, soulHarvestTimer: u.soulHarvestTimer,
+    permAtkBonus: u.permAtkBonus, auraStacks: u.auraStacks,
+    color: (u as any).color, slotIndex: (u as any).slotIndex,
+  };
 }
 
 function serializeGrid(grid: Cell[][]) {
@@ -65,7 +101,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [playerScore, setPlayerScore] = useState(0);
   const [enemyScore, setEnemyScore] = useState(0);
+  const playerScoreRef = useRef(0);
+  const enemyScoreRef = useRef(0);
   const [roundNumber, setRoundNumber] = useState(1);
+  const playerMaxUnits = getRoundUnitLimit(roundNumber);
+  const enemyMaxUnits = playerMaxUnits;
   const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
   const [opponentLeft, setOpponentLeft] = useState(false);
@@ -123,6 +163,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const phaseRef = useRef(phase);
   const playerUnitsRef = useRef(playerUnits);
+  const enemyUnitsRef = useRef(enemyUnits);
+  const turnCountRef = useRef(0);
   const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hadBothPlayersRef = useRef(false);
   const myReadyRef = useRef(false);
@@ -140,9 +182,17 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Keep refs in sync
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
+  useEffect(() => { enemyUnitsRef.current = enemyUnits; }, [enemyUnits]);
   useEffect(() => { isMyTurnRef.current = isMyTurnToPlace; }, [isMyTurnToPlace]);
   useEffect(() => { myReadyRef.current = myReady; }, [myReady]);
   useEffect(() => { opponentReadyRef.current = opponentReady; }, [opponentReady]);
+  useEffect(() => { playerScoreRef.current = playerScore; }, [playerScore]);
+  useEffect(() => { enemyScoreRef.current = enemyScore; }, [enemyScore]);
+
+  const auraRef = useRef<{ zones: AuraZoneMap; effects: AuraEffectMap }>({ zones: {}, effects: {} });
+  useEffect(() => {
+    loadAuraData().then(d => { auraRef.current = d; }).catch(() => {});
+  }, []);
 
   // Setup broadcast channel
   useEffect(() => {
@@ -197,8 +247,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       if (action === 'battle_start') {
         setGrid(data.grid as Cell[][]);
+        setPlayerUnits(data.enemyUnits || []);
+        setEnemyUnits(data.playerUnits || []);
         setPhase('battle');
         setBattleTimer(ROUND_TIME_LIMIT);
+        setTurnCount(0);
         setMyReady(false);
         setOpponentReady(false);
         setOpponentSnapshot([]);
@@ -442,8 +495,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Place unit on my side
   const placeUnit = useCallback((row: number, col: number, overrideSlot?: number) => {
     if (phase !== 'place_player' || !isMyTurnToPlace) return;
-    if (!myRows.includes(row)) return;
-    if (playerUnits.length >= getMaxUnits(playerScore, enemyScore, roundNumber)) return;
+    if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return;
+    if (playerUnits.length >= playerMaxUnits) return;
     if (grid[row][col].unit) return;
     if (grid[row][col].terrain === 'water') return;
 
@@ -470,7 +523,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
-  }, [phase, isMyTurnToPlace, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, myRows, myTeam, playerBannedUnits, playerScore, enemyScore, roundNumber]);
+  }, [phase, isMyTurnToPlace, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, myTeam, playerBannedUnits, playerMaxUnits]);
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
@@ -543,32 +596,46 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
     if (!room || !room.player1_units || !room.player2_units) return;
 
-    // Build full grid
-    const newGrid = grid.map(r => r.map(c => ({ ...c, unit: null as Unit | null })));
-    // Preserve terrain
-    for (let r = 0; r < GRID_SIZE; r++) {
-      for (let c = 0; c < GRID_SIZE; c++) {
-        newGrid[r][c].terrain = grid[r][c].terrain;
-      }
-    }
-
-    const allNewUnits: Unit[] = [];
-    for (const u of room.player1_units as any[]) {
-      const unit: Unit = { ...u, team: 'player', activationTurn: u.activationTurn ?? getActivationTurn(u.row, 'player'), startRow: u.startRow ?? u.row };
-      newGrid[unit.row][unit.col].unit = unit;
-      allNewUnits.push(unit);
-    }
-    for (const u of room.player2_units as any[]) {
-      const unit: Unit = { ...u, team: 'enemy', activationTurn: u.activationTurn ?? getActivationTurn(u.row, 'enemy'), startRow: u.startRow ?? u.row };
-      newGrid[unit.row][unit.col].unit = unit;
-      allNewUnits.push(unit);
-    }
-
-    // Set tank bonds for all units
+    const battlePlayers: Unit[] = (room.player1_units as any[]).map((u: any) => ({
+      ...u,
+      team: 'player' as const,
+      row: u.row + GRID_SIZE * 2,
+      startRow: u.row + GRID_SIZE * 2,
+      laneCol: u.col,
+      activationTurn: undefined,
+      enteredArena: false,
+    }));
+    const battleEnemies: Unit[] = (room.player2_units as any[]).map((u: any) => ({
+      ...u,
+      team: 'enemy' as const,
+      row: u.row,
+      startRow: u.row,
+      laneCol: u.col,
+      activationTurn: undefined,
+      enteredArena: false,
+    }));
+    const allNewUnits: Unit[] = [...battlePlayers, ...battleEnemies];
     setBondsForPlacement(allNewUnits);
 
+    const newGrid = createBattleWorldGrid();
+    for (let r = 0; r < GRID_SIZE; r++) {
+      for (let c = 0; c < GRID_SIZE; c++) {
+        newGrid[r + GRID_SIZE][c].terrain = grid[r][c].terrain;
+      }
+    }
+    for (const u of battlePlayers) newGrid[u.row][u.col].unit = u;
+    for (const u of battleEnemies) newGrid[u.row][u.col].unit = u;
+
+    const logs: string[] = [];
+    const phantoms = spawnDoppelgangerPhantoms(allNewUnits, newGrid, logs);
+    if (phantoms.length > 0) allNewUnits.push(...phantoms);
+
     setGrid(newGrid);
+    setPlayerUnits(allNewUnits.filter(u => u.team === 'player'));
+    setEnemyUnits(allNewUnits.filter(u => u.team === 'enemy'));
     setPhase('battle');
+    setTurnCount(0);
+    turnCountRef.current = 0;
     setBattleTimer(ROUND_TIME_LIMIT);
     setMyReady(false);
     setOpponentReady(false);
@@ -591,12 +658,20 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setShieldWallUsed(false);
     setShieldWallActive(false);
     shieldWallTicksLeft.current = 0;
+    if (logs.length > 0) setBattleLog(logs);
 
     // Broadcast battle start
     channelRef.current?.send({
       type: 'broadcast',
       event: 'game_sync',
-      payload: { action: 'battle_start', data: { grid: serializeGrid(newGrid) } },
+      payload: {
+        action: 'battle_start',
+        data: {
+          grid: serializeGrid(newGrid),
+          playerUnits: allNewUnits.filter(u => u.team === 'player').map(serializeUnit),
+          enemyUnits: allNewUnits.filter(u => u.team === 'enemy').map(serializeUnit),
+        },
+      },
     });
 
     await updateRoom(roomId, { status: 'playing' });
@@ -749,13 +824,17 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     step: number,
     team: 'player' | 'enemy'
   ) => {
-    // Mirror axes for enemy team (host's perspective: enemy starts on rows 0-2).
+    // Mirror axes for enemy team (host perspective: player marches upward, enemy downward).
     const sign = team === 'player' ? 1 : -1;
     let dr = 0, dc = 0, maxSteps = 0;
     if (step === 0) { dr = 1 * sign;  dc = 0;          maxSteps = 2; }
     else if (step === 1) { dr = 0;     dc = dir * sign; maxSteps = 5; }
     else if (step === 2) { dr = -1 * sign; dc = 0;     maxSteps = 5; }
     if (dr === 0 && dc === 0) return;
+    const rowCount = grid.length;
+    const colCount = grid[0]?.length ?? GRID_SIZE;
+    const arenaTop = GRID_SIZE;
+    const arenaBottom = GRID_SIZE * 2;
     const teamUnits = units.filter(u => u.team === team && u.hp > 0 && !u.dead);
     const sorted = [...teamUnits].sort((a, b) => {
       if (dr > 0) return b.row - a.row;
@@ -768,13 +847,15 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       for (let s = 0; s < maxSteps; s++) {
         const nr = u.row + dr;
         const nc = u.col + dc;
-        if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) break;
+        if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
+        if (u.enteredArena && (nr < arenaTop || nr >= arenaBottom)) break;
         const tgt = grid[nr]?.[nc];
         if (!tgt) break;
         if (tgt.terrain === 'water') break;
         if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
         if (grid[u.row]?.[u.col]?.unit?.id === u.id) grid[u.row][u.col].unit = null;
         u.row = nr; u.col = nc;
+        if (u.row >= arenaTop && u.row < arenaBottom) u.enteredArena = true;
         grid[u.row][u.col].unit = u;
       }
     }
@@ -1234,8 +1315,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     return () => { if (battleRef.current) clearInterval(battleRef.current); };
   }, [phase, isHost, battleTick]);
 
-  const gameOver = playerScore >= POINTS_TO_WIN || enemyScore >= POINTS_TO_WIN;
-  const gameWon = playerScore >= POINTS_TO_WIN;
+  const gameOver = playerScore >= ROUNDS_TO_WIN || enemyScore >= ROUNDS_TO_WIN;
+  const gameWon = playerScore >= ROUNDS_TO_WIN;
 
   // Next round
   const nextRound = useCallback(async () => {
@@ -1355,7 +1436,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     recordedRoundRef.current = roundNumber;
     // Host: playerUnits = player1, enemyUnits = player2
     const placements = [
-      ...playerUnits.map(u => ({ team: 'player1' as const, type: u.type, color: (u as any).color, row: u.row, col: u.col, hp: u.hp })),
+      ...playerUnits.map(u => ({ team: 'player1' as const, type: u.type, color: (u as any).color, row: Math.max(0, u.row - GRID_SIZE * 2), col: u.col, hp: u.hp })),
       ...enemyUnits.map(u => ({ team: 'player2' as const, type: u.type, color: (u as any).color, row: u.row, col: u.col, hp: u.hp })),
     ];
     matchRecorder.startRound(roundNumber, placements);
@@ -1389,8 +1470,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     playerUnits, enemyUnits, turnCount, battleLog, battleEvents, battleTimer,
     playerScore, enemyScore, roundNumber,
     playerStarts: true,
-    playerMaxUnits: getMaxUnits(playerScore, enemyScore, roundNumber),
-    enemyMaxUnits: getMaxUnits(playerScore, enemyScore, roundNumber),
+    playerMaxUnits,
+    enemyMaxUnits,
     gameOver, gameWon, gameDraw: false,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
