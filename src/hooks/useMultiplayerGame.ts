@@ -456,98 +456,50 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     });
   }, [phase, isMyTurnToPlace]);
 
-  // Confirm placement
-  const confirmPlacement = useCallback(async () => {
-    if (!isMyTurnRef.current) return;
+  // Surrender: end the round, opponent gets the point.
+  const surrenderRound = useCallback(() => {
+    if (phaseRef.current === 'round_won' || phaseRef.current === 'round_lost' || phaseRef.current === 'round_draw') return;
+    setEnemyScore(s => s + 1);
+    setPhase('round_lost');
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'game_sync',
+      payload: { action: 'surrender', data: {} },
+    });
+  }, []);
 
-    const currentPlacingPhase = placingPhaseRef.current;
+  // Confirm placement: simultaneous — set ready, opponent does the same independently.
+  // Host starts battle once BOTH are ready.
+  const confirmPlacement = useCallback(async () => {
+    if (myReadyRef.current || phaseRef.current !== 'place_player') return;
     const units = playerUnitsRef.current;
 
-    if (currentPlacingPhase === 'first') {
-      // First player done placing
-      if (units.length === 0) {
-        // No units placed → forfeit! Opponent gets the point
-        handleForfeit();
-        return;
-      }
-
-      const unitData = units.map(serializeUnit);
-      const field = isHost ? 'player1_units' : 'player2_units';
-      await updateRoom(roomId, { [field]: unitData });
-
-      // Broadcast to opponent: show units, start their turn
-      channelRef.current?.send({
-        type: 'broadcast',
-        event: 'game_sync',
-        payload: { action: 'first_placement_done', data: { units: unitData } },
-      });
-
-      // For the first placer, switch to waiting
-      setPlacingPhase('second');
-      
-      setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
-
-    } else if (currentPlacingPhase === 'second') {
-      // Second player done placing
-      if (units.length === 0) {
-        // No units → forfeit
-        handleForfeit();
-        return;
-      }
-
-      const unitData = units.map(serializeUnit);
-      const field = isHost ? 'player1_units' : 'player2_units';
-      await updateRoom(roomId, { [field]: unitData });
-
-      // Both players have placed → start battle
-      await startBattleFromPlacements();
-    }
-  }, [roomId, isHost]);
-
-  // Handle forfeit (no units placed)
-  const handleForfeit = useCallback(async () => {
-    const myPlayerNum = isHost ? 1 : 2;
-    const currentPhase = placingPhaseRef.current;
-
-    // Who forfeited? The current placer
-    const forfeitedPlayerNum = currentPhase === 'first' ? placingPlayer : (placingPlayer === 1 ? 2 : 1);
-    const iForfeited = forfeitedPlayerNum === myPlayerNum;
-
-    let newPScore = playerScore;
-    let newEScore = enemyScore;
-    let myPhase: Phase;
-    let opponentPhase: Phase;
-
-    if (iForfeited) {
-      // I forfeited → opponent gets point
-      newEScore += 1;
-      myPhase = 'round_lost';
-      opponentPhase = 'round_won';
-    } else {
-      // Opponent forfeited → I get point
-      newPScore += 1;
-      myPhase = 'round_won';
-      opponentPhase = 'round_lost';
+    // Empty placement = surrender this round
+    if (units.length === 0) {
+      surrenderRound();
+      return;
     }
 
-    setPlayerScore(newPScore);
-    setEnemyScore(newEScore);
-    setPhase(myPhase);
-    setPlacingPhase('done');
+    const unitData = units.map(serializeUnit);
+    const field = isHost ? 'player1_units' : 'player2_units';
+    const readyField = isHost ? 'player1_ready' : 'player2_ready';
+    await updateRoom(roomId, { [field]: unitData, [readyField]: true });
+
+    setMyReady(true);
+    myReadyRef.current = true;
 
     channelRef.current?.send({
       type: 'broadcast',
       event: 'game_sync',
-      payload: {
-        action: 'first_placement_forfeit',
-        data: {
-          myScore: newEScore, // swapped for opponent
-          opponentScore: newPScore,
-          myPhase: opponentPhase,
-        },
-      },
+      payload: { action: 'ready_toggle', data: { ready: true, units: unitData } },
     });
-  }, [isHost, placingPlayer, playerScore, enemyScore]);
+
+    // Host: if opponent already ready → start battle now.
+    if (isHost && opponentReadyRef.current) {
+      setTimeout(() => startBattleRef.current?.(), 100);
+    }
+  }, [roomId, isHost, surrenderRound]);
+
 
   // Start battle after both placed
   const startBattleFromPlacements = useCallback(async () => {
