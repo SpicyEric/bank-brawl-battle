@@ -219,6 +219,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           // Sync focus fire state
           if (data.enemyFocusFire) setFocusFireActive(true);
           else setFocusFireActive(false);
+          // Sync flank active state from host (guest's units = enemy team on host)
+          const myFlank = data.enemyFlankActive as -1 | 1 | null | undefined;
+          setFlankActive(myFlank === -1 ? 'left' : myFlank === 1 ? 'right' : null);
         }
       }
 
