@@ -796,7 +796,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             const enemiesOnField = allUnits.some(u => u.team !== team && u.hp > 0 && !u.dead && inBattlefield(u));
             if (enemiesOnField) return;
             const backDr = team === 'player' ? 1 : -1;
-            const myUnits = allUnits.filter(u => u.team === team && u.hp > 0 && !u.dead);
+            // Only units that are themselves inside the visible 8×8 fall back; units
+            // still marching in from their build zone keep advancing via formation movement.
+            const myUnits = allUnits.filter(u => u.team === team && u.hp > 0 && !u.dead && inBattlefield(u));
             // Sort so units closest to their base move first → no self-blocking.
             const sorted = [...myUnits].sort((a, b) => backDr > 0 ? b.row - a.row : a.row - b.row);
             for (const u of sorted) {
