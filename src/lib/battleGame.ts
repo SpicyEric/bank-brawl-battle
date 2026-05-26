@@ -1261,6 +1261,11 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
     baseAtk *= atkMul;
   }
 
+  // Doppel buff: 50% chance to add +5 ATK per stack
+  if (aStacks && aStacks.doppelChance50Plus5 > 0) {
+    if (Math.random() < 0.5) baseAtk += 5 * aStacks.doppelChance50Plus5;
+  }
+
   let dmg = baseAtk * (0.95 + Math.random() * 0.1);
 
   const aColor = getUnitColor(attacker);
