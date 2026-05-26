@@ -1303,13 +1303,15 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           : (afT && unit.team === 'enemy') ? afT
           : findTarget(unit, battlefieldUnits);
         if (!target) {
-          // No reachable enemy on the battlefield → fast retreat (up to 3 cells toward own base).
-          const backDr = unit.team === 'player' ? 1 : -1;
+          // No reachable enemy on the battlefield. Units that have already entered
+          // the arena (one-way lock) MUST NOT retreat — they hold position. Units
+          // still outside walk FORWARD into the arena instead of backward.
           const rowCount = newGrid.length;
           const colCount = newGrid[0]?.length ?? GRID_SIZE;
-          if (!isFrozenNow && !seekerHolds && !shouldSkipMove(unit)) {
+          const forwardDr = unit.team === 'player' ? -1 : 1; // toward arena center
+          if (!isFrozenNow && !seekerHolds && !shouldSkipMove(unit) && !unit.enteredArena) {
             for (let s = 0; s < 3; s++) {
-              const nr = unit.row + backDr;
+              const nr = unit.row + forwardDr;
               const nc = unit.col;
               if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
               const tgt = newGrid[nr]?.[nc];
@@ -1318,6 +1320,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
               if (tgt.unit && tgt.unit.id !== unit.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
               if (newGrid[unit.row]?.[unit.col]?.unit?.id === unit.id) newGrid[unit.row][unit.col].unit = null;
               unit.row = nr;
+              if (unit.row >= VIEW_TOP && unit.row < VIEW_BOTTOM) unit.enteredArena = true;
               newGrid[unit.row][unit.col].unit = unit;
             }
           }
