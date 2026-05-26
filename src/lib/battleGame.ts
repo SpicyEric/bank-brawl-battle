@@ -759,6 +759,16 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
 
+  // === AURA AGGRO: forceAggro stacks (taunt / cloner / doppelganger pull) ===
+  const aggroEnemies = enemies.filter(e => (e.auraStacks?.forceAggro ?? 0) > 0);
+  if (aggroEnemies.length > 0) {
+    aggroEnemies.sort((a, b) =>
+      ((b.auraStacks?.forceAggro ?? 0) - (a.auraStacks?.forceAggro ?? 0)) ||
+      (distance(unit, a) - distance(unit, b))
+    );
+    return aggroEnemies[0];
+  }
+
   // === LAMB TAUNT: enemy lamb provokes ALL units within a 7x7 area (Chebyshev ≤ 3). ===
   const enemyLamb = enemies.find(e => e.type === 'lamb' && distance(unit, e) <= 3);
   if (enemyLamb) {
