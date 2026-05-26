@@ -90,6 +90,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const isHost = role === 'player1';
   const myRows = isHost ? PLAYER_ROWS : ENEMY_ROWS;
   const myTeam = isHost ? 'player' as const : 'enemy' as const;
+  const playerMaxUnits = getRoundUnitLimit(roundNumber);
+  const enemyMaxUnits = playerMaxUnits;
 
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
@@ -101,6 +103,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const [battleLog, setBattleLog] = useState<string[]>([]);
   const [playerScore, setPlayerScore] = useState(0);
   const [enemyScore, setEnemyScore] = useState(0);
+  const playerScoreRef = useRef(0);
+  const enemyScoreRef = useRef(0);
   const [roundNumber, setRoundNumber] = useState(1);
   const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
@@ -159,6 +163,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const phaseRef = useRef(phase);
   const playerUnitsRef = useRef(playerUnits);
+  const enemyUnitsRef = useRef(enemyUnits);
+  const turnCountRef = useRef(0);
   const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hadBothPlayersRef = useRef(false);
   const myReadyRef = useRef(false);
@@ -176,9 +182,17 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Keep refs in sync
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
+  useEffect(() => { enemyUnitsRef.current = enemyUnits; }, [enemyUnits]);
   useEffect(() => { isMyTurnRef.current = isMyTurnToPlace; }, [isMyTurnToPlace]);
   useEffect(() => { myReadyRef.current = myReady; }, [myReady]);
   useEffect(() => { opponentReadyRef.current = opponentReady; }, [opponentReady]);
+  useEffect(() => { playerScoreRef.current = playerScore; }, [playerScore]);
+  useEffect(() => { enemyScoreRef.current = enemyScore; }, [enemyScore]);
+
+  const auraRef = useRef<{ zones: AuraZoneMap; effects: AuraEffectMap }>({ zones: {}, effects: {} });
+  useEffect(() => {
+    loadAuraData().then(d => { auraRef.current = d; }).catch(() => {});
+  }, []);
 
   // Setup broadcast channel
   useEffect(() => {
