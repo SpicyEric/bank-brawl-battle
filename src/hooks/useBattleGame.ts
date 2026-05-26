@@ -66,6 +66,13 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const aiDripStartedRef = useRef(false);
   const aiDripTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
+  // Aura data (loaded once)
+  const auraRef = useRef<{ zones: AuraZoneMap; effects: AuraEffectMap }>({ zones: {}, effects: {} });
+  useEffect(() => {
+    loadAuraData().then(d => { auraRef.current = d; }).catch(() => {});
+  }, []);
+
+
   // Fatigue system:
   // - Slot mode (roster): key = slot index (0..8). One slot = one bench-able unit instance.
   // - Legacy mode: key = unit type.
