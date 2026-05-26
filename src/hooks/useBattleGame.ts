@@ -86,8 +86,15 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
   // - Legacy mode: key = unit type.
   const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
   const [enemyFatigue, setEnemyFatigue] = useState<Record<string, number>>({});
+  // Handicap locks the last `handicap` roster slots for the entire match.
+  const handicapBannedSlots: number[] = hasRoster && safeHandicap > 0
+    ? Array.from({ length: safeHandicap }, (_, i) => 9 - 1 - i)
+    : [];
   const playerBannedSlots: number[] = hasRoster
-    ? roster!.map((_, i) => i).filter(i => (playerFatigue[i] || 0) >= 1)
+    ? Array.from(new Set([
+        ...roster!.map((_, i) => i).filter(i => (playerFatigue[i] || 0) >= 1),
+        ...handicapBannedSlots,
+      ]))
     : [];
   const playerBannedUnits: UnitType[] = hasRoster
     ? [] // not used in slot mode (picker uses bannedSlots)
