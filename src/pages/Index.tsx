@@ -39,6 +39,8 @@ function ScoreDots({ score, max, color }: { score: number; max: number; color: '
 function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | 'player2' }) {
   const [roster, setRoster] = useState<UnitType[] | null>(null);
   const [opponentRoster, setOpponentRoster] = useState<UnitType[] | undefined>(undefined);
+  const [ownHandicap, setOwnHandicap] = useState(0);
+  const [opponentHandicap, setOpponentHandicap] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -49,12 +51,16 @@ function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | '
         const room: any = await getRoomById(roomId);
         const field = role === 'player1' ? 'player1_roster' : 'player2_roster';
         const oppField = role === 'player1' ? 'player2_roster' : 'player1_roster';
+        const ownHandiField = role === 'player1' ? 'player1_handicap' : 'player2_handicap';
+        const oppHandiField = role === 'player1' ? 'player2_handicap' : 'player1_handicap';
         const list = (room?.[field] as UnitType[] | null) || null;
         const oppList = (room?.[oppField] as UnitType[] | null) || undefined;
         if (cancelled) return;
         if (list && list.length === 9) setRoster(list);
         else setLoadError('Roster nicht gefunden');
         if (oppList && oppList.length === 9) setOpponentRoster(oppList);
+        setOwnHandicap(Number(room?.[ownHandiField] ?? 0) || 0);
+        setOpponentHandicap(Number(room?.[oppHandiField] ?? 0) || 0);
       } catch (e: any) {
         if (!cancelled) setLoadError(e.message || 'Roster konnte nicht geladen werden');
       }
@@ -68,21 +74,81 @@ function MultiplayerGame({ roomId, role }: { roomId: string; role: 'player1' | '
   if (!roster) {
     return <div className="min-h-[100dvh] flex items-center justify-center text-muted-foreground text-sm">Lade Roster…</div>;
   }
-  return <MultiplayerGameInner roomId={roomId} role={role} roster={roster} opponentRoster={opponentRoster} />;
+  return <MultiplayerGameInner roomId={roomId} role={role} roster={roster} opponentRoster={opponentRoster} ownHandicap={ownHandicap} opponentHandicap={opponentHandicap} />;
 }
 
-function MultiplayerGameInner({ roomId, role, roster, opponentRoster }: { roomId: string; role: 'player1' | 'player2'; roster: UnitType[]; opponentRoster?: UnitType[] }) {
-  const game = useMultiplayerGame({ roomId, role, roster, opponentRoster });
-  return <GameUI game={game} isMultiplayer flipped={role === 'player2'} roster={roster} />;
+function MultiplayerGameInner({ roomId, role, roster, opponentRoster, ownHandicap, opponentHandicap }: { roomId: string; role: 'player1' | 'player2'; roster: UnitType[]; opponentRoster?: UnitType[]; ownHandicap: number; opponentHandicap: number }) {
+  const game = useMultiplayerGame({ roomId, role, roster, opponentRoster, ownHandicap, opponentHandicap });
+  const [showOverview, setShowOverview] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setShowOverview(false), 3000);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <>
+      <GameUI game={game} isMultiplayer flipped={role === 'player2'} roster={roster} />
+      {showOverview && (
+        <HandicapOverview
+          ownHandicap={ownHandicap}
+          opponentHandicap={opponentHandicap}
+          isHost={role === 'player1'}
+          onClose={() => setShowOverview(false)}
+        />
+      )}
+    </>
+  );
+}
+
+function HandicapDots({ value, max = 3 }: { value: number; max?: number }) {
+  return (
+    <span className="inline-flex gap-1 align-middle">
+      {Array.from({ length: max }).map((_, i) => (
+        <span
+          key={i}
+          className={`w-2 h-2 rounded-full ${
+            i < value ? 'bg-danger shadow-[0_0_6px_hsl(var(--danger))]' : 'bg-muted/40 border border-border'
+          }`}
+        />
+      ))}
+    </span>
+  );
+}
+
+function HandicapOverview({ ownHandicap, opponentHandicap, isHost, onClose }: { ownHandicap: number; opponentHandicap: number; isHost: boolean; onClose: () => void }) {
+  const ownLabel = isHost ? 'Spieler A (Du)' : 'Spieler B (Du)';
+  const oppLabel = isHost ? 'Spieler B' : 'Spieler A';
+  const row = (label: string, h: number) => (
+    <div className="flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-card border border-border">
+      <span className="font-semibold text-sm text-foreground">{label}</span>
+      <div className="flex items-center gap-3">
+        <span className="font-mono text-sm text-foreground">{9 - h} Einheiten</span>
+        {h > 0 ? <HandicapDots value={h} /> : <span className="text-[10px] uppercase tracking-wider text-muted-foreground">kein Handicap</span>}
+      </div>
+    </div>
+  );
+  return (
+    <div
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-background/85 backdrop-blur-sm px-6"
+    >
+      <div className="w-full max-w-sm space-y-3">
+        <h2 className="text-center text-lg font-extrabold text-foreground mb-2">⚔️ Match-Übersicht</h2>
+        {row(ownLabel, ownHandicap)}
+        {row(oppLabel, opponentHandicap)}
+        <p className="text-center text-[11px] text-muted-foreground mt-2">Tippen zum Schließen</p>
+      </div>
+    </div>
+  );
 }
 
 function SinglePlayerGame() {
   const [searchParams] = useSearchParams();
   const difficulty = parseInt(searchParams.get('difficulty') || '3', 10);
   const rosterParam = searchParams.get('roster');
+  const handicap = parseInt(searchParams.get('handicap') || '0', 10) || 0;
   const roster = rosterParam ? (rosterParam.split(',').filter(Boolean) as UnitType[]) : undefined;
   const validRoster = roster && roster.length === 9 ? roster : undefined;
-  const game = useBattleGame(difficulty, validRoster);
+  const game = useBattleGame(difficulty, validRoster, handicap);
   return <GameUI game={game} isMultiplayer={false} roster={validRoster} />;
 }
 
