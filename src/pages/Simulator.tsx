@@ -15,8 +15,6 @@ const Simulator = () => {
   const [total, setTotal] = useState(0);
   const [report, setReport] = useState<SimReport | null>(null);
   const [count, setCount] = useState(500);
-  const [teamSize, setTeamSize] = useState(5);
-  const [mode, setMode] = useState<TeamMode>('random');
 
   const run = async () => {
     if (running) return;
@@ -26,8 +24,8 @@ const Simulator = () => {
     setTotal(count);
     try {
       const r = await runSimulation(count, {
-        teamSize,
-        mode,
+        teamSize: 9,
+        mode: 'random',
         onProgress: (done, all) => { setProgress(done); setTotal(all); },
       });
       setReport(r);
