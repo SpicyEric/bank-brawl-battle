@@ -913,6 +913,45 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   {(unit.obeliskBuff || 0) > 0 && (
                     <div className="absolute inset-0 z-0 pointer-events-none rounded-sm cell-obelisk-buff" />
                   )}
+                  {/* Aura stacks halo (buff / nerf / mixed) */}
+                  {unit.auraStacks && (unit.auraStacks.totalBuff > 0 || unit.auraStacks.totalNerf > 0) && (
+                    <div
+                      className={`absolute inset-0 z-0 pointer-events-none rounded-sm aura-halo ${
+                        unit.auraStacks.totalBuff > 0 && unit.auraStacks.totalNerf > 0
+                          ? 'aura-halo-mixed'
+                          : unit.auraStacks.totalBuff > 0
+                            ? 'aura-halo-buff'
+                            : 'aura-halo-nerf'
+                      }`}
+                    />
+                  )}
+                  {/* Stack count badge */}
+                  {unit.auraStacks && (unit.auraStacks.totalBuff + unit.auraStacks.totalNerf) > 0 && (
+                    <div className="absolute -top-1 -left-1 z-30 pointer-events-none flex gap-[1px]">
+                      {unit.auraStacks.totalBuff > 0 && (
+                        <span className="text-[8px] leading-none font-bold px-[2px] rounded bg-emerald-500/90 text-white shadow">
+                          +{unit.auraStacks.totalBuff}
+                        </span>
+                      )}
+                      {unit.auraStacks.totalNerf > 0 && (
+                        <span className="text-[8px] leading-none font-bold px-[2px] rounded bg-rose-600/90 text-white shadow">
+                          −{unit.auraStacks.totalNerf}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {/* Dodge flash */}
+                  {unit._justDodged && (Date.now() - unit._justDodged) < 600 && (
+                    <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
+                      <span className="text-[10px] font-extrabold text-sky-200 drop-shadow-[0_0_4px_rgba(56,189,248,0.95)] animate-fade-in">MISS</span>
+                    </div>
+                  )}
+                  {/* Crit flash */}
+                  {unit._justCrit && (Date.now() - unit._justCrit) < 500 && (
+                    <div className="absolute inset-0 z-30 pointer-events-none flex items-center justify-center">
+                      <span className="text-[10px] font-extrabold text-amber-200 drop-shadow-[0_0_4px_rgba(251,191,36,0.95)] animate-scale-in">CRIT!</span>
+                    </div>
+                  )}
                   <span
                     className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''} ${isPhantom ? 'opacity-70' : ''} ${unit.ghost && unit.ghost > 0 ? 'ghost-active' : ''}`}
                     style={{
