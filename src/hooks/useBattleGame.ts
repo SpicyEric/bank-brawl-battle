@@ -513,6 +513,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       applyAuraStacks(allUnits, auraRef.current.zones, auraRef.current.effects);
       // Apply per-tick regen / drain auras
       applyAuraTick(allUnits, []);
+      // Source-driven per-tick effects (doppelganger lifedrain)
+      applyAuraSourceEffects(allUnits, auraRef.current.zones, auraRef.current.effects, []);
 
 
 
