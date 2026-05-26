@@ -509,6 +509,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
 
+      // === Aura stacks: recompute every tick from current positions ===
+      applyAuraStacks(allUnits, auraRef.current.zones, auraRef.current.effects);
+
+
+
       // Visible 8x8 battlefield window = rows [GRID_SIZE .. 2*GRID_SIZE).
       // Combat (targeting + attacks) only happens against units inside this window.
       const VIEW_TOP = GRID_SIZE;
