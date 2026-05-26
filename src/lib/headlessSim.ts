@@ -450,12 +450,19 @@ function simulateOneBattle(
         }
         let dmg = calcDamage(unit, target, grid);
         if (isFrozenNow) dmg = Math.round(dmg * frozenMul);
+        // Phase-3 aura: damage-share / miss-chance / taunt reduction
+        dmg = applyDefenderShare(unit, target, dmg, allUnits, logs);
 
         const beforeHp = target.hp;
         target.hp = Math.max(0, target.hp - dmg);
         const dealt = beforeHp - target.hp;
         ensureStats(unit.id).damageDealt += dealt;
         ensureStats(target.id).damageTaken += dealt;
+
+        // Phase-2 aura on-attack triggers (splash, chain, bleed, fire, freeze, web, reflect, drain, weaken)
+        if (dmg > 0) {
+          applyAuraOnAttack({ attacker: unit, defender: target, dmg, allUnits, grid, logs, events });
+        }
 
         if (dmg > 0 && unit.type === 'waterwalker') {
           unit.seekerIdleTicks = 0;
