@@ -317,7 +317,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       if (currentPhase === 'battle' || currentPhase === 'round_won' || currentPhase === 'round_lost' || currentPhase === 'round_draw') {
         return true;
       }
-      return currentPhase === 'place_player' && placingPhaseRef.current === 'second';
+      return currentPhase === 'place_player' && (myReadyRef.current || opponentReadyRef.current);
     };
 
     const scheduleDisconnectCheck = () => {
