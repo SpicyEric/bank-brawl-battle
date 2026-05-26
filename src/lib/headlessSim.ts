@@ -50,16 +50,44 @@ export interface PairStat {
   vsWins: number; // a's wins
 }
 
+// Aggregated buff/nerf attribution across the whole simulation.
+// Key encodes recipient + source + effectKey + kind so we can find
+// "this unit, buffed by THIS unit with THIS effect, has X% winrate."
+export interface AuraAttribCell {
+  recipient: UnitType;
+  source: UnitType;
+  effectKey: string;
+  kind: 'buff' | 'nerf';
+  games: number;          // # battles where recipient had ≥1 stack from this source/effect
+  wins: number;           // # of those won by recipient's team
+  stacksSum: number;      // sum of max-stacks per battle (→ avg = stacksSum/games)
+  recipientSurvSum: number; // sum of recipient final HP% (→ avg)
+  recipientDmgSum: number;  // sum of recipient damage dealt (→ avg)
+}
+
+export interface BuffPerUnitCell {
+  recipient: UnitType;
+  effectKey: string;
+  kind: 'buff' | 'nerf';
+  games: number;
+  wins: number;
+  stacksSum: number;
+  recipientSurvSum: number;
+  recipientDmgSum: number;
+}
+
 export interface SimReport {
   battles: number;
   ticksTotal: number;
   draws: number;
   durationMs: number;
   perUnit: Record<UnitType, UnitStat>;
-  // Matchup matrix: matrix[a][b] = win rate (%) of a's team when b is on opposing team
   vsMatrix: Record<UnitType, Record<UnitType, { games: number; wins: number }>>;
-  // Synergy matrix: synergy[a][b] = win rate when a & b on same team (a !== b)
   synergyMatrix: Record<UnitType, Record<UnitType, { games: number; wins: number }>>;
+  // recipient|source|effectKey|kind  →  attribution cell
+  auraAttrib: Map<string, AuraAttribCell>;
+  // recipient|effectKey|kind  →  per-unit buff cell (collapsed across sources)
+  buffPerUnit: Map<string, BuffPerUnitCell>;
   rosterP1?: UnitType[];
   rosterP2?: UnitType[];
 }
@@ -86,7 +114,11 @@ function emptyReport(): SimReport {
       synergyMatrix[t][u] = { games: 0, wins: 0 };
     }
   }
-  return { battles: 0, ticksTotal: 0, draws: 0, durationMs: 0, perUnit, vsMatrix, synergyMatrix };
+  return {
+    battles: 0, ticksTotal: 0, draws: 0, durationMs: 0,
+    perUnit, vsMatrix, synergyMatrix,
+    auraAttrib: new Map(), buffPerUnit: new Map(),
+  };
 }
 
 function shuffle<T>(arr: T[]): T[] {
