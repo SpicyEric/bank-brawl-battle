@@ -624,15 +624,17 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
   // Always 9v9, AI builds full formations (auras, tank-bonds, clustering) per match.
   const n = opts.teamSize ?? 9;
 
+  // Load aura zones/effects once (admin-managed in unit_types table).
+  const { zones, effects } = await loadAuraData();
+
   for (let i = 0; i < battlesTotal; i++) {
     // Randomized difficulty per match → mix of weak / mid / OP formations.
-    // 2..5 covers Normal → Insane (uses counter-color, tank bonds, aura clustering).
     const diffP1 = 2 + Math.floor(Math.random() * 4);
     const diffP2 = 2 + Math.floor(Math.random() * 4);
 
     let result: BattleResult;
     try {
-      result = simulateOneBattle(n, diffP1, diffP2);
+      result = simulateOneBattle(n, diffP1, diffP2, zones, effects);
     } catch (err) {
       console.warn('[headlessSim] battle failed, skipping', err);
       continue;
@@ -655,8 +657,9 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
       const r = result.perId[m.id];
       if (!r) continue;
       s.games += 1;
+      const won = (result.winner === 'player' && m.team === 'player') || (result.winner === 'enemy' && m.team === 'enemy');
       if (result.winner === 'draw') s.draws += 1;
-      else if ((result.winner === 'player' && m.team === 'player') || (result.winner === 'enemy' && m.team === 'enemy')) s.wins += 1;
+      else if (won) s.wins += 1;
       else s.losses += 1;
       s.kills += r.kills;
       if (r.died) s.deaths += 1;
@@ -664,6 +667,43 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
       s.damageTaken += r.damageTaken;
       s.healingGiven += r.healingGiven;
       s.survivedHpPctSum += r.survivedHpPct;
+
+      // === Buff/Nerf attribution for this unit instance ===
+      const auraMap = result.auraSources[m.id];
+      if (auraMap) {
+        // Deduplicate per (effectKey,kind) at unit-level (recipient summary):
+        const seenPerUnit = new Set<string>();
+        for (const { source, effectKey, kind, stacks } of auraMap.values()) {
+          // Per (recipient, source, effect, kind) attribution
+          const akey = `${m.type}|${source}|${effectKey}|${kind}`;
+          let cell = report.auraAttrib.get(akey);
+          if (!cell) {
+            cell = { recipient: m.type, source, effectKey, kind, games: 0, wins: 0, stacksSum: 0, recipientSurvSum: 0, recipientDmgSum: 0 };
+            report.auraAttrib.set(akey, cell);
+          }
+          cell.games += 1;
+          if (won) cell.wins += 1;
+          cell.stacksSum += stacks;
+          cell.recipientSurvSum += r.survivedHpPct;
+          cell.recipientDmgSum += r.damageDealt;
+
+          // Per (recipient, effect, kind) — collapsed across sources
+          const bkey = `${m.type}|${effectKey}|${kind}`;
+          if (!seenPerUnit.has(bkey)) {
+            seenPerUnit.add(bkey);
+            let bcell = report.buffPerUnit.get(bkey);
+            if (!bcell) {
+              bcell = { recipient: m.type, effectKey, kind, games: 0, wins: 0, stacksSum: 0, recipientSurvSum: 0, recipientDmgSum: 0 };
+              report.buffPerUnit.set(bkey, bcell);
+            }
+            bcell.games += 1;
+            if (won) bcell.wins += 1;
+            bcell.stacksSum += stacks;
+            bcell.recipientSurvSum += r.survivedHpPct;
+            bcell.recipientDmgSum += r.damageDealt;
+          }
+        }
+      }
     }
 
     // vs-matrix (a from p1, b from p2)
@@ -687,7 +727,6 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
 
     if (opts.onProgress && (i % yieldEvery === 0 || i === battlesTotal - 1)) {
       opts.onProgress(i + 1, battlesTotal);
-      // Yield to UI so progress bar updates and tab doesn't lock
       await new Promise(r => setTimeout(r, 0));
     }
   }
