@@ -812,6 +812,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         return true;
       }).sort((a, b) => a.maxCooldown - b.maxCooldown);
 
+      // Doppelgänger phantoms must lose invulnerability in formation combat too.
+      // This used to live only in the non-formation branch, making phantoms unattackable forever.
+      tickPhantomTimers(allUnits, newGrid, logs);
+
       // === FORMATION_MODE (SP-only rewrite, Step 3+4) ============================
       // Individual movement AIs (lock-on, kiting, terrain seekers, dash, flying,
       // special tick patterns) are skipped here. Each unit auto-attacks the
@@ -1189,8 +1193,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       processLavaTick(newGrid, logs);
       // === Banshee ghost timer tick-down ===
       processGhostTick(allUnits, newGrid, logs);
-      // === Doppelganger phantom timers ===
-      tickPhantomTimers(allUnits, newGrid, logs);
+      // === Doppelganger phantom timers === handled before the mode split.
       // === Cloner: spawn clones every 6 ticks (max 3 lifetime) ===
       tickClonerSpawns(allUnits, newGrid, logs);
       // === Mage impulse: every 7 ticks push enemies in 7x7 outward ===
