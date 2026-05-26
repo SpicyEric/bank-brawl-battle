@@ -29,8 +29,9 @@ function createBattleWorldGrid(): Cell[][] {
   );
 }
 
-export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
+export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handicap: number = 0) {
   const hasRoster = !!(roster && roster.length === 9);
+  const safeHandicap = Math.max(0, Math.min(3, handicap | 0));
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
   // Slot-based selection (when roster present). Otherwise legacy type-based.
