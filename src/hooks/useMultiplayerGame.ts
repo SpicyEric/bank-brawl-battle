@@ -871,19 +871,33 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
 
+      // === Auras (SP parity): recompute zones + per-tick effects every tick ===
+      applyAuraStacks(allUnits, auraRef.current.zones, auraRef.current.effects);
+      applyAuraTick(allUnits, []);
+      applyAuraSourceEffects(allUnits, auraRef.current.zones, auraRef.current.effects, []);
+
+      // Visible 8×8 arena window (rows [GRID_SIZE, 2*GRID_SIZE)).
+      const VIEW_TOP = GRID_SIZE;
+      const VIEW_BOTTOM = GRID_SIZE * 2;
+      const inBattlefield = (u: Unit) => u.row >= VIEW_TOP && u.row < VIEW_BOTTOM;
+
       // Flank shifts (host applies for both: own = player team, opp = enemy team)
+      let flankShifting = false;
       if (flankActiveRef.current) {
+        flankShifting = true;
         applyFlankStep(newGrid, allUnits, flankActiveRef.current.dir, flankActiveRef.current.step, 'player');
         const ns = flankActiveRef.current.step + 1;
         if (ns >= 3) { flankActiveRef.current = null; setFlankActive(null); }
         else flankActiveRef.current = { dir: flankActiveRef.current.dir, step: ns };
       }
       if (opponentFlankRef.current) {
+        flankShifting = true;
         applyFlankStep(newGrid, allUnits, opponentFlankRef.current.dir, opponentFlankRef.current.step, 'enemy');
         const ns = opponentFlankRef.current.step + 1;
         if (ns >= 3) opponentFlankRef.current = null;
         else opponentFlankRef.current = { dir: opponentFlankRef.current.dir, step: ns };
       }
+
 
 
       // Tick down morale for both players (host tracks both)
