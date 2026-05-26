@@ -88,11 +88,13 @@ function getDeterministicFirstPlacer(roomId: string, roundNumber: number): 1 | 2
 }
 
 export function useMultiplayerGame(config: MultiplayerConfig) {
-  const { roomId, role, roster, opponentRoster } = config;
+  const { roomId, role, roster, opponentRoster, ownHandicap = 0, opponentHandicap = 0 } = config;
   const hasRoster = !!(roster && roster.length === 9);
   const isHost = role === 'player1';
   const myRows = isHost ? PLAYER_ROWS : ENEMY_ROWS;
   const myTeam = isHost ? 'player' as const : 'enemy' as const;
+  const safeOwnHandicap = Math.max(0, Math.min(3, ownHandicap | 0));
+  const safeOppHandicap = Math.max(0, Math.min(3, opponentHandicap | 0));
 
   const [grid, setGrid] = useState<Cell[][]>(() => generateTerrain(createEmptyGrid()));
   const [phase, setPhase] = useState<Phase>('place_player');
@@ -107,8 +109,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const playerScoreRef = useRef(0);
   const enemyScoreRef = useRef(0);
   const [roundNumber, setRoundNumber] = useState(1);
-  const playerMaxUnits = getRoundUnitLimit(roundNumber);
-  const enemyMaxUnits = playerMaxUnits;
+  const playerMaxUnits = getRoundUnitLimit(roundNumber, safeOwnHandicap);
+  const enemyMaxUnits = getRoundUnitLimit(roundNumber, safeOppHandicap);
   const [battleEvents, setBattleEvents] = useState<BattleEvent[]>([]);
   const [battleTimer, setBattleTimer] = useState(ROUND_TIME_LIMIT);
   const [opponentLeft, setOpponentLeft] = useState(false);
