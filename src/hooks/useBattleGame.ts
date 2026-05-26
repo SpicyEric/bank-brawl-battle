@@ -1286,6 +1286,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
                 newGrid[unit.row][unit.col].unit = null;
                 unit.row = newPos.row;
                 unit.col = newPos.col;
+                if (unit.row >= VIEW_TOP && unit.row < VIEW_BOTTOM) unit.enteredArena = true;
                 newGrid[unit.row][unit.col].unit = unit;
               }
             }
