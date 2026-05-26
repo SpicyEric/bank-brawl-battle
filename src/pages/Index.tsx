@@ -351,6 +351,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
           auraZones={auraZones}
           selectedFormationCells={selectedFormationCells}
           hideEnemyUnits={hideEnemyUnits}
+          hidePlayerUnits={hidePlayerUnits}
         />
 
 
