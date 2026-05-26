@@ -385,8 +385,18 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     if (enemyUnits.length > 0) return; // already filled (e.g. tutorial pre-fill)
     aiDripStartedRef.current = true;
 
-    // Plan placements once (random pass: difficulty 1 path → pure random)
-    const planned = generateAIPlacement([], enemyMaxUnits, grid, 1, enemyBannedUnits);
+    // Variable AI skill per placement phase – sometimes great combos, sometimes sloppy.
+    // Bias around the chosen difficulty, occasionally one notch worse/better.
+    const skillRoll = Math.random();
+    const dripDifficulty =
+      skillRoll < 0.15 ? 1 :
+      skillRoll < 0.50 ? Math.max(1, difficulty - 1) :
+      skillRoll < 0.85 ? difficulty :
+      Math.min(5, difficulty + 1);
+
+    // Plan placements once with chosen skill (clustering / tank-bonds kick in at higher difficulty).
+    const planned = generateAIPlacement([], enemyMaxUnits, grid, dripDifficulty, enemyBannedUnits);
+    aiDripPendingRef.current = planned.slice();
     const count = planned.length;
     if (count === 0) return;
     const totalDripMs = 10000; // place all within first 10 seconds
@@ -405,6 +415,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           });
           return [...prev, u];
         });
+        // Remove from pending plan once placed.
+        aiDripPendingRef.current = aiDripPendingRef.current.filter(x => !(x.row === p.row && x.col === p.col));
       }, idx * stepMs);
       aiDripTimeoutsRef.current.push(t);
     });
@@ -412,7 +424,36 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     return () => {
       // Don't cancel on every render; only on phase exit which is handled below.
     };
-  }, [phase, enemyMaxUnits, enemyBannedUnits, difficulty]);
+  }, [phase, enemyMaxUnits, enemyBannedUnits, difficulty, grid]);
+
+  // Spy: instantly flush all remaining planned AI placements onto the board.
+  const revealAIPlacement = useCallback(() => {
+    for (const t of aiDripTimeoutsRef.current) clearTimeout(t);
+    aiDripTimeoutsRef.current = [];
+    const remaining = aiDripPendingRef.current.slice();
+    aiDripPendingRef.current = [];
+    if (remaining.length === 0) return;
+    setEnemyUnits(prev => {
+      const occupied = new Set(prev.map(u => `${u.row},${u.col}`));
+      const additions: Unit[] = [];
+      for (const p of remaining) {
+        const key = `${p.row},${p.col}`;
+        if (occupied.has(key)) continue;
+        occupied.add(key);
+        additions.push(createUnit(p.type, 'enemy', p.row, p.col));
+      }
+      if (additions.length === 0) return prev;
+      setGrid(g => {
+        const next = g.map(r => r.map(c => ({ ...c })));
+        for (const u of additions) {
+          if (next[u.row]?.[u.col]?.unit) continue;
+          next[u.row][u.col] = { ...next[u.row][u.col], unit: u };
+        }
+        return next;
+      });
+      return [...prev, ...additions];
+    });
+  }, []);
 
   // Reset AI-drip flag when leaving placement (so a new match drips again)
   useEffect(() => {
