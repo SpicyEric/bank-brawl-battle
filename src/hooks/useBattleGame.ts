@@ -786,6 +786,37 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         }
         if (!flankShifting) moveTeamFormations('player');
         moveTeamFormations('enemy');
+
+        // === Fast retreat: if no enemy is on the visible 8x8, units back off 3 cells/tick.
+        // Suppressed during flank maneuver so the forced sideways/forward shifts aren't undone.
+        if (!flankShifting) {
+          const rowCount = newGrid.length;
+          const colCount = newGrid[0]?.length ?? GRID_SIZE;
+          const retreatTeam = (team: 'player' | 'enemy') => {
+            const enemiesOnField = allUnits.some(u => u.team !== team && u.hp > 0 && !u.dead && inBattlefield(u));
+            if (enemiesOnField) return;
+            const backDr = team === 'player' ? 1 : -1;
+            const myUnits = allUnits.filter(u => u.team === team && u.hp > 0 && !u.dead);
+            // Sort so units closest to their base move first → no self-blocking.
+            const sorted = [...myUnits].sort((a, b) => backDr > 0 ? b.row - a.row : a.row - b.row);
+            for (const u of sorted) {
+              for (let s = 0; s < 3; s++) {
+                const nr = u.row + backDr;
+                const nc = u.col;
+                if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
+                const tgt = newGrid[nr]?.[nc];
+                if (!tgt) break;
+                if (tgt.terrain === 'water') break;
+                if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
+                if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
+                u.row = nr; u.col = nc;
+                newGrid[u.row][u.col].unit = u;
+              }
+            }
+          };
+          retreatTeam('player');
+          retreatTeam('enemy');
+        }
       } else {
 
 
