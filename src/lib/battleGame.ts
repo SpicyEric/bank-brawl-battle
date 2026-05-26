@@ -87,13 +87,21 @@ export interface Unit {
   laneCol?: number;
   laneBroken?: boolean; // once true, unit drops lane discipline for the rest of combat
   laneStuckTicks?: number; // ticks in a row where no forward-in-lane move was possible
-  // --- Aura runtime (Phase 1, see auraEffects.ts) ---
+  // --- Aura runtime (Phase 1 + 2, see auraEffects.ts) ---
   auraStacks?: import('./auraEffects').AuraStacks;
-  _baseMaxHp?: number;       // baseline maxHp before any aura-driven max_hp% bonuses
-  _justDodged?: number;      // ms timestamp – last dodge (for visual)
-  _justCrit?: number;        // ms timestamp – last crit (for visual)
-  _justRegen?: number;       // ms timestamp – last aura regen tick
-  _justDrain?: number;       // ms timestamp – last aura drain tick
+  _baseMaxHp?: number;
+  _justDodged?: number;
+  _justCrit?: number;
+  _justRegen?: number;
+  _justDrain?: number;
+  _justAuraTrigger?: number;
+  // Phase-2 temporary debuffs applied by aura triggers
+  auraDmgTakenMul?: number;     // weaken_50%_2t: incoming dmg multiplier
+  auraWeakenTicks?: number;
+  auraAtkDebuff?: number;       // archer aura: flat ATK reduction
+  auraAtkDebuffTicks?: number;
+  auraAtkBuff?: number;         // archer nerf: flat ATK boost to enemy
+  auraAtkBuffTicks?: number;
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
