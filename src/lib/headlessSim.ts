@@ -612,7 +612,7 @@ function simulateOneBattle(
   }
 
   const unitMeta = Array.from(allUnitsIdx.entries()).map(([id, meta]) => ({ id, type: meta.type, team: meta.team }));
-  return { winner, ticks: turn + 1, unitMeta, perId, finalAlive };
+  return { winner, ticks: turn + 1, unitMeta, perId, finalAlive, auraSources };
 }
 
 // ============== Public API ==============
