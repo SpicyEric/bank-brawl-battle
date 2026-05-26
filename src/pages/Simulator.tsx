@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Play, Download, Loader2, Zap } from 'lucide-react';
-import { runSimulation, rankUnits, flattenMatchups, flattenSynergies, reportToCsv, type SimReport, type TeamMode } from '@/lib/headlessSim';
+import { runSimulation, rankUnits, flattenMatchups, flattenSynergies, reportToCsv, type SimReport } from '@/lib/headlessSim';
 import { UNIT_DEFS, UNIT_TYPES } from '@/lib/battleGame';
 import { toast } from 'sonner';
 import menuBg from '@/assets/menu-bg.png';
@@ -15,8 +15,6 @@ const Simulator = () => {
   const [total, setTotal] = useState(0);
   const [report, setReport] = useState<SimReport | null>(null);
   const [count, setCount] = useState(500);
-  const [teamSize, setTeamSize] = useState(5);
-  const [mode, setMode] = useState<TeamMode>('random');
 
   const run = async () => {
     if (running) return;
@@ -26,8 +24,8 @@ const Simulator = () => {
     setTotal(count);
     try {
       const r = await runSimulation(count, {
-        teamSize,
-        mode,
+        teamSize: 9,
+        mode: 'random',
         onProgress: (done, all) => { setProgress(done); setTotal(all); },
       });
       setReport(r);
@@ -94,28 +92,11 @@ const Simulator = () => {
                 className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-secondary text-secondary-foreground w-24" />
             </div>
           </div>
-          <div>
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Team-Größe</label>
-            <div className="flex gap-2 mt-2">
-              {[3, 5, 7, 9].map(n => (
-                <button key={n} onClick={() => setTeamSize(n)} disabled={running}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-all ${teamSize === n ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground hover:bg-accent'}`}>
-                  {n}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wide">Modus</label>
-            <div className="flex gap-2 mt-2">
-              {(['random'] as TeamMode[]).map(m => (
-                <button key={m} onClick={() => setMode(m)} disabled={running}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-semibold capitalize ${mode === m ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'}`}>
-                  Zufall vs. Zufall
-                </button>
-              ))}
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-2">Zu Beginn der Simulation zieht jeder Spieler einen festen {9}er-Roster aus 9 <b>unterschiedlichen</b> Einheiten (unterschiedlich pro Spieler). Pro Match werden dann zufällig {teamSize} Einheiten <b>mit Wiederholung</b> aus diesem Roster auf zufällige Positionen platziert – so kommen auch Mono-Teams (z.B. 5× Bogenschütze) ganz natürlich vor.</p>
+          <div className="rounded-lg bg-secondary/40 border border-border/60 p-3">
+            <div className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-1">Modus</div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              Jedes Match: <b>9 vs 9</b>. Beide Teams werden vom <b>KI-Formationsbauer</b> auf das volle 8×8-Feld gestellt – mit Aura-Buffs, Tank-Bonds, Clustering und Konter-Farben (RPS). Schwierigkeit wird pro Match zufällig (Normal → Insane) variiert, damit du sowohl <b>kranke OP-Stacks</b> als auch lockere Formationen siehst. Einheiten dürfen mehrfach vorkommen.
+            </p>
           </div>
 
           <button onClick={run} disabled={running}

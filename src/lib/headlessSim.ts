@@ -16,6 +16,7 @@ import {
   tickObeliskAura, tickBomberActions, tickBombFuses, tickShadowpriestHarvest,
   applyPostAttackEffects, applyDeathEffects, applyMirrorReflect, applyChainAttack,
   applyShadowpriestCurse, handleShadowbladeTick,
+  generateAIPlacement,
 } from '@/lib/battleGame';
 import type { BattleEvent } from '@/lib/battleEvents';
 
@@ -147,26 +148,34 @@ interface BattleResult {
 }
 
 // ============== The full headless tick loop ==============
-function simulateOneBattle(p1Types: UnitType[], p2Types: UnitType[]): BattleResult {
+function simulateOneBattle(teamSize: number, difficultyP1: number, difficultyP2: number): BattleResult {
   const grid = generateTerrain(createEmptyGrid());
   const colorOf = (i: number): ColorGroup => (i < 3 ? 'red' : i < 6 ? 'green' : 'blue');
 
-  const place = (types: UnitType[], team: 'player' | 'enemy', rows: number[]) => {
-    const cells = shuffle(getOpenCells(rows, grid));
-    const units: Unit[] = [];
-    types.forEach((t, i) => {
-      if (i >= cells.length) return;
-      const { row, col } = cells[i];
-      const u = createUnit(t, team, row, col, colorOf(i), i);
-      grid[row][col].unit = u;
-      units.push(u);
-    });
-    return units;
-  };
+  // Team 1 placement: use real AI formation builder (auras, tank-bonds, clustering).
+  const p1Plan = generateAIPlacement([], teamSize, grid, difficultyP1, []);
+  const pUnits: Unit[] = [];
+  p1Plan.forEach((p, i) => {
+    if (grid[p.row][p.col].unit) return;
+    const u = createUnit(p.type, 'player', p.row, p.col, colorOf(i), i);
+    grid[p.row][p.col].unit = u;
+    pUnits.push(u);
+  });
 
-  const pUnits = place(p1Types, 'player', PLAYER_ROWS);
-  const eUnits = place(p2Types, 'enemy', ENEMY_ROWS);
+  // Team 2 placement: passes pUnits so AI can counter player's color composition.
+  const p2Plan = generateAIPlacement(pUnits, teamSize, grid, difficultyP2, []);
+  const eUnits: Unit[] = [];
+  p2Plan.forEach((p, i) => {
+    if (grid[p.row][p.col].unit) return;
+    const u = createUnit(p.type, 'enemy', p.row, p.col, colorOf(i), i);
+    grid[p.row][p.col].unit = u;
+    eUnits.push(u);
+  });
+
   setBondsForPlacement([...pUnits, ...eUnits]);
+  const p1Types = pUnits.map(u => u.type);
+  const p2Types = eUnits.map(u => u.type);
+  void p1Types; void p2Types;
 
   // Per-id stats accumulator (covers original placed units; clones/phantoms still get the kill credit via attacker id mapping below)
   const allUnitsIdx = new Map<string, { type: UnitType; team: 'player' | 'enemy' }>();
@@ -503,39 +512,18 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
   const t0 = performance.now();
   const yieldEvery = opts.yieldEvery ?? 50;
 
-  const rSize = opts.rosterSize ?? 9;
-  const n = opts.teamSize ?? 5;
-  const mode = opts.mode ?? 'random';
-
-  // Build fixed per-simulation rosters of UNIQUE units (different for each player).
-  // These stay the same for ALL matches in this simulation run.
-  let rosterP1: UnitType[];
-  let rosterP2: UnitType[];
-  if (mode === 'roster' && opts.rosterP1 && opts.rosterP2) {
-    rosterP1 = [...opts.rosterP1];
-    rosterP2 = [...opts.rosterP2];
-  } else {
-    rosterP1 = drawUniqueRoster(rSize);
-    do { rosterP2 = drawUniqueRoster(rSize); }
-    while (UNIT_TYPES.length > rSize && rosterP1.every((u, i) => u === rosterP2[i]));
-  }
-  report.rosterP1 = [...rosterP1];
-  report.rosterP2 = [...rosterP2];
+  // Always 9v9, AI builds full formations (auras, tank-bonds, clustering) per match.
+  const n = opts.teamSize ?? 9;
 
   for (let i = 0; i < battlesTotal; i++) {
-    let p1: UnitType[]; let p2: UnitType[];
-    if (mode === 'pure' && opts.pureType) {
-      p1 = Array.from({ length: n }, () => opts.pureType!);
-      p2 = pickWithReplacement(rosterP2, n);
-    } else {
-      // Pick 5 (teamSize) WITH replacement from each player's fixed 9-unit roster.
-      // Duplicates → mono compositions naturally appear across many matches.
-      p1 = pickWithReplacement(rosterP1, n);
-      p2 = pickWithReplacement(rosterP2, n);
-    }
+    // Randomized difficulty per match → mix of weak / mid / OP formations.
+    // 2..5 covers Normal → Insane (uses counter-color, tank bonds, aura clustering).
+    const diffP1 = 2 + Math.floor(Math.random() * 4);
+    const diffP2 = 2 + Math.floor(Math.random() * 4);
+
     let result: BattleResult;
     try {
-      result = simulateOneBattle(p1, p2);
+      result = simulateOneBattle(n, diffP1, diffP2);
     } catch (err) {
       console.warn('[headlessSim] battle failed, skipping', err);
       continue;
