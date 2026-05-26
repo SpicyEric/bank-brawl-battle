@@ -108,7 +108,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
   const [spying, setSpying] = useState(false);
   const spyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerSpy = () => {
-    if (spyUsed || isMultiplayer) return;
+    if (spyUsed) return;
     if (game.phase !== 'place_player') return;
     // Flush all pending AI placements so player sees the final formation immediately.
     game.revealAIPlacement?.();
@@ -126,15 +126,14 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
       setSpyUsed(false);
       setSpying(false);
     } else {
-      // Hide enemies again as soon as placement ends.
       setSpying(false);
     }
     if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
   }, [game.phase, matchId]);
   // Hide enemies during placement unless the spy was used this phase.
-  const hideEnemyUnits = !isMultiplayer && game.phase === 'place_player' && !spying;
+  const hideEnemyUnits = game.phase === 'place_player' && !spying;
   // During the 3-second spy reveal, hide our own units so the enemy board is solo.
-  const hidePlayerUnits = !isMultiplayer && game.phase === 'place_player' && spying;
+  const hidePlayerUnits = game.phase === 'place_player' && spying;
 
   // Aura zones (loaded once from DB), recomputed overlay each render based on placed units
   const [auraZones, setAuraZones] = useState<import('@/lib/auraData').AuraZoneMap>({});
@@ -147,8 +146,10 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
   }, []);
   const auraOverlay = useMemo(() => {
     if (game.phase !== 'place_player') return undefined;
+    // While spying the enemy board, hide our own aura overlays so only the enemy field is visible.
+    if (spying) return undefined;
     return computeAuraOverlay(game.playerUnits ?? [], auraZones);
-  }, [game.playerUnits, game.phase, auraZones]);
+  }, [game.playerUnits, game.phase, auraZones, spying]);
 
   // Formation selection (combat-phase: tap own unit → select formation → tap adjacent cell → move)
   const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null);
@@ -291,7 +292,18 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
       {/* Grid */}
       <div className="px-4 relative">
         <BattleGrid
-          grid={game.grid}
+          grid={(() => {
+            // MP spy: overlay opponent snapshot onto an empty board for 3s.
+            if (isMultiplayer && spying && (game as any).opponentSnapshot) {
+              const snap = (game as any).opponentSnapshot as Array<{ row: number; col: number; team?: string }>;
+              const g = game.grid.map(r => r.map(c => ({ ...c, unit: null as any })));
+              for (const u of snap) {
+                if (g[u.row]?.[u.col]) g[u.row][u.col].unit = u as any;
+              }
+              return g;
+            }
+            return game.grid;
+          })()}
           phase={game.phase}
           flipped={flipped}
           matchId={matchId}
@@ -386,28 +398,26 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 </span>
               </div>
             )}
-            {!isMultiplayer && (
-              <div className="flex gap-2">
-                <button
-                  onClick={triggerSpy}
-                  disabled={spyUsed}
-                  className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all select-none active:scale-[0.98] ${
-                    spyUsed
-                      ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
-                      : 'bg-card border border-primary/50 text-primary hover:bg-primary/10'
-                  }`}
-                >
-                  {spying ? '👁️ Gegner sichtbar…' : spyUsed ? '👁️ Spioniert' : '👁️ Spionieren'}
-                </button>
-                <button
-                  onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
-                  disabled={game.playerUnits.length === 0}
-                  className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  ✅ Bereit ({game.playerUnits.length})
-                </button>
-              </div>
-            )}
+            <div className="flex gap-2">
+              <button
+                onClick={triggerSpy}
+                disabled={spyUsed}
+                className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all select-none active:scale-[0.98] ${
+                  spyUsed
+                    ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
+                    : 'bg-card border border-primary/50 text-primary hover:bg-primary/10'
+                }`}
+              >
+                {spying ? '👁️ Gegner sichtbar…' : spyUsed ? '👁️ Spioniert' : '👁️ Spionieren'}
+              </button>
+              <button
+                onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
+                disabled={game.playerUnits.length === 0}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ✅ Bereit ({game.playerUnits.length})
+              </button>
+            </div>
             <UnitPicker
               selected={game.selectedUnit}
               onSelect={game.setSelectedUnit}
@@ -450,15 +460,6 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 setLastPlaced({ row, col, type });
               }}
             />
-            {isMultiplayer && (
-              <button
-                onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
-                disabled={!game.placeTimer && game.playerUnits.length < game.playerMaxUnits}
-                className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                ✅ Bereit {game.playerUnits.length === 0 ? '(Aufgeben)' : ''}
-              </button>
-            )}
           </div>
         )}
 
@@ -577,7 +578,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
             </div>
 
             {/* Aufgeben Button (mit Ja/Nein-Bestätigung) */}
-            {!isMultiplayer && game.surrenderRound && (
+            {game.surrenderRound && (
               surrenderConfirm ? (
                 <div className="grid grid-cols-2 gap-1.5">
                   <button

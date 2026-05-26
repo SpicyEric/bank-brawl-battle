@@ -99,36 +99,38 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
   const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 1);
 
-  // Alternating placement state
-  const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(() => getDeterministicFirstPlacer(roomId, 1));
-  const [placingPhase, setPlacingPhase] = useState<'first' | 'second' | 'done'>('first');
+  // Simultaneous placement: each player has their own ready flag + 60s timer.
+  const [myReady, setMyReady] = useState(false);
+  const [opponentReady, setOpponentReady] = useState(false);
   const [placeTimer, setPlaceTimer] = useState(MULTI_PLACE_TIME_LIMIT);
-  const [opponentUnitsVisible, setOpponentUnitsVisible] = useState<Unit[]>([]);
+  // Live snapshot of opponent's current placement (for spy button).
+  const [opponentSnapshot, setOpponentSnapshot] = useState<Unit[]>([]);
 
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const placeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const placingPhaseRef = useRef(placingPhase);
   const phaseRef = useRef(phase);
   const playerUnitsRef = useRef(playerUnits);
   const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hadBothPlayersRef = useRef(false);
+  const myReadyRef = useRef(false);
+  const opponentReadyRef = useRef(false);
+  const snapshotBroadcastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Derive isMyTurnToPlace and waitingForOpponent directly (no effects — avoids race conditions)
-  const myPlayerNum = isHost ? 1 : 2;
-  const isMyTurnToPlace = phase === 'place_player' && (
-    (placingPhase === 'first' && myPlayerNum === placingPlayer) ||
-    (placingPhase === 'second' && myPlayerNum !== placingPlayer)
-  );
-  const waitingForOpponent = phase === 'place_player' && !isMyTurnToPlace && placingPhase !== 'done';
+  // Derive isMyTurnToPlace and waitingForOpponent from ready flags.
+  const isMyTurnToPlace = phase === 'place_player' && !myReady;
+  const waitingForOpponent = phase === 'place_player' && myReady && !opponentReady;
+  // Compatibility: kept for UI; always 'first' (no alternating anymore).
+  const placingPhase: 'first' | 'second' | 'done' = phase === 'place_player' ? 'first' : 'done';
 
   const isMyTurnRef = useRef(isMyTurnToPlace);
 
   // Keep refs in sync
-  useEffect(() => { placingPhaseRef.current = placingPhase; }, [placingPhase]);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
   useEffect(() => { isMyTurnRef.current = isMyTurnToPlace; }, [isMyTurnToPlace]);
+  useEffect(() => { myReadyRef.current = myReady; }, [myReady]);
+  useEffect(() => { opponentReadyRef.current = opponentReady; }, [opponentReady]);
 
   // Setup broadcast channel
   useEffect(() => {
@@ -141,38 +143,43 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       if (action === 'terrain') {
         setGrid(data.grid as Cell[][]);
-        setPlacingPlayer(data.placingPlayer);
-        setPlacingPhase('first');
         setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
       }
 
-      if (action === 'first_placement_done') {
-        const firstUnits = (data.units as any[]).map((u: any) => ({ ...u } as Unit));
-        setOpponentUnitsVisible(firstUnits);
-        setGrid(prev => {
-          const next = prev.map(r => r.map(c => ({ ...c })));
-          for (const u of firstUnits) {
-            next[u.row][u.col] = { ...next[u.row][u.col], unit: u };
-          }
-          return next;
-        });
-        setPlacingPhase('second');
-        setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
+      // Live snapshot of opponent's current placement (used by spy button)
+      if (action === 'placement_snapshot') {
+        const units = (data.units as any[]).map((u: any) => ({ ...u } as Unit));
+        setOpponentSnapshot(units);
       }
 
-      if (action === 'first_placement_forfeit') {
-        setPlayerScore(data.myScore);
-        setEnemyScore(data.opponentScore);
-        setPhase(data.myPhase);
-        setPlacingPhase('done');
+      // Opponent toggled ready (with their final units, so host can start battle without re-fetch)
+      if (action === 'ready_toggle') {
+        const ready = !!data.ready;
+        setOpponentReady(ready);
+        opponentReadyRef.current = ready;
+        if (ready && Array.isArray(data.units)) {
+          const units = (data.units as any[]).map((u: any) => ({ ...u } as Unit));
+          setOpponentSnapshot(units);
+        }
+        // Host: if both ready, start battle
+        if (ready && isHost && myReadyRef.current) {
+          setTimeout(() => startBattleRef.current?.(), 100);
+        }
+      }
+
+      // Opponent surrendered the round
+      if (action === 'surrender') {
+        setPlayerScore(s => s + 1);
+        setPhase('round_won');
       }
 
       if (action === 'battle_start') {
         setGrid(data.grid as Cell[][]);
         setPhase('battle');
         setBattleTimer(ROUND_TIME_LIMIT);
-        setPlacingPhase('done');
-        setOpponentUnitsVisible([]);
+        setMyReady(false);
+        setOpponentReady(false);
+        setOpponentSnapshot([]);
       }
 
       if (action === 'battle_tick') {
@@ -246,8 +253,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setRoundNumber(data.roundNumber);
         setPlayerScore(data.playerScore);
         setEnemyScore(data.enemyScore);
-        setPlacingPlayer(data.placingPlayer);
-        setPlacingPhase('first');
+        setMyReady(false);
+        setOpponentReady(false);
+        myReadyRef.current = false;
+        opponentReadyRef.current = false;
+        setOpponentSnapshot([]);
         setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
         setPlayerUnits([]);
         setEnemyUnits([]);
@@ -255,7 +265,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setTurnCount(0);
         setSelectedUnit('warrior'); // will be corrected by fatigue check in UI
         setBattleTimer(ROUND_TIME_LIMIT);
-        setOpponentUnitsVisible([]);
         // Reset morale for new round
         setMoraleBoostUsed(false);
         setMoraleBoostActive(null);
@@ -308,7 +317,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       if (currentPhase === 'battle' || currentPhase === 'round_won' || currentPhase === 'round_lost' || currentPhase === 'round_draw') {
         return true;
       }
-      return currentPhase === 'place_player' && placingPhaseRef.current === 'second';
+      return currentPhase === 'place_player' && (myReadyRef.current || opponentReadyRef.current);
     };
 
     const scheduleDisconnectCheck = () => {
@@ -355,39 +364,32 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     };
   }, [roomId, role]);
 
-  // Host generates terrain and decides who places first — ONLY for round 1 (initial setup)
-  // Subsequent rounds are handled by nextRound() which already broadcasts terrain + placingPlayer
+  // Host generates terrain — round 1 only. Subsequent rounds handled by nextRound().
   const initialTerrainSent = useRef(false);
   useEffect(() => {
-    if (isHost && roundNumber === 1 && phase === 'place_player' && placingPhase === 'first' && !initialTerrainSent.current) {
+    if (isHost && roundNumber === 1 && phase === 'place_player' && !initialTerrainSent.current) {
       initialTerrainSent.current = true;
-      const whoFirst = getDeterministicFirstPlacer(roomId, roundNumber);
-      setPlacingPlayer(whoFirst as 1 | 2);
-
       setTimeout(() => {
         channelRef.current?.send({
           type: 'broadcast',
           event: 'game_sync',
-          payload: { action: 'terrain', data: { grid: serializeGrid(grid), placingPlayer: whoFirst } },
+          payload: { action: 'terrain', data: { grid: serializeGrid(grid) } },
         });
       }, 500);
     }
-  }, [isHost, roundNumber, phase, placingPhase]);
+  }, [isHost, roundNumber, phase]);
 
-  // Placement timer countdown
+  // Placement timer countdown — runs for each player independently.
   useEffect(() => {
-    if (phase !== 'place_player' || placingPhase === 'done') {
+    if (phase !== 'place_player' || myReady) {
       if (placeTimerRef.current) clearInterval(placeTimerRef.current);
       return;
     }
 
-    setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
     placeTimerRef.current = setInterval(() => {
       setPlaceTimer(prev => {
         if (prev <= 1) {
-          // Timer expired — auto-confirm
           if (placeTimerRef.current) clearInterval(placeTimerRef.current);
-          // Use setTimeout to avoid state update during render
           setTimeout(() => autoConfirmPlacement(), 0);
           return 0;
         }
@@ -398,7 +400,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     return () => {
       if (placeTimerRef.current) clearInterval(placeTimerRef.current);
     };
-  }, [phase, placingPhase]);
+  }, [phase, myReady]);
 
   // Auto-confirm when timer runs out (or player clicks bereit)
   const autoConfirmPlacement = useCallback(() => {
@@ -454,100 +456,53 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     });
   }, [phase, isMyTurnToPlace]);
 
-  // Confirm placement
-  const confirmPlacement = useCallback(async () => {
-    if (!isMyTurnRef.current) return;
+  // Surrender: end the round, opponent gets the point.
+  const surrenderRound = useCallback(() => {
+    if (phaseRef.current === 'round_won' || phaseRef.current === 'round_lost' || phaseRef.current === 'round_draw') return;
+    setEnemyScore(s => s + 1);
+    setPhase('round_lost');
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'game_sync',
+      payload: { action: 'surrender', data: {} },
+    });
+  }, []);
 
-    const currentPlacingPhase = placingPhaseRef.current;
+  // Confirm placement: simultaneous — set ready, opponent does the same independently.
+  // Host starts battle once BOTH are ready.
+  const confirmPlacement = useCallback(async () => {
+    if (myReadyRef.current || phaseRef.current !== 'place_player') return;
     const units = playerUnitsRef.current;
 
-    if (currentPlacingPhase === 'first') {
-      // First player done placing
-      if (units.length === 0) {
-        // No units placed → forfeit! Opponent gets the point
-        handleForfeit();
-        return;
-      }
-
-      const unitData = units.map(serializeUnit);
-      const field = isHost ? 'player1_units' : 'player2_units';
-      await updateRoom(roomId, { [field]: unitData });
-
-      // Broadcast to opponent: show units, start their turn
-      channelRef.current?.send({
-        type: 'broadcast',
-        event: 'game_sync',
-        payload: { action: 'first_placement_done', data: { units: unitData } },
-      });
-
-      // For the first placer, switch to waiting
-      setPlacingPhase('second');
-      
-      setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
-
-    } else if (currentPlacingPhase === 'second') {
-      // Second player done placing
-      if (units.length === 0) {
-        // No units → forfeit
-        handleForfeit();
-        return;
-      }
-
-      const unitData = units.map(serializeUnit);
-      const field = isHost ? 'player1_units' : 'player2_units';
-      await updateRoom(roomId, { [field]: unitData });
-
-      // Both players have placed → start battle
-      await startBattleFromPlacements();
-    }
-  }, [roomId, isHost]);
-
-  // Handle forfeit (no units placed)
-  const handleForfeit = useCallback(async () => {
-    const myPlayerNum = isHost ? 1 : 2;
-    const currentPhase = placingPhaseRef.current;
-
-    // Who forfeited? The current placer
-    const forfeitedPlayerNum = currentPhase === 'first' ? placingPlayer : (placingPlayer === 1 ? 2 : 1);
-    const iForfeited = forfeitedPlayerNum === myPlayerNum;
-
-    let newPScore = playerScore;
-    let newEScore = enemyScore;
-    let myPhase: Phase;
-    let opponentPhase: Phase;
-
-    if (iForfeited) {
-      // I forfeited → opponent gets point
-      newEScore += 1;
-      myPhase = 'round_lost';
-      opponentPhase = 'round_won';
-    } else {
-      // Opponent forfeited → I get point
-      newPScore += 1;
-      myPhase = 'round_won';
-      opponentPhase = 'round_lost';
+    // Empty placement = surrender this round
+    if (units.length === 0) {
+      surrenderRound();
+      return;
     }
 
-    setPlayerScore(newPScore);
-    setEnemyScore(newEScore);
-    setPhase(myPhase);
-    setPlacingPhase('done');
+    const unitData = units.map(serializeUnit);
+    const field = isHost ? 'player1_units' : 'player2_units';
+    const readyField = isHost ? 'player1_ready' : 'player2_ready';
+    await updateRoom(roomId, { [field]: unitData, [readyField]: true });
+
+    setMyReady(true);
+    myReadyRef.current = true;
 
     channelRef.current?.send({
       type: 'broadcast',
       event: 'game_sync',
-      payload: {
-        action: 'first_placement_forfeit',
-        data: {
-          myScore: newEScore, // swapped for opponent
-          opponentScore: newPScore,
-          myPhase: opponentPhase,
-        },
-      },
+      payload: { action: 'ready_toggle', data: { ready: true, units: unitData } },
     });
-  }, [isHost, placingPlayer, playerScore, enemyScore]);
+
+    // Host: if opponent already ready → start battle now.
+    if (isHost && opponentReadyRef.current) {
+      setTimeout(() => startBattleRef.current?.(), 100);
+    }
+  }, [roomId, isHost, surrenderRound]);
+
 
   // Start battle after both placed
+  const startBattleRef = useRef<(() => Promise<void>) | null>(null);
   const startBattleFromPlacements = useCallback(async () => {
     const { data: room } = await supabase
       .from('game_rooms')
@@ -584,8 +539,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setGrid(newGrid);
     setPhase('battle');
     setBattleTimer(ROUND_TIME_LIMIT);
-    setPlacingPhase('done');
-    setOpponentUnitsVisible([]);
+    setMyReady(false);
+    setOpponentReady(false);
+    myReadyRef.current = false;
+    opponentReadyRef.current = false;
+    setOpponentSnapshot([]);
     // Reset all abilities for battle start
     setMoraleBoostUsed(false);
     setMoraleBoostActive(null);
@@ -612,6 +570,22 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
     await updateRoom(roomId, { status: 'playing' });
   }, [roomId, grid]);
+  startBattleRef.current = startBattleFromPlacements;
+
+  // Broadcast a live snapshot of our current placement (throttled) so the opponent can spy it.
+  useEffect(() => {
+    if (phase !== 'place_player' || myReady) return;
+    if (snapshotBroadcastTimer.current) clearTimeout(snapshotBroadcastTimer.current);
+    snapshotBroadcastTimer.current = setTimeout(() => {
+      const unitData = playerUnitsRef.current.map(serializeUnit);
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'game_sync',
+        payload: { action: 'placement_snapshot', data: { units: unitData } },
+      });
+    }, 400);
+    return () => { if (snapshotBroadcastTimer.current) clearTimeout(snapshotBroadcastTimer.current); };
+  }, [playerUnits, phase, myReady]);
 
   // Activate morale boost
   const activateMoraleBoost = useCallback(() => {
@@ -1158,7 +1132,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const nextRound = useCallback(async () => {
     const newRound = roundNumber + 1;
     const newGrid = generateTerrain(createEmptyGrid());
-    const whoFirst = getDeterministicFirstPlacer(roomId, newRound);
 
     // Update fatigue before resetting units
     setPlayerFatigue(prev => {
@@ -1187,10 +1160,12 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setPhase('place_player');
     setBattleTimer(ROUND_TIME_LIMIT);
     
-    setPlacingPlayer(whoFirst as 1 | 2);
-    setPlacingPhase('first');
+    setMyReady(false);
+    setOpponentReady(false);
+    myReadyRef.current = false;
+    opponentReadyRef.current = false;
+    setOpponentSnapshot([]);
     setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
-    setOpponentUnitsVisible([]);
 
     await updateRoom(roomId, {
       player1_units: null, player2_units: null,
@@ -1210,8 +1185,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
               roundNumber: newRound,
               playerScore: enemyScore,
               enemyScore: playerScore,
-              placingPlayer: whoFirst, // absolute player number, no swap needed
             },
+
           },
         });
       }, 300);
@@ -1298,6 +1273,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     gameOver, gameWon, gameDraw: false,
     placeUnit, removeUnit, confirmPlacement, startBattle,
     resetGame, nextRound,
+    surrenderRound,
+    revealAIPlacement: () => {},
+    opponentSnapshot,
     moraleBoostUsed,
     moraleBoostActive,
     activateMoraleBoost,
