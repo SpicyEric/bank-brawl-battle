@@ -143,38 +143,43 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
       if (action === 'terrain') {
         setGrid(data.grid as Cell[][]);
-        setPlacingPlayer(data.placingPlayer);
-        setPlacingPhase('first');
         setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
       }
 
-      if (action === 'first_placement_done') {
-        const firstUnits = (data.units as any[]).map((u: any) => ({ ...u } as Unit));
-        setOpponentUnitsVisible(firstUnits);
-        setGrid(prev => {
-          const next = prev.map(r => r.map(c => ({ ...c })));
-          for (const u of firstUnits) {
-            next[u.row][u.col] = { ...next[u.row][u.col], unit: u };
-          }
-          return next;
-        });
-        setPlacingPhase('second');
-        setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
+      // Live snapshot of opponent's current placement (used by spy button)
+      if (action === 'placement_snapshot') {
+        const units = (data.units as any[]).map((u: any) => ({ ...u } as Unit));
+        setOpponentSnapshot(units);
       }
 
-      if (action === 'first_placement_forfeit') {
-        setPlayerScore(data.myScore);
-        setEnemyScore(data.opponentScore);
-        setPhase(data.myPhase);
-        setPlacingPhase('done');
+      // Opponent toggled ready (with their final units, so host can start battle without re-fetch)
+      if (action === 'ready_toggle') {
+        const ready = !!data.ready;
+        setOpponentReady(ready);
+        opponentReadyRef.current = ready;
+        if (ready && Array.isArray(data.units)) {
+          const units = (data.units as any[]).map((u: any) => ({ ...u } as Unit));
+          setOpponentSnapshot(units);
+        }
+        // Host: if both ready, start battle
+        if (ready && isHost && myReadyRef.current) {
+          setTimeout(() => startBattleRef.current?.(), 100);
+        }
+      }
+
+      // Opponent surrendered the round
+      if (action === 'surrender') {
+        setPlayerScore(s => s + 1);
+        setPhase('round_won');
       }
 
       if (action === 'battle_start') {
         setGrid(data.grid as Cell[][]);
         setPhase('battle');
         setBattleTimer(ROUND_TIME_LIMIT);
-        setPlacingPhase('done');
-        setOpponentUnitsVisible([]);
+        setMyReady(false);
+        setOpponentReady(false);
+        setOpponentSnapshot([]);
       }
 
       if (action === 'battle_tick') {
