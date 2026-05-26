@@ -99,36 +99,38 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const [playerFatigue, setPlayerFatigue] = useState<Record<string, number>>({});
   const playerBannedUnits: UnitType[] = UNIT_TYPES.filter(t => (playerFatigue[t] || 0) >= 1);
 
-  // Alternating placement state
-  const [placingPlayer, setPlacingPlayer] = useState<1 | 2>(() => getDeterministicFirstPlacer(roomId, 1));
-  const [placingPhase, setPlacingPhase] = useState<'first' | 'second' | 'done'>('first');
+  // Simultaneous placement: each player has their own ready flag + 60s timer.
+  const [myReady, setMyReady] = useState(false);
+  const [opponentReady, setOpponentReady] = useState(false);
   const [placeTimer, setPlaceTimer] = useState(MULTI_PLACE_TIME_LIMIT);
-  const [opponentUnitsVisible, setOpponentUnitsVisible] = useState<Unit[]>([]);
+  // Live snapshot of opponent's current placement (for spy button).
+  const [opponentSnapshot, setOpponentSnapshot] = useState<Unit[]>([]);
 
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const placeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const placingPhaseRef = useRef(placingPhase);
   const phaseRef = useRef(phase);
   const playerUnitsRef = useRef(playerUnits);
   const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hadBothPlayersRef = useRef(false);
+  const myReadyRef = useRef(false);
+  const opponentReadyRef = useRef(false);
+  const snapshotBroadcastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Derive isMyTurnToPlace and waitingForOpponent directly (no effects — avoids race conditions)
-  const myPlayerNum = isHost ? 1 : 2;
-  const isMyTurnToPlace = phase === 'place_player' && (
-    (placingPhase === 'first' && myPlayerNum === placingPlayer) ||
-    (placingPhase === 'second' && myPlayerNum !== placingPlayer)
-  );
-  const waitingForOpponent = phase === 'place_player' && !isMyTurnToPlace && placingPhase !== 'done';
+  // Derive isMyTurnToPlace and waitingForOpponent from ready flags.
+  const isMyTurnToPlace = phase === 'place_player' && !myReady;
+  const waitingForOpponent = phase === 'place_player' && myReady && !opponentReady;
+  // Compatibility: kept for UI; always 'first' (no alternating anymore).
+  const placingPhase: 'first' | 'second' | 'done' = phase === 'place_player' ? 'first' : 'done';
 
   const isMyTurnRef = useRef(isMyTurnToPlace);
 
   // Keep refs in sync
-  useEffect(() => { placingPhaseRef.current = placingPhase; }, [placingPhase]);
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { playerUnitsRef.current = playerUnits; }, [playerUnits]);
   useEffect(() => { isMyTurnRef.current = isMyTurnToPlace; }, [isMyTurnToPlace]);
+  useEffect(() => { myReadyRef.current = myReady; }, [myReady]);
+  useEffect(() => { opponentReadyRef.current = opponentReady; }, [opponentReady]);
 
   // Setup broadcast channel
   useEffect(() => {
