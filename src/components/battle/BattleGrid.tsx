@@ -832,7 +832,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
               {isDead && (
                 <span className="text-sm opacity-40 select-none">💀</span>
               )}
-              {unit && !isDead && !isHiddenEnemy && (() => {
+              {unit && !isDead && !isHiddenEnemy && !isHiddenPlayer && (() => {
                 // Row-by-row marching entry: uniform offset that ticks down.
                 // Player marches up from below: visual offset = +entryStep rows.
                 // Enemy marches down from above: visual offset = -entryStep rows.
