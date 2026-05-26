@@ -1720,6 +1720,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
+    stalemateHpRef.current = -1;
+    stalemateTicksRef.current = 0;
+    stalemateRushRef.current = 0;
     battleTick();
     battleRef.current = setInterval(battleTick, 675);
     timerRef.current = setInterval(() => {
