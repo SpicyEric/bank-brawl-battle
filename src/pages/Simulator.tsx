@@ -55,6 +55,9 @@ const Simulator = () => {
   const topMatchups = report ? flattenMatchups(report, 10).sort((a, b) => b.winRate - a.winRate).slice(0, 12) : [];
   const worstMatchups = report ? flattenMatchups(report, 10).sort((a, b) => a.winRate - b.winRate).slice(0, 12) : [];
   const topSynergies = report ? flattenSynergies(report, 10).sort((a, b) => b.winRate - a.winRate).slice(0, 12) : [];
+  const topBuffsForUnit = report ? flattenBuffPerUnit(report, 5).filter(b => b.kind === 'buff').sort((a, b) => b.winRate - a.winRate).slice(0, 15) : [];
+  const topNerfsForUnit = report ? flattenBuffPerUnit(report, 5).filter(b => b.kind === 'nerf').sort((a, b) => b.winRate - a.winRate).slice(0, 10) : [];
+  const topAttrib = report ? flattenAuraAttrib(report, 5).filter(a => a.kind === 'buff').sort((a, b) => b.winRate - a.winRate).slice(0, 15) : [];
 
   const flagColor = (f: string) => f === 'OP' ? 'text-danger' : f === 'STRONG' ? 'text-warning' : f === 'BALANCED' ? 'text-foreground' : f === 'WEAK' ? 'text-muted-foreground' : 'text-muted-foreground/60';
 
