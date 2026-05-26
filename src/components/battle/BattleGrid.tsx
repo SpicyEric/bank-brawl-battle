@@ -37,6 +37,8 @@ interface BattleGridProps {
   hideEnemyUnits?: boolean;
   /** Hide own player units (used briefly while spy reveals the enemy formation). */
   hidePlayerUnits?: boolean;
+  /** Force a specific battlefield background (used to sync host/guest in multiplayer). */
+  battlefieldId?: 'grass' | 'desert';
 }
 
 interface UnitPos { row: number; col: number }
