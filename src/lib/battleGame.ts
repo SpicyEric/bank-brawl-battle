@@ -2662,13 +2662,21 @@ export function handleShadowbladeTick(
  *  remains idle (no move, no attack) until the phantom dies. */
 export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs: string[]): Unit[] {
   const spawned: Unit[] = [];
+  const rowCount = grid.length;
+  const isBattleWorld = rowCount > GRID_SIZE;
+  const arenaTop = isBattleWorld ? GRID_SIZE : 0;
+  const arenaBottom = isBattleWorld ? GRID_SIZE * 2 : GRID_SIZE;
   const originals = allUnits.filter(u =>
     u.type === 'doppelganger' && !u.isPhantom && !u.doppelSpawned && u.hp > 0 && !u.dead
   );
   for (const orig of originals) {
     orig.doppelSpawned = true;
-    // Opponent's 3 placement rows (player → rows 0..2, enemy → rows 5..7)
-    const enemyRows = orig.team === 'player' ? [0, 1, 2] : [5, 6, 7];
+    if (orig.row >= arenaTop && orig.row < arenaBottom) orig.enteredArena = true;
+    // Spawn on the opponent-facing side of the visible arena. In the 24-row battle
+    // world this keeps phantoms visible instead of leaving them in hidden build rows.
+    const enemyRows = orig.team === 'player'
+      ? [arenaTop, arenaTop + 1, arenaTop + 2]
+      : [arenaBottom - 3, arenaBottom - 2, arenaBottom - 1];
     const candidates: { r: number; c: number }[] = [];
     for (const r of enemyRows) {
       for (let c = 0; c < GRID_SIZE; c++) {
@@ -2694,6 +2702,7 @@ export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs
       activationTurn: 0,
       startRow: pick.r,
       stuckTurns: 0,
+      enteredArena: pick.r >= arenaTop && pick.r < arenaBottom,
       lastAttackedId: undefined,
       phantomId: undefined,
     };

@@ -573,6 +573,30 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const VIEW_BOTTOM = GRID_SIZE * 2;
       const inBattlefield = (u: Unit) => u.row >= VIEW_TOP && u.row < VIEW_BOTTOM;
 
+      // Safety net: if an already-entered unit somehow got pushed/retreated outside
+      // the visible arena in an older tick, immediately put it back on-screen.
+      for (const u of allUnits) {
+        if (!u.enteredArena || inBattlefield(u)) continue;
+        const preferredRow = u.row < VIEW_TOP ? VIEW_TOP : VIEW_BOTTOM - 1;
+        const rowOrder = Array.from({ length: VIEW_BOTTOM - VIEW_TOP }, (_, i) => VIEW_TOP + i)
+          .sort((a, b) => Math.abs(a - preferredRow) - Math.abs(b - preferredRow));
+        const colOrder = Array.from({ length: GRID_SIZE }, (_, i) => i)
+          .sort((a, b) => Math.abs(a - u.col) - Math.abs(b - u.col));
+        let placed = false;
+        for (const r of rowOrder) {
+          for (const c of colOrder) {
+            const cell = newGrid[r]?.[c];
+            if (!cell || cell.unit || cell.terrain === 'water') continue;
+            if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
+            u.row = r; u.col = c;
+            newGrid[r][c].unit = u;
+            placed = true;
+            break;
+          }
+          if (placed) break;
+        }
+      }
+
       // === Stalemate detection: if no HP changes for 15 ticks, force a rush ===
       {
         const totalHp = allUnits.reduce((s, u) => s + u.hp, 0);
@@ -1067,12 +1091,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
                 const nr = u.row + dr;
                 const nc = u.col + dc;
                 if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
+                if (u.enteredArena && (nr < VIEW_TOP || nr >= VIEW_BOTTOM)) break;
                 const tgt = newGrid[nr]?.[nc];
                 if (!tgt) break;
                 if (tgt.terrain === 'water') break;
                 if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
                 if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
                 u.row = nr; u.col = nc;
+                if (u.row >= VIEW_TOP && u.row < VIEW_BOTTOM) u.enteredArena = true;
                 newGrid[u.row][u.col].unit = u;
               }
             }
@@ -1088,37 +1114,35 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         if (!flankShifting) moveTeamFormations('player');
         moveTeamFormations('enemy');
 
-        // === Fast retreat: if no enemy is on the visible 8x8, units back off 3 cells/tick.
-        // Suppressed during flank maneuver so the forced sideways/forward shifts aren't undone.
+        // === Arena catch-up: off-field units keep marching into the visible 8×8.
+        // Units that already entered the arena never retreat back out.
         if (!flankShifting) {
           const rowCount = newGrid.length;
           const colCount = newGrid[0]?.length ?? GRID_SIZE;
-          const retreatTeam = (team: 'player' | 'enemy') => {
-            const enemiesOnField = allUnits.some(u => u.team !== team && u.hp > 0 && !u.dead && inBattlefield(u));
-            if (enemiesOnField) return;
-            const backDr = team === 'player' ? 1 : -1;
-            // Only units that are themselves inside the visible 8×8 fall back; units
-            // still marching in from their build zone keep advancing via formation movement.
-            const myUnits = allUnits.filter(u => u.team === team && u.hp > 0 && !u.dead && inBattlefield(u));
-            // Sort so units closest to their base move first → no self-blocking.
-            const sorted = [...myUnits].sort((a, b) => backDr > 0 ? b.row - a.row : a.row - b.row);
-            for (const u of sorted) {
-              for (let s = 0; s < 3; s++) {
-                const nr = u.row + backDr;
-                const nc = u.col;
-                if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
-                const tgt = newGrid[nr]?.[nc];
-                if (!tgt) break;
-                if (tgt.terrain === 'water') break;
-                if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
-                if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
-                u.row = nr; u.col = nc;
-                newGrid[u.row][u.col].unit = u;
-              }
+          const offField = allUnits.filter(u => u.hp > 0 && !u.dead && !inBattlefield(u) && !u.enteredArena);
+          const sorted = [...offField].sort((a, b) => {
+            const aDr = a.row < VIEW_TOP ? 1 : -1;
+            const bDr = b.row < VIEW_TOP ? 1 : -1;
+            if (aDr !== bDr) return bDr - aDr;
+            return aDr > 0 ? b.row - a.row : a.row - b.row;
+          });
+          for (const u of sorted) {
+            const moveDr = u.row < VIEW_TOP ? 1 : -1;
+            for (let s = 0; s < 3; s++) {
+              const nr = u.row + moveDr;
+              const nc = u.col;
+              if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
+              const tgt = newGrid[nr]?.[nc];
+              if (!tgt) break;
+              if (tgt.terrain === 'water') break;
+              if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
+              if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
+              u.row = nr; u.col = nc;
+              if (u.row >= VIEW_TOP && u.row < VIEW_BOTTOM) u.enteredArena = true;
+              newGrid[u.row][u.col].unit = u;
+              if (u.enteredArena) break;
             }
-          };
-          retreatTeam('player');
-          retreatTeam('enemy');
+          }
         }
       } else {
 
