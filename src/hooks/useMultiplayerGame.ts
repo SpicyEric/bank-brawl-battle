@@ -364,39 +364,32 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     };
   }, [roomId, role]);
 
-  // Host generates terrain and decides who places first — ONLY for round 1 (initial setup)
-  // Subsequent rounds are handled by nextRound() which already broadcasts terrain + placingPlayer
+  // Host generates terrain — round 1 only. Subsequent rounds handled by nextRound().
   const initialTerrainSent = useRef(false);
   useEffect(() => {
-    if (isHost && roundNumber === 1 && phase === 'place_player' && placingPhase === 'first' && !initialTerrainSent.current) {
+    if (isHost && roundNumber === 1 && phase === 'place_player' && !initialTerrainSent.current) {
       initialTerrainSent.current = true;
-      const whoFirst = getDeterministicFirstPlacer(roomId, roundNumber);
-      setPlacingPlayer(whoFirst as 1 | 2);
-
       setTimeout(() => {
         channelRef.current?.send({
           type: 'broadcast',
           event: 'game_sync',
-          payload: { action: 'terrain', data: { grid: serializeGrid(grid), placingPlayer: whoFirst } },
+          payload: { action: 'terrain', data: { grid: serializeGrid(grid) } },
         });
       }, 500);
     }
-  }, [isHost, roundNumber, phase, placingPhase]);
+  }, [isHost, roundNumber, phase]);
 
-  // Placement timer countdown
+  // Placement timer countdown — runs for each player independently.
   useEffect(() => {
-    if (phase !== 'place_player' || placingPhase === 'done') {
+    if (phase !== 'place_player' || myReady) {
       if (placeTimerRef.current) clearInterval(placeTimerRef.current);
       return;
     }
 
-    setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
     placeTimerRef.current = setInterval(() => {
       setPlaceTimer(prev => {
         if (prev <= 1) {
-          // Timer expired — auto-confirm
           if (placeTimerRef.current) clearInterval(placeTimerRef.current);
-          // Use setTimeout to avoid state update during render
           setTimeout(() => autoConfirmPlacement(), 0);
           return 0;
         }
@@ -407,7 +400,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     return () => {
       if (placeTimerRef.current) clearInterval(placeTimerRef.current);
     };
-  }, [phase, placingPhase]);
+  }, [phase, myReady]);
 
   // Auto-confirm when timer runs out (or player clicks bereit)
   const autoConfirmPlacement = useCallback(() => {
