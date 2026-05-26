@@ -745,10 +745,19 @@ export function getMoveCells(unit: Unit, grid: Cell[][]): Position[] {
   const canFly = unit.type === 'dragon';
   const canJump = unit.type === 'rider'; // rider jumps over obstacles like a chess knight
   const canSwim = unit.type === 'waterwalker';
+  const rowCount = grid.length;
+  const colCount = grid[0]?.length ?? GRID_SIZE;
+  // Arena window (one-way lock): once a unit has entered the 8×8 battlefield in the
+  // middle of the world (rows [GRID_SIZE .. 2*GRID_SIZE)), it can never step back
+  // out into either build area, regardless of team / role / pull effects.
+  const ARENA_TOP = GRID_SIZE;
+  const ARENA_BOTTOM = GRID_SIZE * 2;
+  const lockedToArena = !!unit.enteredArena;
   return def.movePattern
     .map(p => ({ row: unit.row + p.row, col: unit.col + p.col }))
     .filter(p =>
-      p.row >= 0 && p.row < GRID_SIZE && p.col >= 0 && p.col < GRID_SIZE &&
+      p.row >= 0 && p.row < rowCount && p.col >= 0 && p.col < colCount &&
+      (!lockedToArena || (p.row >= ARENA_TOP && p.row < ARENA_BOTTOM)) &&
       (!grid[p.row][p.col].unit || grid[p.row][p.col].unit!.id === unit.id) &&
       (canFly || canJump || canSwim || grid[p.row][p.col].terrain !== 'water') &&
       (canFly || canJump || !grid[p.row][p.col].unit?.dead)
