@@ -836,5 +836,60 @@ export function reportToCsv(report: SimReport): string {
   for (const s of flattenSynergies(report, 10).sort((x, y) => y.winRate - x.winRate)) {
     lines.push(`${s.a},${s.b},${s.games},${s.winRate.toFixed(1)}`);
   }
+
+  lines.push('');
+  lines.push('# Aura-Effekt pro Einheit (Empfänger × Effekt, min 5 games)');
+  lines.push('recipient,kind,effectKey,games,wins,winRate%,avgStacks,avgSurvivedHp%,avgDmgDealt');
+  for (const b of flattenBuffPerUnit(report, 5).sort((a, b) => b.winRate - a.winRate)) {
+    lines.push([b.recipient, b.kind, b.effectKey, b.games, b.wins, b.winRate.toFixed(1),
+      b.avgStacks.toFixed(2), (b.avgSurvivedHp * 100).toFixed(1), b.avgDmgDealt.toFixed(1)].join(','));
+  }
+
+  lines.push('');
+  lines.push('# Buff/Nerf-Quellen (Quelle → Empfänger × Effekt, min 5 games)');
+  lines.push('source,kind,effectKey,recipient,games,wins,winRate%,avgStacks');
+  for (const a of flattenAuraAttrib(report, 5).sort((a, b) => b.winRate - a.winRate)) {
+    lines.push([a.source, a.kind, a.effectKey, a.recipient, a.games, a.wins,
+      a.winRate.toFixed(1), a.avgStacks.toFixed(2)].join(','));
+  }
+
   return lines.join('\n');
+}
+
+// ============== Buff/Nerf analytics ==============
+export interface FlatBuffCell {
+  recipient: UnitType; effectKey: string; kind: 'buff' | 'nerf';
+  games: number; wins: number; winRate: number;
+  avgStacks: number; avgSurvivedHp: number; avgDmgDealt: number;
+}
+export function flattenBuffPerUnit(report: SimReport, minGames = 5): FlatBuffCell[] {
+  const out: FlatBuffCell[] = [];
+  for (const c of report.buffPerUnit.values()) {
+    if (c.games < minGames) continue;
+    out.push({
+      recipient: c.recipient, effectKey: c.effectKey, kind: c.kind,
+      games: c.games, wins: c.wins, winRate: (c.wins / c.games) * 100,
+      avgStacks: c.stacksSum / c.games,
+      avgSurvivedHp: c.recipientSurvSum / c.games,
+      avgDmgDealt: c.recipientDmgSum / c.games,
+    });
+  }
+  return out;
+}
+
+export interface FlatAttribCell {
+  source: UnitType; recipient: UnitType; effectKey: string; kind: 'buff' | 'nerf';
+  games: number; wins: number; winRate: number; avgStacks: number;
+}
+export function flattenAuraAttrib(report: SimReport, minGames = 5): FlatAttribCell[] {
+  const out: FlatAttribCell[] = [];
+  for (const c of report.auraAttrib.values()) {
+    if (c.games < minGames) continue;
+    out.push({
+      source: c.source, recipient: c.recipient, effectKey: c.effectKey, kind: c.kind,
+      games: c.games, wins: c.wins, winRate: (c.wins / c.games) * 100,
+      avgStacks: c.stacksSum / c.games,
+    });
+  }
+  return out;
 }
