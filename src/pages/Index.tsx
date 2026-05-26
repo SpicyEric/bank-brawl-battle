@@ -575,6 +575,33 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               <span>💀 Opfern=Heilen</span>
             </div>
 
+            {/* Aufgeben Button (mit Ja/Nein-Bestätigung) */}
+            {!isMultiplayer && game.surrenderRound && (
+              surrenderConfirm ? (
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => { setSurrenderConfirm(false); game.surrenderRound?.(); }}
+                    className="py-2 rounded-xl font-semibold text-[11px] bg-danger text-danger-foreground hover:opacity-90 active:scale-[0.97] transition-all"
+                  >
+                    ✅ Ja, aufgeben
+                  </button>
+                  <button
+                    onClick={() => setSurrenderConfirm(false)}
+                    className="py-2 rounded-xl font-semibold text-[11px] bg-muted text-muted-foreground hover:opacity-90 active:scale-[0.97] transition-all"
+                  >
+                    ❌ Nein
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setSurrenderConfirm(true)}
+                  className="w-full py-2 rounded-xl font-semibold text-[11px] bg-muted/40 text-muted-foreground border border-border hover:bg-muted/60 active:scale-[0.97] transition-all"
+                >
+                  🏳️ Aufgeben
+                </button>
+              )
+            )}
+
 
             <BattleLog logs={game.battleLog} />
           </div>
