@@ -1278,7 +1278,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
               unit._justRegen = Date.now();
             }
           }
-          // Reset terrain-seeker idle counter on successful damage
+          // === Phase-2 aura triggers (splash, chain, bleed, fire, freeze, web, reflect, drain, self-effects, lava-splash, poison, curse)
+          if (dmg > 0) {
+            applyAuraOnAttack({ attacker: unit, defender: target, dmg, allUnits, grid: newGrid, logs, events });
+          }
           if (dmg > 0 && unit.type === 'waterwalker') {
             unit.seekerIdleTicks = 0;
           }
