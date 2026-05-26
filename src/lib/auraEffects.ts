@@ -106,6 +106,9 @@ function fieldFor(effectKey: string | null | undefined, kind: 'buff' | 'nerf'): 
       case 'fire_immune_plus_lightning_50percent_bonus': return 'lightning50Bonus';
       case 'web_trap_5percent_on_hit_10percent_dmg_3ticks': return 'webTrap5';
       case 'poison_on_attack_2dmg_per_tick_minus10percent_atk': return 'poisonOnAttack';
+      case 'taunt_50percent_dmg_reduction': return 'tauntDmgRed50';
+      case 'damage_share_50percent_to_eisgolem': return 'damageShareToIce';
+      case '50percent_chance_plus5_atk_and_force_aggro': return 'doppelChance50Plus5';
     }
   } else {
     switch (effectKey) {
@@ -125,6 +128,7 @@ function fieldFor(effectKey: string | null | undefined, kind: 'buff' | 'nerf'): 
       case 'first_attack_only_10percent': return 'firstAttack10';
       case 'can_only_damage_below_70percent_hp': return 'damageBelow70';
       case 'strengthen_enemy_atk_plus10_3ticks': return 'archerBuffEnemy';
+      case '10percent_miss_chance': return 'missChance10';
     }
   }
   return null;
