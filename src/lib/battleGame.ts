@@ -2694,7 +2694,7 @@ export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs
       attack: 5,
       cooldown: 0, maxCooldown: 2,
       isPhantom: true,
-      phantom: 5,
+      phantom: 0, // no invulnerability — phantom is immediately attackable
       doppelSpawned: true,
       bondedToTankId: undefined,
       movedWithTank: false,
@@ -2709,7 +2709,7 @@ export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs
     grid[pick.r][pick.c].unit = phantom;
     spawned.push(phantom);
     orig.phantomId = phantom.id;
-    logs.push(`👥 Doppelgänger spawnt Phantom (80 HP, 5 Ticks unverwundbar)`);
+    logs.push(`👥 Doppelgänger spawnt Phantom (80 HP)`);
   }
   allUnits.push(...spawned);
   return spawned;
