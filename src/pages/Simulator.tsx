@@ -204,6 +204,45 @@ const Simulator = () => {
                   ))}
                 </div>
               </div>
+
+              <div className="bg-card/80 backdrop-blur-sm border border-border rounded-xl p-4">
+                <h3 className="font-bold text-foreground mb-2 text-sm">🚀 OP-Buffs (Empfänger × Effekt → Winrate)</h3>
+                <p className="text-[10px] text-muted-foreground mb-2">avgStacks = ø-Anzahl gestapelter Quellen. Hohe Stacks + hohe Winrate ⇒ Kandidat für „nicht stackbar".</p>
+                <div className="space-y-1 text-xs">
+                  {topBuffsForUnit.map((b, i) => (
+                    <div key={i} className="flex justify-between gap-2 bg-secondary/40 px-2 py-1 rounded">
+                      <span className="truncate">{UNIT_DEFS[b.recipient].emoji} {UNIT_DEFS[b.recipient].label} ← <span className="text-success">{b.effectKey}</span></span>
+                      <span className="font-bold text-success tabular-nums shrink-0">{b.winRate.toFixed(1)}% · ×{b.avgStacks.toFixed(1)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-card/80 backdrop-blur-sm border border-border rounded-xl p-4">
+                <h3 className="font-bold text-foreground mb-2 text-sm">🎯 Buff-Quellen (Quelle → Empfänger × Effekt)</h3>
+                <div className="space-y-1 text-xs">
+                  {topAttrib.map((a, i) => (
+                    <div key={i} className="flex justify-between gap-2 bg-secondary/40 px-2 py-1 rounded">
+                      <span className="truncate">{UNIT_DEFS[a.source].emoji} → {UNIT_DEFS[a.recipient].emoji} <span className="text-muted-foreground">({a.effectKey})</span></span>
+                      <span className="font-bold text-success tabular-nums shrink-0">{a.winRate.toFixed(1)}% · ×{a.avgStacks.toFixed(1)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {topNerfsForUnit.length > 0 && (
+                <div className="bg-card/80 backdrop-blur-sm border border-border rounded-xl p-4">
+                  <h3 className="font-bold text-foreground mb-2 text-sm">☠️ Stärkste Nerf-Effekte (trotzdem hohe Winrate ⇒ schwacher Nerf)</h3>
+                  <div className="space-y-1 text-xs">
+                    {topNerfsForUnit.map((b, i) => (
+                      <div key={i} className="flex justify-between gap-2 bg-secondary/40 px-2 py-1 rounded">
+                        <span className="truncate">{UNIT_DEFS[b.recipient].emoji} {UNIT_DEFS[b.recipient].label} ← <span className="text-danger">{b.effectKey}</span></span>
+                        <span className="font-bold text-warning tabular-nums shrink-0">{b.winRate.toFixed(1)}% · ×{b.avgStacks.toFixed(1)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
