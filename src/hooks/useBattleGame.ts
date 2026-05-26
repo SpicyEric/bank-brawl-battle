@@ -226,9 +226,11 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
   const confirmPlacementRef = useRef<(() => void) | null>(null);
 
   // Rundenskalierung: Runde 1 = 9 Einheiten, +2 pro Runde bis Runde 5 = 17.
-  const rosterMaxUnits = Math.min(9 + (roundNumber - 1) * 2, 17);
+  // Handicap zieht von der eigenen Einheitenzahl ab (Mindestens 1).
+  const rosterMaxUnitsBase = Math.min(9 + (roundNumber - 1) * 2, 17);
+  const rosterMaxUnits = hasRoster ? Math.max(1, rosterMaxUnitsBase - safeHandicap) : rosterMaxUnitsBase;
   const playerMaxUnits = hasRoster ? rosterMaxUnits : getMaxUnits(playerScore, enemyScore, roundNumber);
-  const enemyMaxUnits = hasRoster ? rosterMaxUnits : playerMaxUnits;
+  const enemyMaxUnits = hasRoster ? rosterMaxUnitsBase : playerMaxUnits;
 
   // Slot mode: slots can be reused on the battlefield (mono comps allowed).
   // placedSlots is kept empty so the picker never disables a slot during placement.
