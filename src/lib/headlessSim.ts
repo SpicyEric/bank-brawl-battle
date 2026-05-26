@@ -512,39 +512,18 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
   const t0 = performance.now();
   const yieldEvery = opts.yieldEvery ?? 50;
 
-  const rSize = opts.rosterSize ?? 9;
-  const n = opts.teamSize ?? 5;
-  const mode = opts.mode ?? 'random';
-
-  // Build fixed per-simulation rosters of UNIQUE units (different for each player).
-  // These stay the same for ALL matches in this simulation run.
-  let rosterP1: UnitType[];
-  let rosterP2: UnitType[];
-  if (mode === 'roster' && opts.rosterP1 && opts.rosterP2) {
-    rosterP1 = [...opts.rosterP1];
-    rosterP2 = [...opts.rosterP2];
-  } else {
-    rosterP1 = drawUniqueRoster(rSize);
-    do { rosterP2 = drawUniqueRoster(rSize); }
-    while (UNIT_TYPES.length > rSize && rosterP1.every((u, i) => u === rosterP2[i]));
-  }
-  report.rosterP1 = [...rosterP1];
-  report.rosterP2 = [...rosterP2];
+  // Always 9v9, AI builds full formations (auras, tank-bonds, clustering) per match.
+  const n = opts.teamSize ?? 9;
 
   for (let i = 0; i < battlesTotal; i++) {
-    let p1: UnitType[]; let p2: UnitType[];
-    if (mode === 'pure' && opts.pureType) {
-      p1 = Array.from({ length: n }, () => opts.pureType!);
-      p2 = pickWithReplacement(rosterP2, n);
-    } else {
-      // Pick 5 (teamSize) WITH replacement from each player's fixed 9-unit roster.
-      // Duplicates → mono compositions naturally appear across many matches.
-      p1 = pickWithReplacement(rosterP1, n);
-      p2 = pickWithReplacement(rosterP2, n);
-    }
+    // Randomized difficulty per match → mix of weak / mid / OP formations.
+    // 2..5 covers Normal → Insane (uses counter-color, tank bonds, aura clustering).
+    const diffP1 = 2 + Math.floor(Math.random() * 4);
+    const diffP2 = 2 + Math.floor(Math.random() * 4);
+
     let result: BattleResult;
     try {
-      result = simulateOneBattle(p1, p2);
+      result = simulateOneBattle(n, diffP1, diffP2);
     } catch (err) {
       console.warn('[headlessSim] battle failed, skipping', err);
       continue;
