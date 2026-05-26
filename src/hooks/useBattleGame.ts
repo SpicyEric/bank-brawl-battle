@@ -955,11 +955,36 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           // No allies to heal → fall through to normal attack logic below
         }
 
-        // Focus fire override: player units target lowest HP enemy, AI units target highest HP player
-        const target = (focusTarget && unit.team === 'player') ? focusTarget
-          : (aiFocusTarget && unit.team === 'enemy') ? aiFocusTarget
-          : findTarget(unit, allUnits);
-        if (!target) continue;
+        // Focus fire override: player units target lowest HP enemy, AI units target highest HP player.
+        // Targets must be inside the visible 8x8 battlefield (rows VIEW_TOP..VIEW_BOTTOM).
+        const battlefieldUnits = allUnits.filter(u => u.team === unit.team || inBattlefield(u));
+        const fT = focusTarget && inBattlefield(focusTarget) ? focusTarget : null;
+        const afT = aiFocusTarget && inBattlefield(aiFocusTarget) ? aiFocusTarget : null;
+        const target = (fT && unit.team === 'player') ? fT
+          : (afT && unit.team === 'enemy') ? afT
+          : findTarget(unit, battlefieldUnits);
+        if (!target) {
+          // No reachable enemy on the battlefield → fast retreat (up to 3 cells toward own base).
+          const backDr = unit.team === 'player' ? 1 : -1;
+          const rowCount = newGrid.length;
+          const colCount = newGrid[0]?.length ?? GRID_SIZE;
+          if (!isFrozenNow && !seekerHolds && !shouldSkipMove(unit)) {
+            for (let s = 0; s < 3; s++) {
+              const nr = unit.row + backDr;
+              const nc = unit.col;
+              if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
+              const tgt = newGrid[nr]?.[nc];
+              if (!tgt) break;
+              if (tgt.terrain === 'water') break;
+              if (tgt.unit && tgt.unit.id !== unit.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
+              if (newGrid[unit.row]?.[unit.col]?.unit?.id === unit.id) newGrid[unit.row][unit.col].unit = null;
+              unit.row = nr;
+              newGrid[unit.row][unit.col].unit = unit;
+            }
+          }
+          continue;
+        }
+
 
         if (!canAttack(unit, target)) {
           // Track stuck turns for anti-stalemate
