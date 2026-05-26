@@ -15,6 +15,8 @@ import { BattleEvent } from '@/lib/battleEvents';
 import { findFormations, applyFormationMove, findFormationContaining } from '@/lib/formations';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 import { matchRecorder } from '@/lib/matchRecorder';
+import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
+import { applyAuraStacks, applyAuraTick } from '@/lib/auraEffects';
 
 // Roster slots: 0..2 = red, 3..5 = green, 6..8 = blue
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
@@ -63,6 +65,13 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   // Track if AI drip-placement already kicked off for this match
   const aiDripStartedRef = useRef(false);
   const aiDripTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Aura data (loaded once)
+  const auraRef = useRef<{ zones: AuraZoneMap; effects: AuraEffectMap }>({ zones: {}, effects: {} });
+  useEffect(() => {
+    loadAuraData().then(d => { auraRef.current = d; }).catch(() => {});
+  }, []);
+
 
   // Fatigue system:
   // - Slot mode (roster): key = slot index (0..8). One slot = one bench-able unit instance.
@@ -499,6 +508,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
+
+      // === Aura stacks: recompute every tick from current positions ===
+      applyAuraStacks(allUnits, auraRef.current.zones, auraRef.current.effects);
+      // Apply per-tick regen / drain auras
+      applyAuraTick(allUnits, []);
+
+
+
 
       // Visible 8x8 battlefield window = rows [GRID_SIZE .. 2*GRID_SIZE).
       // Combat (targeting + attacks) only happens against units inside this window.
@@ -1252,6 +1269,15 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
           }
           target.hp = Math.max(0, target.hp - dmg);
+          // Aura: generic lifesteal from stacks (independent of vampire-specific block below)
+          if (dmg > 0 && unit.auraStacks && unit.auraStacks.lifesteal30 > 0 && unit.hp < unit.maxHp) {
+            const pct = Math.min(1, 0.30 * unit.auraStacks.lifesteal30);
+            const heal = Math.min(unit.maxHp - unit.hp, Math.round(dmg * pct));
+            if (heal > 0) {
+              unit.hp += heal;
+              unit._justRegen = Date.now();
+            }
+          }
           // Reset terrain-seeker idle counter on successful damage
           if (dmg > 0 && unit.type === 'waterwalker') {
             unit.seekerIdleTicks = 0;

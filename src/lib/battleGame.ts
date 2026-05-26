@@ -87,6 +87,13 @@ export interface Unit {
   laneCol?: number;
   laneBroken?: boolean; // once true, unit drops lane discipline for the rest of combat
   laneStuckTicks?: number; // ticks in a row where no forward-in-lane move was possible
+  // --- Aura runtime (Phase 1, see auraEffects.ts) ---
+  auraStacks?: import('./auraEffects').AuraStacks;
+  _baseMaxHp?: number;       // baseline maxHp before any aura-driven max_hp% bonuses
+  _justDodged?: number;      // ms timestamp – last dodge (for visual)
+  _justCrit?: number;        // ms timestamp – last crit (for visual)
+  _justRegen?: number;       // ms timestamp – last aura regen tick
+  _justDrain?: number;       // ms timestamp – last aura drain tick
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -1206,9 +1213,18 @@ function hasAdjacentFriendlyTank(defender: Unit, grid: Cell[][]): boolean {
   return false;
 }
 
-// Calculate damage with counter system + terrain bonuses + shield aura
+// Calculate damage with counter system + terrain bonuses + shield aura + aura stacks
 export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): number {
-  
+  // --- Dodge roll (defender aura) – return 0 if dodge succeeds
+  const defStacks = defender.auraStacks;
+  if (defStacks && defStacks.dodge30 > 0) {
+    const dodgePct = Math.min(0.95, 0.30 * defStacks.dodge30);
+    if (Math.random() < dodgePct) {
+      defender._justDodged = Date.now();
+      return 0;
+    }
+  }
+
   let baseAtk = attacker.attack + (attacker.judgeBonus || 0) + (attacker.permAtkBonus || 0);
   // Shadowpriest curse: −50% attack permanently on cursed attackers
   if ((attacker.curseAtkMul ?? 1) !== 1) baseAtk = Math.max(0, baseAtk * (attacker.curseAtkMul ?? 1));
@@ -1216,6 +1232,14 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   if (attacker.type === 'assassin' && defender.hp < defender.maxHp * 0.5) {
     baseAtk += 4;
   }
+
+  // --- Aura: attacker atk% modifier (stackable, additive)
+  const aStacks = attacker.auraStacks;
+  if (aStacks) {
+    const atkMul = Math.max(0, 1 + 0.50 * aStacks.atkPlus50 - 0.50 * aStacks.atkMinus50);
+    baseAtk *= atkMul;
+  }
+
   let dmg = baseAtk * (0.95 + Math.random() * 0.1);
 
   const aColor = getUnitColor(attacker);
@@ -1250,6 +1274,27 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   if ((attacker.hornBuff || 0) > 0) dmg *= 2;
   // Obelisk buff: +50% damage while obeliskBuff active
   if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.5;
+
+  // --- Aura: own-damage nerfs on attacker (stack additively)
+  if (aStacks) {
+    const ownMul = Math.max(0,
+      1 - 0.20 * aStacks.ownDmgMinus20
+        - 0.50 * aStacks.ownDmgMinus50
+        - 0.60 * aStacks.weaken60);
+    dmg *= ownMul;
+
+    // Crit roll (mage buff): up to 95% chance, +100% dmg per stack (additive)
+    const critChance = Math.min(0.95, 0.20 * aStacks.crit20Dmg100);
+    if (critChance > 0 && Math.random() < critChance) {
+      dmg *= (1 + 1.0 * aStacks.crit20Dmg100);
+      attacker._justCrit = Date.now();
+    }
+  }
+
+  // --- Aura: incoming damage reduction on defender (shieldbearer)
+  if (defStacks && defStacks.incomingMinus60 > 0) {
+    dmg *= Math.max(0, 1 - 0.60 * defStacks.incomingMinus60);
+  }
 
   return Math.floor(dmg);
 }
@@ -1674,7 +1719,10 @@ export function isImmuneToFire(_unit: Unit, _grid: Cell[][]): boolean {
 export function effectiveCooldown(unit: Unit, _grid: Cell[][]): number {
   let cd = unit.maxCooldown;
   if ((unit.obeliskBuff || 0) > 0) cd = Math.max(1, Math.ceil(cd / 2));
-  return cd;
+  // Aura stacks: cooldown ±1 per stack
+  const s = unit.auraStacks;
+  if (s) cd = cd - s.cdMinus1 + s.cdPlus1;
+  return Math.max(1, cd);
 }
 
 export type SeekerResult = 'normal' | 'on_terrain' | 'moved' | 'wait';
