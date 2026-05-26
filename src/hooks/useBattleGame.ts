@@ -16,7 +16,7 @@ import { findFormations, applyFormationMove, findFormationContaining } from '@/l
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 import { matchRecorder } from '@/lib/matchRecorder';
 import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
-import { applyAuraStacks, applyAuraTick } from '@/lib/auraEffects';
+import { applyAuraStacks, applyAuraTick, applyAuraOnAttack, fireLightningTakenMul, hasImmuneFFP } from '@/lib/auraEffects';
 
 // Roster slots: 0..2 = red, 3..5 = green, 6..8 = blue
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
@@ -1020,8 +1020,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       // === Burn DoT processing (Brandstifter / Arsonist) ===
       for (const u of allUnits) {
         if (!u.burning || u.burning.length === 0 || u.hp <= 0) continue;
-        // Mountaineer on hill is immune to fire damage
-        if (isImmuneToFire(u, newGrid)) {
+        // Mountaineer on hill is immune to fire damage; cloner aura grants fire/frost/poison immunity
+        if (isImmuneToFire(u, newGrid) || hasImmuneFFP(u)) {
           u.burning = [];
           continue;
         }
@@ -1032,6 +1032,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           return b.turns > 0;
         });
         if (totalBurn > 0) {
+          // Aura nerf: double dmg from lightning/fire on this defender
+          totalBurn = Math.round(totalBurn * fireLightningTakenMul(u));
           u.hp = Math.max(0, u.hp - totalBurn);
           logs.push(`🔥 ${UNIT_DEFS[u.type].emoji} brennt: -${totalBurn} ❤️${u.hp <= 0 ? ' ☠️' : ''}`);
           if (u.hp <= 0) (u as any).dead = true;
@@ -1278,7 +1280,10 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
               unit._justRegen = Date.now();
             }
           }
-          // Reset terrain-seeker idle counter on successful damage
+          // === Phase-2 aura triggers (splash, chain, bleed, fire, freeze, web, reflect, drain, self-effects, lava-splash, poison, curse)
+          if (dmg > 0) {
+            applyAuraOnAttack({ attacker: unit, defender: target, dmg, allUnits, grid: newGrid, logs, events });
+          }
           if (dmg > 0 && unit.type === 'waterwalker') {
             unit.seekerIdleTicks = 0;
           }

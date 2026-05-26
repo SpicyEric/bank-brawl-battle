@@ -87,13 +87,21 @@ export interface Unit {
   laneCol?: number;
   laneBroken?: boolean; // once true, unit drops lane discipline for the rest of combat
   laneStuckTicks?: number; // ticks in a row where no forward-in-lane move was possible
-  // --- Aura runtime (Phase 1, see auraEffects.ts) ---
+  // --- Aura runtime (Phase 1 + 2, see auraEffects.ts) ---
   auraStacks?: import('./auraEffects').AuraStacks;
-  _baseMaxHp?: number;       // baseline maxHp before any aura-driven max_hp% bonuses
-  _justDodged?: number;      // ms timestamp – last dodge (for visual)
-  _justCrit?: number;        // ms timestamp – last crit (for visual)
-  _justRegen?: number;       // ms timestamp – last aura regen tick
-  _justDrain?: number;       // ms timestamp – last aura drain tick
+  _baseMaxHp?: number;
+  _justDodged?: number;
+  _justCrit?: number;
+  _justRegen?: number;
+  _justDrain?: number;
+  _justAuraTrigger?: number;
+  // Phase-2 temporary debuffs applied by aura triggers
+  auraDmgTakenMul?: number;     // weaken_50%_2t: incoming dmg multiplier
+  auraWeakenTicks?: number;
+  auraAtkDebuff?: number;       // archer aura: flat ATK reduction
+  auraAtkDebuffTicks?: number;
+  auraAtkBuff?: number;         // archer nerf: flat ATK boost to enemy
+  auraAtkBuffTicks?: number;
 }
 
 export type TerrainType = 'none' | 'forest' | 'hill' | 'water';
@@ -1226,6 +1234,9 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   }
 
   let baseAtk = attacker.attack + (attacker.judgeBonus || 0) + (attacker.permAtkBonus || 0);
+  // Aura: archer-DoT temporary ATK debuff/buff applied to this attacker
+  if (attacker.auraAtkDebuff) baseAtk = Math.max(0, baseAtk - attacker.auraAtkDebuff);
+  if (attacker.auraAtkBuff) baseAtk += attacker.auraAtkBuff;
   // Shadowpriest curse: −50% attack permanently on cursed attackers
   if ((attacker.curseAtkMul ?? 1) !== 1) baseAtk = Math.max(0, baseAtk * (attacker.curseAtkMul ?? 1));
   // Assassin: +4 damage against enemies below 50% HP
@@ -1294,6 +1305,21 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // --- Aura: incoming damage reduction on defender (shieldbearer)
   if (defStacks && defStacks.incomingMinus60 > 0) {
     dmg *= Math.max(0, 1 - 0.60 * defStacks.incomingMinus60);
+  }
+
+  // --- Aura: weaken_50%_2t multiplier on defender's incoming dmg
+  if (defender.auraDmgTakenMul && defender.auraDmgTakenMul !== 1) {
+    dmg *= defender.auraDmgTakenMul;
+  }
+
+  // --- Attacker nerfs: first-attack-only, damage-only-below-70
+  if (aStacks) {
+    if (aStacks.firstAttack10 > 0 && !attacker.firstAttackUsed) {
+      dmg *= Math.pow(0.10, aStacks.firstAttack10);
+    }
+    if (aStacks.damageBelow70 > 0 && defender.hp > defender.maxHp * 0.7) {
+      dmg = 0;
+    }
   }
 
   return Math.floor(dmg);
@@ -1671,8 +1697,12 @@ export function processLavaTick(grid: Cell[][], logs: string[]): void {
     const cell = grid[r][c];
     if (!cell.lavaTicks) continue;
     const u = cell.unit;
-    if (u && u.hp > 0 && !u.dead && u.team !== cell.lavaOwnerTeam && !isImmuneToFire(u, grid)) {
-      const dmg = cell.lavaDmg ?? 6;
+    if (u && u.hp > 0 && !u.dead && u.team !== cell.lavaOwnerTeam && !isImmuneToFire(u, grid) && !(u.auraStacks && u.auraStacks.immuneFFP > 0)) {
+      let dmg = cell.lavaDmg ?? 6;
+      // Aura: double dmg from fire/lightning
+      if (u.auraStacks && u.auraStacks.doubleFromLightningFire > 0) {
+        dmg = Math.round(dmg * (1 + 1 * u.auraStacks.doubleFromLightningFire));
+      }
       u.hp = Math.max(0, u.hp - dmg);
       logs.push(`🌋 Lava → ${UNIT_DEFS[u.type].emoji} ${dmg}${u.hp <= 0 ? ' ☠️' : ''}`);
       if (u.hp <= 0) (u as any).dead = true;

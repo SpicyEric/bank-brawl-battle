@@ -952,6 +952,15 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                       <span className="text-[10px] font-extrabold text-amber-200 drop-shadow-[0_0_4px_rgba(251,191,36,0.95)] animate-scale-in">CRIT!</span>
                     </div>
                   )}
+                  {/* Generic aura-trigger spark (splash, chain, bleed, freeze ...) */}
+                  {unit._justAuraTrigger && (Date.now() - unit._justAuraTrigger) < 500 && (
+                    <div className="absolute inset-0 z-20 pointer-events-none rounded-sm"
+                      style={{
+                        boxShadow: 'inset 0 0 8px 2px hsl(48 95% 60% / 0.9), 0 0 8px 2px hsl(48 95% 60% / 0.7)',
+                        animation: 'aura-halo-buff-anim 0.5s ease-out',
+                      }}
+                    />
+                  )}
                   <span
                     className={`text-base sm:text-lg leading-none select-none relative ${isFrozen ? 'opacity-60' : ''} ${isPhantom ? 'opacity-70' : ''} ${unit.ghost && unit.ghost > 0 ? 'ghost-active' : ''}`}
                     style={{
