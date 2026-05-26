@@ -913,18 +913,6 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                   {(unit.obeliskBuff || 0) > 0 && (
                     <div className="absolute inset-0 z-0 pointer-events-none rounded-sm cell-obelisk-buff" />
                   )}
-                  {/* Aura stacks halo (buff / nerf / mixed) */}
-                  {unit.auraStacks && (unit.auraStacks.totalBuff > 0 || unit.auraStacks.totalNerf > 0) && (
-                    <div
-                      className={`absolute inset-0 z-0 pointer-events-none rounded-sm aura-halo ${
-                        unit.auraStacks.totalBuff > 0 && unit.auraStacks.totalNerf > 0
-                          ? 'aura-halo-mixed'
-                          : unit.auraStacks.totalBuff > 0
-                            ? 'aura-halo-buff'
-                            : 'aura-halo-nerf'
-                      }`}
-                    />
-                  )}
                   {/* Stack count badge */}
                   {unit.auraStacks && (unit.auraStacks.totalBuff + unit.auraStacks.totalNerf) > 0 && (
                     <div className="absolute -top-1 -left-1 z-30 pointer-events-none flex gap-[1px]">
