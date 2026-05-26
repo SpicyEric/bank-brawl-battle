@@ -104,6 +104,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
   // for 3 seconds. While revealing, your own units are hidden — only the enemy
   // 8×8 board is visible. After 3s, view reverts to your own placement.
   const [spyUsed, setSpyUsed] = useState(false);
+  const [surrenderConfirm, setSurrenderConfirm] = useState(false);
   const [spying, setSpying] = useState(false);
   const spyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerSpy = () => {
