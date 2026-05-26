@@ -16,7 +16,7 @@ import { findFormations, applyFormationMove, findFormationContaining } from '@/l
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
 import { matchRecorder } from '@/lib/matchRecorder';
 import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
-import { applyAuraStacks, applyAuraTick, applyAuraOnAttack, fireLightningTakenMul, hasImmuneFFP } from '@/lib/auraEffects';
+import { applyAuraStacks, applyAuraTick, applyAuraOnAttack, applyAuraOnDeath, applyAuraSourceEffects, applyDefenderShare, fireLightningTakenMul, hasImmuneFFP } from '@/lib/auraEffects';
 
 // Roster slots: 0..2 = red, 3..5 = green, 6..8 = blue
 const SLOT_COLORS: ColorGroup[] = ['red','red','red','green','green','green','blue','blue','blue'];
@@ -513,6 +513,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       applyAuraStacks(allUnits, auraRef.current.zones, auraRef.current.effects);
       // Apply per-tick regen / drain auras
       applyAuraTick(allUnits, []);
+      // Source-driven per-tick effects (doppelganger lifedrain)
+      applyAuraSourceEffects(allUnits, auraRef.current.zones, auraRef.current.effects, []);
 
 
 
@@ -1270,6 +1272,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             // Shield wall: enemy attacks on player units deal 50% damage
             if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
           }
+          // === Phase-3 aura: miss-chance (obelisk), taunt-reduction (magnetiker), damage-share (icegolem) ===
+          dmg = applyDefenderShare(unit, target, dmg, allUnits, logs);
           target.hp = Math.max(0, target.hp - dmg);
           // Aura: generic lifesteal from stacks (independent of vampire-specific block below)
           if (dmg > 0 && unit.auraStacks && unit.auraStacks.lifesteal30 > 0 && unit.hp < unit.maxHp) {
@@ -1510,6 +1514,16 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
         u.judgeBonus = Math.max(u.judgeBonus || 0, fallenAllies * 8);
       }
 
+
+
+
+      // === Phase-3 on-death aura sweep (sniper-death, bomber-death-splash) ===
+      for (const u of allUnits) {
+        if (u.dead && !(u as any)._auraDeathHandled) {
+          (u as any)._auraDeathHandled = true;
+          applyAuraOnDeath(u, allUnits, newGrid, auraRef.current.zones, auraRef.current.effects, logs);
+        }
+      }
 
       if (logs.length > 0) {
         setBattleLog(prev => [...logs, ...prev].slice(0, 40));

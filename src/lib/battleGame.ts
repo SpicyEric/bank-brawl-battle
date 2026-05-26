@@ -759,6 +759,16 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   const enemies = allUnits.filter(u => u.team !== unit.team && u.hp > 0);
   if (enemies.length === 0) return null;
 
+  // === AURA AGGRO: forceAggro stacks (taunt / cloner / doppelganger pull) ===
+  const aggroEnemies = enemies.filter(e => (e.auraStacks?.forceAggro ?? 0) > 0);
+  if (aggroEnemies.length > 0) {
+    aggroEnemies.sort((a, b) =>
+      ((b.auraStacks?.forceAggro ?? 0) - (a.auraStacks?.forceAggro ?? 0)) ||
+      (distance(unit, a) - distance(unit, b))
+    );
+    return aggroEnemies[0];
+  }
+
   // === LAMB TAUNT: enemy lamb provokes ALL units within a 7x7 area (Chebyshev ≤ 3). ===
   const enemyLamb = enemies.find(e => e.type === 'lamb' && distance(unit, e) <= 3);
   if (enemyLamb) {
@@ -1249,6 +1259,11 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   if (aStacks) {
     const atkMul = Math.max(0, 1 + 0.50 * aStacks.atkPlus50 - 0.50 * aStacks.atkMinus50);
     baseAtk *= atkMul;
+  }
+
+  // Doppel buff: 50% chance to add +5 ATK per stack
+  if (aStacks && aStacks.doppelChance50Plus5 > 0) {
+    if (Math.random() < 0.5) baseAtk += 5 * aStacks.doppelChance50Plus5;
   }
 
   let dmg = baseAtk * (0.95 + Math.random() * 0.1);

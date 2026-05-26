@@ -26,29 +26,35 @@ export interface AuraStacks {
   hpRegen3: number; hpDrain3: number;
   doubleFromLightningFire: number;
   // === Phase 2 — triggers ===
-  splash7: number;          // sprengmeister buff: +7 splash on attack
-  chain20: number;          // chaindancer-style: 20% chain per stack
-  chain30Then10: number;    // chain 30%→10% (legacy compound key)
-  chainOnAttack: number;    // guaranteed mini-chain per stack
-  bleedOnAttack: number;    // assassin: bleed DoT on hit
-  fireOnAttack: number;     // arsonist: burn DoT on hit
-  freeze50: number;         // frost: 50% freeze chance per stack
-  webTrap5: number;         // spider: 5% web chance per stack
-  permAtkDrain2: number;    // banshee: −2 permanent ATK per hit
-  reflect20: number;        // mirror: 20% reflect per stack
-  weaken50_2t: number;      // lamb: enemy −50% dmg 2 ticks
-  archerDebuffEnemy: number;// archer buff: target ATK −40 for 3t
-  archerBuffEnemy: number;  // archer nerf: target ATK +10 for 3t (yes, helping enemy)
-  selfBurn20: number;       // 20% chance to self-ignite on attack
-  selfDamage5: number;      // −5 self-HP per hit
-  lavaSplash: number;       // vulkanit buff: 5 splash + 3 DoT around target
-  selfFreeze20: number;     // 20% self-freeze on attack
-  poisonOnAttack: number;   // poison: 2 dmg/tick + ATK−10%
-  curseOnAttack: number;    // shadowpriest: +1 curse stack on hit
-  firstAttack10: number;    // tank nerf: first attack only 10% dmg
-  damageBelow70: number;    // shaman nerf: can only damage tgt < 70% HP
-  immuneFFP: number;        // cloner buff: immune to fire/frost/poison
-  lightning50Bonus: number; // waterwalker buff: +50% damage with lightning aura
+  splash7: number;
+  chain20: number;
+  chain30Then10: number;
+  chainOnAttack: number;
+  bleedOnAttack: number;
+  fireOnAttack: number;
+  freeze50: number;
+  webTrap5: number;
+  permAtkDrain2: number;
+  reflect20: number;
+  weaken50_2t: number;
+  archerDebuffEnemy: number;
+  archerBuffEnemy: number;
+  selfBurn20: number;
+  selfDamage5: number;
+  lavaSplash: number;
+  selfFreeze20: number;
+  poisonOnAttack: number;
+  curseOnAttack: number;
+  firstAttack10: number;
+  damageBelow70: number;
+  immuneFFP: number;
+  lightning50Bonus: number;
+  // === Phase 3 — aggro / share / death ===
+  forceAggro: number;           // enemies prioritise this unit
+  tauntDmgRed50: number;        // magnetiker: −50% incoming dmg while taunting
+  missChance10: number;         // obelisk nerf: 10% miss chance per stack
+  damageShareToIce: number;     // icegolem: 50% redirect of incoming dmg
+  doppelChance50Plus5: number;  // doppel buff: 50% chance +5 ATK + aggro
   // aggregate counts for UI
   totalBuff: number; totalNerf: number;
 }
@@ -64,6 +70,8 @@ const EMPTY: AuraStacks = {
   archerDebuffEnemy: 0, archerBuffEnemy: 0, selfBurn20: 0, selfDamage5: 0,
   lavaSplash: 0, selfFreeze20: 0, poisonOnAttack: 0, curseOnAttack: 0,
   firstAttack10: 0, damageBelow70: 0, immuneFFP: 0, lightning50Bonus: 0,
+  forceAggro: 0, tauntDmgRed50: 0, missChance10: 0,
+  damageShareToIce: 0, doppelChance50Plus5: 0,
   totalBuff: 0, totalNerf: 0,
 };
 
@@ -98,6 +106,9 @@ function fieldFor(effectKey: string | null | undefined, kind: 'buff' | 'nerf'): 
       case 'fire_immune_plus_lightning_50percent_bonus': return 'lightning50Bonus';
       case 'web_trap_5percent_on_hit_10percent_dmg_3ticks': return 'webTrap5';
       case 'poison_on_attack_2dmg_per_tick_minus10percent_atk': return 'poisonOnAttack';
+      case 'taunt_50percent_dmg_reduction': return 'tauntDmgRed50';
+      case 'damage_share_50percent_to_eisgolem': return 'damageShareToIce';
+      case '50percent_chance_plus5_atk_and_force_aggro': return 'doppelChance50Plus5';
     }
   } else {
     switch (effectKey) {
@@ -117,6 +128,7 @@ function fieldFor(effectKey: string | null | undefined, kind: 'buff' | 'nerf'): 
       case 'first_attack_only_10percent': return 'firstAttack10';
       case 'can_only_damage_below_70percent_hp': return 'damageBelow70';
       case 'strengthen_enemy_atk_plus10_3ticks': return 'archerBuffEnemy';
+      case '10percent_miss_chance': return 'missChance10';
     }
   }
   return null;
@@ -149,6 +161,15 @@ export function applyAuraStacks(
       (tgt.auraStacks[key] as number) += 1;
       if (kind === 'buff') tgt.auraStacks.totalBuff += 1;
       else tgt.auraStacks.totalNerf += 1;
+      // Aggro implications: taunt + doppel buff also pull enemy attention
+      if (key === 'tauntDmgRed50' || key === 'doppelChance50Plus5') {
+        tgt.auraStacks.forceAggro += 1;
+      }
+    }
+    // === Source-self nerfs: force_aggro_on_self → the SOURCE becomes priority target ===
+    if (src.auraStacks && eff.nerf === 'force_aggro_on_self') {
+      src.auraStacks.forceAggro = Math.max(src.auraStacks.forceAggro, 1);
+      if (src.auraStacks.totalNerf === 0) src.auraStacks.totalNerf = 1;
     }
   }
   for (const u of allUnits) {
@@ -196,6 +217,36 @@ export function applyAuraTick(allUnits: Unit[], logs: string[]): void {
     }
   }
 }
+
+/** Per-tick source-driven side-effects (drain from source for doppelganger nerf). */
+export function applyAuraSourceEffects(
+  allUnits: Unit[], zones: AuraZoneMap, effects: AuraEffectMap, logs: string[],
+): void {
+  for (const src of allUnits) {
+    if (src.dead || src.hp <= 0) continue;
+    const eff = effects[src.type as UnitType];
+    const z = zones[src.type as UnitType];
+    if (!eff || !z) continue;
+    // Doppelganger nerf: lose 5 HP per ally currently in the nerf zone (per stack)
+    if (eff.nerf === 'lifedrain_5hp_per_tick_to_doppelganger') {
+      let stacks = 0;
+      for (const pos of ZONE_POSITIONS) {
+        if (z[pos] !== 'nerf') continue;
+        const { dr, dc } = ZONE_DELTA[pos];
+        const r = src.row + dr, c = src.col + dc;
+        const ally = allUnits.find(u => u.row === r && u.col === c && u.team === src.team && !u.dead && u.hp > 0);
+        if (ally) stacks++;
+      }
+      if (stacks > 0) {
+        const dmg = 5 * stacks;
+        src.hp = Math.max(0, src.hp - dmg);
+        src._justDrain = Date.now();
+        if (src.hp <= 0) { src.dead = true; logs.push(`💀 ${UNIT_DEFS[src.type].emoji} stirbt am Aura-Lebensentzug`); }
+      }
+    }
+  }
+}
+
 
 /** Multiplier applied to fire/lava/burn DoT damage based on defender's aura nerf. */
 export function fireLightningTakenMul(target: Unit): number {
@@ -438,10 +489,94 @@ export function applyAuraOnAttack(params: {
   }
 }
 
-/** On-death aura triggers (sniper death bonus, splash on death, etc.). */
-export function applyAuraOnDeath(deadUnit: Unit, allUnits: Unit[], grid: Cell[][], logs: string[]): void {
-  // We don't track on_death effects via stacks (these are properties of the dying unit itself,
-  // not auras projected on it). They live in the unit's own effect key set — handled by
-  // existing hardcoded death logic for now. Reserved for future expansion.
-  void deadUnit; void allUnits; void grid; void logs;
+/** Damage-share + miss-chance + taunt-reduction + doppel bonus.
+ *  Called right before applying damage. Returns adjusted dmg and mutates redirect target. */
+export function applyDefenderShare(
+  attacker: Unit, defender: Unit, dmg: number, allUnits: Unit[], logs: string[],
+): number {
+  const ds = defender.auraStacks;
+  if (!ds || dmg <= 0) return dmg;
+  // Miss chance (obelisk nerf on attacker side actually) — handle if defender forced miss on attacker
+  const as = attacker.auraStacks;
+  if (as && as.missChance10 > 0) {
+    const miss = Math.min(0.95, 0.10 * as.missChance10);
+    if (Math.random() < miss) {
+      attacker._justDodged = Date.now();
+      return 0;
+    }
+  }
+  let adj = dmg;
+  // Taunt damage reduction (magnetiker)
+  if (ds.tauntDmgRed50 > 0) {
+    adj = Math.round(adj * Math.max(0.05, 1 - 0.50 * ds.tauntDmgRed50));
+  }
+  // Damage share to allied icegolem
+  if (ds.damageShareToIce > 0) {
+    const frac = Math.min(0.95, 0.50 * ds.damageShareToIce);
+    const share = Math.round(adj * frac);
+    if (share > 0) {
+      const ice = allUnits.find(u => u.team === defender.team && u.type === 'icegolem' && !u.dead && u.hp > 0 && u.id !== defender.id);
+      if (ice) {
+        ice.hp = Math.max(0, ice.hp - share);
+        logs.push(`🧊 Schadens-Teilen → 🧊 ${share}`);
+        if (ice.hp <= 0) ice.dead = true;
+        adj -= share;
+      }
+    }
+  }
+  return Math.max(0, adj);
 }
+
+/** Doppel 50% chance: bonus +5 ATK per stack on the hit. */
+export function applyDoppelHitBonus(attacker: Unit, dmg: number): number {
+  const s = attacker.auraStacks;
+  if (!s || s.doppelChance50Plus5 <= 0) return dmg;
+  if (Math.random() < 0.5) {
+    return dmg + 5 * s.doppelChance50Plus5;
+  }
+  return dmg;
+}
+
+/** On-death aura triggers (sniper death bonus, bomber death splash, etc.). */
+export function applyAuraOnDeath(
+  deadUnit: Unit, allUnits: Unit[], grid: Cell[][],
+  zones: AuraZoneMap, effects: AuraEffectMap, logs: string[],
+): void {
+  const eff = effects[deadUnit.type as UnitType];
+  const z = zones[deadUnit.type as UnitType];
+  if (!eff) return;
+
+  // === Sniper death nerf: deals 20 dmg to allies that were in its nerf zone ===
+  if (eff.nerf === 'on_sniper_death_20_damage_to_nerved' && z) {
+    for (const pos of ZONE_POSITIONS) {
+      if (z[pos] !== 'nerf') continue;
+      const { dr, dc } = ZONE_DELTA[pos];
+      const r = deadUnit.row + dr, c = deadUnit.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const ally = grid[r]?.[c]?.unit;
+      if (ally && !ally.dead && ally.hp > 0 && ally.team === deadUnit.team) {
+        ally.hp = Math.max(0, ally.hp - 20);
+        logs.push(`🎯 Sniper-Todesnerf → ${UNIT_DEFS[ally.type].emoji} 20`);
+        if (ally.hp <= 0) ally.dead = true;
+      }
+    }
+  }
+
+  // === Bomber death: splash to surrounding allies (death-explosion penalty) ===
+  if (eff.nerf === 'on_death_splash_to_allies') {
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = deadUnit.row + dr, c = deadUnit.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const ally = grid[r]?.[c]?.unit;
+      if (ally && !ally.dead && ally.hp > 0 && ally.team === deadUnit.team) {
+        ally.hp = Math.max(0, ally.hp - 15);
+        logs.push(`💥 Bomber-Tod → ${UNIT_DEFS[ally.type].emoji} 15`);
+        if (ally.hp <= 0) ally.dead = true;
+      }
+    }
+  }
+
+  void allUnits;
+}
+
