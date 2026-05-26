@@ -32,6 +32,7 @@ export interface Unit {
   frozenDmgMul?: number; // damage multiplier while frozen (default 0.5; frost nova sets 0.3)
   webbed?: number; // turns remaining webbed (spiderqueen) – same as frozen, distinct visual
   stuckTurns?: number; // turns without attacking – used for anti-stalemate
+  enteredArena?: boolean; // once true, the unit may not leave the 8×8 arena window (rows GRID_SIZE..2*GRID_SIZE)
   activationTurn?: number; // turn number when this unit becomes active (staggered rows)
   startRow?: number; // the row the unit was originally placed on
   lastAttackedId?: string; // last enemy attacked (rider uses this for target-switching)
