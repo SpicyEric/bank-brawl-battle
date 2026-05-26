@@ -404,7 +404,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         channelRef.current?.send({
           type: 'broadcast',
           event: 'game_sync',
-          payload: { action: 'terrain', data: { grid: serializeGrid(grid) } },
+          payload: { action: 'terrain', data: { grid: serializeGrid(grid), battlefieldId } },
         });
       }, 500);
     }
