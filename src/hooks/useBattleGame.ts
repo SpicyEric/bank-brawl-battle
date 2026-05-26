@@ -550,6 +550,20 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     setBattleLog(prev => [`🏃 FLANKE ${dir === -1 ? '←' : '→'}! Alle Einheiten umfassen den Gegner!`, ...prev]);
   }, [phase, flankLeftUsed, flankRightUsed]);
 
+  // Surrender the current round: enemy gets the point, round ends immediately.
+  const surrenderRound = useCallback(() => {
+    if (phase !== 'battle') return;
+    if (battleRef.current) clearInterval(battleRef.current);
+    if (timerRef.current) clearInterval(timerRef.current);
+    const newES = enemyScoreRef.current + 1;
+    enemyScoreRef.current = newES;
+    setEnemyScore(newES);
+    setBattleLog(prev => ['🏳️ Aufgegeben — Gegner gewinnt die Runde!', ...prev]);
+    const result = checkGameOver(playerScoreRef.current, newES);
+    if (result.draw) { setGameDraw(true); setPhase('game_draw'); }
+    else setPhase('round_lost');
+  }, [phase, checkGameOver]);
+
   // Run one battle tick
   const battleTick = useCallback(() => {
     setGrid(prevGrid => {
@@ -2031,6 +2045,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     sacrificeUsed, activateSacrifice,
     shieldWallUsed, shieldWallActive, activateShieldWall,
     flankLeftUsed, flankRightUsed, flankActive, activateFlank,
+    surrenderRound,
     waitingForOpponent: false,
     aiMoraleActive,
     inOvertime: false,
