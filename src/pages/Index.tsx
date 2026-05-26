@@ -460,15 +460,6 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 setLastPlaced({ row, col, type });
               }}
             />
-            {isMultiplayer && (
-              <button
-                onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
-                disabled={!game.placeTimer && game.playerUnits.length < game.playerMaxUnits}
-                className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-              >
-                ✅ Bereit {game.playerUnits.length === 0 ? '(Aufgeben)' : ''}
-              </button>
-            )}
           </div>
         )}
 
