@@ -573,6 +573,63 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       const VIEW_BOTTOM = GRID_SIZE * 2;
       const inBattlefield = (u: Unit) => u.row >= VIEW_TOP && u.row < VIEW_BOTTOM;
 
+      // === Stalemate detection: if no HP changes for 15 ticks, force a rush ===
+      {
+        const totalHp = allUnits.reduce((s, u) => s + u.hp, 0);
+        if (totalHp === stalemateHpRef.current) {
+          stalemateTicksRef.current += 1;
+        } else {
+          stalemateHpRef.current = totalHp;
+          stalemateTicksRef.current = 0;
+          if (stalemateRushRef.current === 0) {
+            // no active rush + HP changed naturally
+          }
+        }
+        if (stalemateTicksRef.current >= 15 && stalemateRushRef.current === 0) {
+          stalemateRushRef.current = 4;
+          stalemateTicksRef.current = 0;
+          setBattleLog(prev => ['⚡ Pattsituation! Alle Einheiten stürmen aufeinander zu!', ...prev]);
+        }
+        if (stalemateRushRef.current > 0) {
+          stalemateRushRef.current -= 1;
+          // For each unit, take ONE forced step toward the nearest enemy (ignores terrain, respects unit collisions and grid bounds).
+          const ordered = [...allUnits].sort(() => Math.random() - 0.5);
+          for (const u of ordered) {
+            if (u.hp <= 0 || u.dead) continue;
+            if ((u.frozen ?? 0) > 0 || (u.webbed ?? 0) > 0) continue;
+            let best: Unit | null = null;
+            let bestDist = Infinity;
+            for (const e of allUnits) {
+              if (e.team === u.team || e.hp <= 0 || e.dead) continue;
+              const d = Math.max(Math.abs(e.row - u.row), Math.abs(e.col - u.col));
+              if (d < bestDist) { bestDist = d; best = e; }
+            }
+            if (!best || bestDist <= 1) continue;
+            const dr = Math.sign(best.row - u.row);
+            const dc = Math.sign(best.col - u.col);
+            const candidates: [number, number][] = [
+              [u.row + dr, u.col + dc],
+              [u.row + dr, u.col],
+              [u.row, u.col + dc],
+            ];
+            for (const [nr, nc] of candidates) {
+              if (nr < 0 || nr >= GRID_SIZE * 3 || nc < 0 || nc >= GRID_SIZE) continue;
+              // Stay inside arena once entered
+              if (u.enteredArena && (nr < VIEW_TOP || nr >= VIEW_BOTTOM)) continue;
+              if (newGrid[nr][nc].unit) continue;
+              newGrid[u.row][u.col].unit = null;
+              u.row = nr; u.col = nc;
+              if (nr >= VIEW_TOP && nr < VIEW_BOTTOM) u.enteredArena = true;
+              u.stuckTurns = 0;
+              newGrid[nr][nc].unit = u;
+              break;
+            }
+          }
+        }
+      }
+
+
+
       // Morale boost tick-down
       if (moralePhase.current !== 'none' && moraleTicksLeft.current > 0) {
         moraleTicksLeft.current -= 1;
