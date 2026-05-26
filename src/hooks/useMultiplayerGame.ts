@@ -1143,10 +1143,12 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setPhase('place_player');
     setBattleTimer(ROUND_TIME_LIMIT);
     
-    setPlacingPlayer(whoFirst as 1 | 2);
-    setPlacingPhase('first');
+    setMyReady(false);
+    setOpponentReady(false);
+    myReadyRef.current = false;
+    opponentReadyRef.current = false;
+    setOpponentSnapshot([]);
     setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
-    setOpponentUnitsVisible([]);
 
     await updateRoom(roomId, {
       player1_units: null, player2_units: null,
