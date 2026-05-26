@@ -306,6 +306,12 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setShieldWallUsed(false);
         setShieldWallActive(false);
         shieldWallTicksLeft.current = 0;
+        setFlankLeftUsed(false);
+        setFlankRightUsed(false);
+        setFlankActive(null);
+        flankActiveRef.current = null;
+        opponentFlankRef.current = null;
+        if (data.battlefieldId) setBattlefieldId(data.battlefieldId);
       }
     });
 
