@@ -156,6 +156,16 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       if (action === 'terrain') {
         setGrid(data.grid as Cell[][]);
         setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
+        if (data.battlefieldId) setBattlefieldId(data.battlefieldId);
+      }
+
+      // Opponent activated flank
+      if (action === 'flank') {
+        const dir = data.dir as -1 | 1;
+        if (isHost) {
+          opponentFlankRef.current = { dir, step: 0 };
+        }
+        setBattleLog(prev => [`🏃 GEGNER FLANKE ${dir === -1 ? '←' : '→'}!`, ...prev]);
       }
 
       // Live snapshot of opponent's current placement (used by spy button)
