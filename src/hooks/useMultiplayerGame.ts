@@ -1115,7 +1115,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const nextRound = useCallback(async () => {
     const newRound = roundNumber + 1;
     const newGrid = generateTerrain(createEmptyGrid());
-    const whoFirst = getDeterministicFirstPlacer(roomId, newRound);
 
     // Update fatigue before resetting units
     setPlayerFatigue(prev => {
