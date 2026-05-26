@@ -521,7 +521,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               </div>
             </div>
 
-            {/* Ability Buttons */}
+            {/* Ability Buttons: Kampfschrei | Flanke← | Flanke→ | Opfer */}
             <div className="grid grid-cols-4 gap-1.5">
               {/* Kriegsschrei */}
               <button
@@ -537,32 +537,41 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                     : 'bg-warning text-warning-foreground hover:opacity-90 shadow-[0_0_8px_hsl(var(--warning)/0.3)]'
                 }`}
               >
-                {game.moraleBoostActive === 'buff'
-                  ? '🔥 AKTIV!'
-                  : game.moraleBoostActive === 'debuff'
-                  ? '😮‍💨 Müde'
-                  : game.moraleBoostUsed
-                  ? '🔥 ✓'
-                  : '🔥 Schrei'}
+                {game.moraleBoostActive === 'buff' ? '🔥 AKTIV!'
+                  : game.moraleBoostActive === 'debuff' ? '😮‍💨 Müde'
+                  : game.moraleBoostUsed ? '🔥 ✓' : '🔥 Schrei'}
               </button>
 
-              {/* Fokusfeuer */}
+              {/* Flanke links */}
               <button
-                onClick={() => { game.activateFocusFire(); sfxFocusFire(); }}
-                disabled={game.focusFireUsed}
+                onClick={() => { game.activateFlank?.(-1); }}
+                disabled={game.flankLeftUsed || !!game.flankActive}
                 className={`py-2 rounded-xl font-semibold text-[10px] transition-all active:scale-[0.97] ${
-                  game.focusFireActive
+                  game.flankActive === 'left'
                     ? 'bg-primary/20 border-2 border-primary text-primary animate-pulse cursor-default'
-                    : game.focusFireUsed
+                    : game.flankLeftUsed
                     ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
                     : 'bg-primary text-primary-foreground hover:opacity-90 shadow-[0_0_8px_hsl(var(--primary)/0.3)]'
                 }`}
               >
-                {game.focusFireActive
-                  ? '🎯 FEUER!'
-                  : game.focusFireUsed
-                  ? '🎯 ✓'
-                  : '🎯 Fokus'}
+                {game.flankActive === 'left' ? '⬅️ FLANKE!'
+                  : game.flankLeftUsed ? '⬅️ ✓' : '⬅️ Flanke'}
+              </button>
+
+              {/* Flanke rechts */}
+              <button
+                onClick={() => { game.activateFlank?.(1); }}
+                disabled={game.flankRightUsed || !!game.flankActive}
+                className={`py-2 rounded-xl font-semibold text-[10px] transition-all active:scale-[0.97] ${
+                  game.flankActive === 'right'
+                    ? 'bg-primary/20 border-2 border-primary text-primary animate-pulse cursor-default'
+                    : game.flankRightUsed
+                    ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
+                    : 'bg-primary text-primary-foreground hover:opacity-90 shadow-[0_0_8px_hsl(var(--primary)/0.3)]'
+                }`}
+              >
+                {game.flankActive === 'right' ? 'FLANKE! ➡️'
+                  : game.flankRightUsed ? '➡️ ✓' : 'Flanke ➡️'}
               </button>
 
               {/* Opferritual */}
@@ -577,37 +586,17 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
               >
                 {game.sacrificeUsed ? '💀 ✓' : '💀 Opfer'}
               </button>
-
-              {/* Schildwall */}
-              <button
-                onClick={() => { game.activateShieldWall(); sfxShieldWall(); }}
-                disabled={game.shieldWallUsed}
-                className={`py-2 rounded-xl font-semibold text-[10px] transition-all active:scale-[0.97] ${
-                  game.shieldWallActive
-                    ? 'bg-success/20 border-2 border-success text-success animate-pulse cursor-default'
-                    : game.shieldWallUsed
-                    ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
-                    : 'bg-success text-success-foreground hover:opacity-90 shadow-[0_0_8px_hsl(var(--success)/0.3)]'
-                }`}
-              >
-                {game.shieldWallActive
-                  ? '🛡️ AKTIV!'
-                  : game.shieldWallUsed
-                  ? '🛡️ ✓'
-                  : '🛡️ Wall'}
-              </button>
             </div>
 
             {/* Ability info line */}
             <div className="flex gap-1 text-[8px] text-muted-foreground justify-center flex-wrap">
               <span>🔥+25%→-15%</span>
               <span>•</span>
-              <span>🎯 Schwächstes</span>
+              <span>⬅️➡️ 2 zurück → 5 seitwärts → 5 vor</span>
               <span>•</span>
               <span>💀 Opfern=Heilen</span>
-              <span>•</span>
-              <span>🛡️ Rückzug 50%</span>
             </div>
+
 
             <BattleLog logs={game.battleLog} />
           </div>
