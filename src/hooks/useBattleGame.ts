@@ -712,11 +712,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           if (best.hp <= 0) (best as any).dead = true;
         }
         // 2) Formations move one cell toward the nearest opposing formation.
-        // Visible 8x8 battlefield = rows [GRID_SIZE .. 2*GRID_SIZE). Targets/formations
-        // only engage opponents inside this window; units outside it count as "off-field".
-        const VIEW_TOP = GRID_SIZE;
-        const VIEW_BOTTOM = GRID_SIZE * 2;
-        const inBattlefield = (u: Unit) => u.row >= VIEW_TOP && u.row < VIEW_BOTTOM;
+        // (VIEW_TOP/VIEW_BOTTOM/inBattlefield hoisted above)
         const moveTeamFormations = (team: 'player' | 'enemy') => {
           const formations = findFormations(allUnits, team);
           const opponentsAlive = allUnits.filter(u => u.team !== team && u.hp > 0 && !u.dead && inBattlefield(u));
