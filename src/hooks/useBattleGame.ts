@@ -1270,6 +1270,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             // Shield wall: enemy attacks on player units deal 50% damage
             if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
           }
+          // === Phase-3 aura: miss-chance (obelisk), taunt-reduction (magnetiker), damage-share (icegolem) ===
+          dmg = applyDefenderShare(unit, target, dmg, allUnits, logs);
           target.hp = Math.max(0, target.hp - dmg);
           // Aura: generic lifesteal from stacks (independent of vampire-specific block below)
           if (dmg > 0 && unit.auraStacks && unit.auraStacks.lifesteal30 > 0 && unit.hp < unit.maxHp) {
