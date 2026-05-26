@@ -570,6 +570,22 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
     await updateRoom(roomId, { status: 'playing' });
   }, [roomId, grid]);
+  startBattleRef.current = startBattleFromPlacements;
+
+  // Broadcast a live snapshot of our current placement (throttled) so the opponent can spy it.
+  useEffect(() => {
+    if (phase !== 'place_player' || myReady) return;
+    if (snapshotBroadcastTimer.current) clearTimeout(snapshotBroadcastTimer.current);
+    snapshotBroadcastTimer.current = setTimeout(() => {
+      const unitData = playerUnitsRef.current.map(serializeUnit);
+      channelRef.current?.send({
+        type: 'broadcast',
+        event: 'game_sync',
+        payload: { action: 'placement_snapshot', data: { units: unitData } },
+      });
+    }, 400);
+    return () => { if (snapshotBroadcastTimer.current) clearTimeout(snapshotBroadcastTimer.current); };
+  }, [playerUnits, phase, myReady]);
 
   // Activate morale boost
   const activateMoraleBoost = useCallback(() => {
