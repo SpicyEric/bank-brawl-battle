@@ -1436,7 +1436,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     recordedRoundRef.current = roundNumber;
     // Host: playerUnits = player1, enemyUnits = player2
     const placements = [
-      ...playerUnits.map(u => ({ team: 'player1' as const, type: u.type, color: (u as any).color, row: u.row, col: u.col, hp: u.hp })),
+      ...playerUnits.map(u => ({ team: 'player1' as const, type: u.type, color: (u as any).color, row: Math.max(0, u.row - GRID_SIZE * 2), col: u.col, hp: u.hp })),
       ...enemyUnits.map(u => ({ team: 'player2' as const, type: u.type, color: (u as any).color, row: u.row, col: u.col, hp: u.hp })),
     ];
     matchRecorder.startRound(roundNumber, placements);
