@@ -18,6 +18,8 @@ import {
   applyShadowpriestCurse, handleShadowbladeTick,
   generateAIPlacement,
 } from '@/lib/battleGame';
+import { applyAuraStacks, applyAuraTick, applyAuraSourceEffects, applyAuraOnAttack, applyAuraOnDeath, applyDefenderShare } from '@/lib/auraEffects';
+import { loadAuraData, ZONE_POSITIONS, ZONE_DELTA, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
 import type { BattleEvent } from '@/lib/battleEvents';
 
 const MAX_TICKS = 80;
