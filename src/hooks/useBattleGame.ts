@@ -1020,8 +1020,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
       // === Burn DoT processing (Brandstifter / Arsonist) ===
       for (const u of allUnits) {
         if (!u.burning || u.burning.length === 0 || u.hp <= 0) continue;
-        // Mountaineer on hill is immune to fire damage
-        if (isImmuneToFire(u, newGrid)) {
+        // Mountaineer on hill is immune to fire damage; cloner aura grants fire/frost/poison immunity
+        if (isImmuneToFire(u, newGrid) || hasImmuneFFP(u)) {
           u.burning = [];
           continue;
         }
@@ -1032,6 +1032,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           return b.turns > 0;
         });
         if (totalBurn > 0) {
+          // Aura nerf: double dmg from lightning/fire on this defender
+          totalBurn = Math.round(totalBurn * fireLightningTakenMul(u));
           u.hp = Math.max(0, u.hp - totalBurn);
           logs.push(`🔥 ${UNIT_DEFS[u.type].emoji} brennt: -${totalBurn} ❤️${u.hp <= 0 ? ' ☠️' : ''}`);
           if (u.hp <= 0) (u as any).dead = true;
