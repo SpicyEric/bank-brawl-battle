@@ -108,7 +108,7 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
   const [spying, setSpying] = useState(false);
   const spyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const triggerSpy = () => {
-    if (spyUsed || isMultiplayer) return;
+    if (spyUsed) return;
     if (game.phase !== 'place_player') return;
     // Flush all pending AI placements so player sees the final formation immediately.
     game.revealAIPlacement?.();
@@ -126,15 +126,14 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
       setSpyUsed(false);
       setSpying(false);
     } else {
-      // Hide enemies again as soon as placement ends.
       setSpying(false);
     }
     if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
   }, [game.phase, matchId]);
   // Hide enemies during placement unless the spy was used this phase.
-  const hideEnemyUnits = !isMultiplayer && game.phase === 'place_player' && !spying;
+  const hideEnemyUnits = game.phase === 'place_player' && !spying;
   // During the 3-second spy reveal, hide our own units so the enemy board is solo.
-  const hidePlayerUnits = !isMultiplayer && game.phase === 'place_player' && spying;
+  const hidePlayerUnits = game.phase === 'place_player' && spying;
 
   // Aura zones (loaded once from DB), recomputed overlay each render based on placed units
   const [auraZones, setAuraZones] = useState<import('@/lib/auraData').AuraZoneMap>({});
