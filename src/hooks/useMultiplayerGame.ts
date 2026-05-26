@@ -106,6 +106,18 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   // Live snapshot of opponent's current placement (for spy button).
   const [opponentSnapshot, setOpponentSnapshot] = useState<Unit[]>([]);
 
+  // Flank state (mine + opponent indicator)
+  const [flankLeftUsed, setFlankLeftUsed] = useState(false);
+  const [flankRightUsed, setFlankRightUsed] = useState(false);
+  const [flankActive, setFlankActive] = useState<'left' | 'right' | null>(null);
+  const flankActiveRef = useRef<{ dir: -1 | 1; step: number } | null>(null);
+  const opponentFlankRef = useRef<{ dir: -1 | 1; step: number } | null>(null);
+
+  // Battlefield background ID — host picks, both display the same.
+  const [battlefieldId, setBattlefieldId] = useState<'grass' | 'desert'>(() =>
+    Math.random() < 0.5 ? 'grass' : 'desert'
+  );
+
   const battleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const placeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -144,6 +156,16 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       if (action === 'terrain') {
         setGrid(data.grid as Cell[][]);
         setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
+        if (data.battlefieldId) setBattlefieldId(data.battlefieldId);
+      }
+
+      // Opponent activated flank
+      if (action === 'flank') {
+        const dir = data.dir as -1 | 1;
+        if (isHost) {
+          opponentFlankRef.current = { dir, step: 0 };
+        }
+        setBattleLog(prev => [`🏃 GEGNER FLANKE ${dir === -1 ? '←' : '→'}!`, ...prev]);
       }
 
       // Live snapshot of opponent's current placement (used by spy button)
@@ -197,6 +219,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           // Sync focus fire state
           if (data.enemyFocusFire) setFocusFireActive(true);
           else setFocusFireActive(false);
+          // Sync flank active state from host (guest's units = enemy team on host)
+          const myFlank = data.enemyFlankActive as -1 | 1 | null | undefined;
+          setFlankActive(myFlank === -1 ? 'left' : myFlank === 1 ? 'right' : null);
         }
       }
 
@@ -281,6 +306,12 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         setShieldWallUsed(false);
         setShieldWallActive(false);
         shieldWallTicksLeft.current = 0;
+        setFlankLeftUsed(false);
+        setFlankRightUsed(false);
+        setFlankActive(null);
+        flankActiveRef.current = null;
+        opponentFlankRef.current = null;
+        if (data.battlefieldId) setBattlefieldId(data.battlefieldId);
       }
     });
 
@@ -373,7 +404,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         channelRef.current?.send({
           type: 'broadcast',
           event: 'game_sync',
-          payload: { action: 'terrain', data: { grid: serializeGrid(grid) } },
+          payload: { action: 'terrain', data: { grid: serializeGrid(grid), battlefieldId } },
         });
       }, 500);
     }
@@ -690,6 +721,66 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     });
   }, [shieldWallUsed, phase, myTeam]);
 
+  // Activate flank: same logic as SP — 3-tick burst (back, sideways, forward)
+  // applied to my team only. Host: applied locally + via flankActiveRef.
+  // Guest: broadcasts to host, host applies on enemy team.
+  const activateFlank = useCallback((dir: -1 | 1) => {
+    if (phase !== 'battle') return;
+    if (dir === -1 && flankLeftUsed) return;
+    if (dir === 1 && flankRightUsed) return;
+    if (dir === -1) setFlankLeftUsed(true); else setFlankRightUsed(true);
+    setFlankActive(dir === -1 ? 'left' : 'right');
+    if (isHost) {
+      flankActiveRef.current = { dir, step: 0 };
+    }
+    setBattleLog(prev => [`🏃 FLANKE ${dir === -1 ? '←' : '→'}! Alle Einheiten umfassen den Gegner!`, ...prev]);
+    channelRef.current?.send({
+      type: 'broadcast',
+      event: 'game_sync',
+      payload: { action: 'flank', data: { dir } },
+    });
+  }, [phase, flankLeftUsed, flankRightUsed, isHost]);
+
+  // Helper: apply one flank step to a single team's units in-place.
+  const applyFlankStep = (
+    grid: Cell[][],
+    units: Unit[],
+    dir: -1 | 1,
+    step: number,
+    team: 'player' | 'enemy'
+  ) => {
+    // Mirror axes for enemy team (host's perspective: enemy starts on rows 0-2).
+    const sign = team === 'player' ? 1 : -1;
+    let dr = 0, dc = 0, maxSteps = 0;
+    if (step === 0) { dr = 1 * sign;  dc = 0;          maxSteps = 2; }
+    else if (step === 1) { dr = 0;     dc = dir * sign; maxSteps = 5; }
+    else if (step === 2) { dr = -1 * sign; dc = 0;     maxSteps = 5; }
+    if (dr === 0 && dc === 0) return;
+    const teamUnits = units.filter(u => u.team === team && u.hp > 0 && !u.dead);
+    const sorted = [...teamUnits].sort((a, b) => {
+      if (dr > 0) return b.row - a.row;
+      if (dr < 0) return a.row - b.row;
+      if (dc > 0) return b.col - a.col;
+      if (dc < 0) return a.col - b.col;
+      return 0;
+    });
+    for (const u of sorted) {
+      for (let s = 0; s < maxSteps; s++) {
+        const nr = u.row + dr;
+        const nc = u.col + dc;
+        if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) break;
+        const tgt = grid[nr]?.[nc];
+        if (!tgt) break;
+        if (tgt.terrain === 'water') break;
+        if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
+        if (grid[u.row]?.[u.col]?.unit?.id === u.id) grid[u.row][u.col].unit = null;
+        u.row = nr; u.col = nc;
+        grid[u.row][u.col].unit = u;
+      }
+    }
+  };
+
+
   // Battle tick - only host runs this
   const battleTick = useCallback(() => {
     if (!isHost) return;
@@ -698,6 +789,21 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
+
+      // Flank shifts (host applies for both: own = player team, opp = enemy team)
+      if (flankActiveRef.current) {
+        applyFlankStep(newGrid, allUnits, flankActiveRef.current.dir, flankActiveRef.current.step, 'player');
+        const ns = flankActiveRef.current.step + 1;
+        if (ns >= 3) { flankActiveRef.current = null; setFlankActive(null); }
+        else flankActiveRef.current = { dir: flankActiveRef.current.dir, step: ns };
+      }
+      if (opponentFlankRef.current) {
+        applyFlankStep(newGrid, allUnits, opponentFlankRef.current.dir, opponentFlankRef.current.step, 'enemy');
+        const ns = opponentFlankRef.current.step + 1;
+        if (ns >= 3) opponentFlankRef.current = null;
+        else opponentFlankRef.current = { dir: opponentFlankRef.current.dir, step: ns };
+      }
+
 
       // Tick down morale for both players (host tracks both)
       if (moralePhase.current !== 'none' && moraleTicksLeft.current > 0) {
@@ -1078,6 +1184,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
               // Focus fire states
               playerFocusFire: focusFireTicksLeft.current > 0,
               enemyFocusFire: opponentFocusFireTicksLeft.current > 0,
+              // Flank active state (host's player team = player1; enemy team = player2/guest)
+              playerFlankActive: flankActiveRef.current?.dir ?? null,
+              enemyFlankActive: opponentFlankRef.current?.dir ?? null,
             },
           },
         });
@@ -1132,6 +1241,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const nextRound = useCallback(async () => {
     const newRound = roundNumber + 1;
     const newGrid = generateTerrain(createEmptyGrid());
+    // Host re-picks the battlefield biome each round; guest follows via broadcast.
+    const newBattlefieldId: 'grass' | 'desert' = isHost
+      ? (Math.random() < 0.5 ? 'grass' : 'desert')
+      : battlefieldId;
+    if (isHost) setBattlefieldId(newBattlefieldId);
 
     // Update fatigue before resetting units
     setPlayerFatigue(prev => {
@@ -1166,6 +1280,12 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     opponentReadyRef.current = false;
     setOpponentSnapshot([]);
     setPlaceTimer(MULTI_PLACE_TIME_LIMIT);
+    // Reset flank
+    setFlankLeftUsed(false);
+    setFlankRightUsed(false);
+    setFlankActive(null);
+    flankActiveRef.current = null;
+    opponentFlankRef.current = null;
 
     await updateRoom(roomId, {
       player1_units: null, player2_units: null,
@@ -1185,13 +1305,14 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
               roundNumber: newRound,
               playerScore: enemyScore,
               enemyScore: playerScore,
+              battlefieldId: newBattlefieldId,
             },
 
           },
         });
       }, 300);
     }
-  }, [roundNumber, roomId, isHost, playerScore, enemyScore, playerUnits, playerBannedUnits]);
+  }, [roundNumber, roomId, isHost, playerScore, enemyScore, playerUnits, playerBannedUnits, battlefieldId, hasRoster, roster]);
 
   const resetGame = useCallback(() => {}, []);
   const startBattle = useCallback(() => {}, []);
@@ -1287,10 +1408,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     shieldWallUsed,
     shieldWallActive,
     activateShieldWall,
-    flankLeftUsed: false,
-    flankRightUsed: false,
-    flankActive: null as 'left' | 'right' | null,
-    activateFlank: (_dir: -1 | 1) => {},
+    flankLeftUsed,
+    flankRightUsed,
+    flankActive,
+    activateFlank,
+    battlefieldId,
     opponentMoraleActive,
     waitingForOpponent,
     opponentLeft,

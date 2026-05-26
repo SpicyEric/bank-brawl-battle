@@ -37,6 +37,8 @@ interface BattleGridProps {
   hideEnemyUnits?: boolean;
   /** Hide own player units (used briefly while spy reveals the enemy formation). */
   hidePlayerUnits?: boolean;
+  /** Force a specific battlefield background (used to sync host/guest in multiplayer). */
+  battlefieldId?: 'grass' | 'desert';
 }
 
 interface UnitPos { row: number; col: number }
@@ -53,7 +55,7 @@ interface RiderHornFlash { id: string; row: number; col: number; kind: 'inner' |
 interface DragonSpinFlame { id: string; row: number; col: number; delayMs: number }
 interface TeleportEffect { id: string; row: number; col: number; kind: 'out' | 'in' }
 
-export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview, matchId, auraOverlay, auraZones, selectedFormationCells, hideEnemyUnits, hidePlayerUnits }: BattleGridProps) {
+export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents = [], moraleBoostActive, opponentMoraleActive, focusFireActive, sacrificeFlash, alwaysShowColorDots, showZoneColors, flipped, dragPreview, matchId, auraOverlay, auraZones, selectedFormationCells, hideEnemyUnits, hidePlayerUnits, battlefieldId }: BattleGridProps) {
   const isPlacing = phase === 'place_player';
   const [flashCells, setFlashCells] = useState<Set<string>>(new Set());
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -101,15 +103,24 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
     { id: 'grass' as const, url: battlefieldGrass },
     { id: 'desert' as const, url: battlefieldDesert },
   ], []);
-  const [battlefield, setBattlefield] = useState(() => BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
+  const [battlefield, setBattlefield] = useState(() => {
+    if (battlefieldId) return BATTLEFIELDS.find(b => b.id === battlefieldId) ?? BATTLEFIELDS[0];
+    return BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)];
+  });
   const battlefieldBg = battlefield.url;
   const prevMatchIdRef = useRef<number | undefined>(matchId);
   useEffect(() => {
+    if (battlefieldId) {
+      const bf = BATTLEFIELDS.find(b => b.id === battlefieldId);
+      if (bf && bf.id !== battlefield.id) setBattlefield(bf);
+      prevMatchIdRef.current = matchId;
+      return;
+    }
     if (matchId !== undefined && matchId !== prevMatchIdRef.current) {
       setBattlefield(BATTLEFIELDS[Math.floor(Math.random() * BATTLEFIELDS.length)]);
       prevMatchIdRef.current = matchId;
     }
-  }, [matchId, BATTLEFIELDS]);
+  }, [matchId, BATTLEFIELDS, battlefieldId, battlefield.id]);
 
 
   // War cry flash animation (own or opponent)
