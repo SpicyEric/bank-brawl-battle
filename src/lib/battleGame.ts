@@ -1641,14 +1641,15 @@ export function processLavaTick(grid: Cell[][], logs: string[]): void {
   }
 }
 
-/** Arsonist: leave a 3-tick burning trail on the cell the unit is leaving.
+/** Arsonist: leave a 15-tick burning trail on the cell the unit is leaving.
  *  Damages enemies only (lavaOwnerTeam = arsonist's team). Call BEFORE clearing the cell. */
 export function leaveArsonistTrail(grid: Cell[][], unit: Unit): void {
   if (unit.type !== 'arsonist') return;
   const cell = grid[unit.row]?.[unit.col];
   if (!cell || cell.terrain === 'water') return;
-  cell.lavaTicks = 6;
+  cell.lavaTicks = 15;
   cell.lavaOwnerTeam = unit.team;
+  cell.lavaDmg = 4;
 }
 
 // ============= TERRAIN SEEKERS (waterwalker) =============
