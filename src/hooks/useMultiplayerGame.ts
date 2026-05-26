@@ -824,13 +824,17 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     step: number,
     team: 'player' | 'enemy'
   ) => {
-    // Mirror axes for enemy team (host's perspective: enemy starts on rows 0-2).
+    // Mirror axes for enemy team (host perspective: player marches upward, enemy downward).
     const sign = team === 'player' ? 1 : -1;
     let dr = 0, dc = 0, maxSteps = 0;
     if (step === 0) { dr = 1 * sign;  dc = 0;          maxSteps = 2; }
     else if (step === 1) { dr = 0;     dc = dir * sign; maxSteps = 5; }
     else if (step === 2) { dr = -1 * sign; dc = 0;     maxSteps = 5; }
     if (dr === 0 && dc === 0) return;
+    const rowCount = grid.length;
+    const colCount = grid[0]?.length ?? GRID_SIZE;
+    const arenaTop = GRID_SIZE;
+    const arenaBottom = GRID_SIZE * 2;
     const teamUnits = units.filter(u => u.team === team && u.hp > 0 && !u.dead);
     const sorted = [...teamUnits].sort((a, b) => {
       if (dr > 0) return b.row - a.row;
@@ -843,13 +847,15 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       for (let s = 0; s < maxSteps; s++) {
         const nr = u.row + dr;
         const nc = u.col + dc;
-        if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) break;
+        if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
+        if (u.enteredArena && (nr < arenaTop || nr >= arenaBottom)) break;
         const tgt = grid[nr]?.[nc];
         if (!tgt) break;
         if (tgt.terrain === 'water') break;
         if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
         if (grid[u.row]?.[u.col]?.unit?.id === u.id) grid[u.row][u.col].unit = null;
         u.row = nr; u.col = nc;
+        if (u.row >= arenaTop && u.row < arenaBottom) u.enteredArena = true;
         grid[u.row][u.col].unit = u;
       }
     }
