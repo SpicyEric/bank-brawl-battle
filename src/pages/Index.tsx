@@ -86,7 +86,7 @@ function SinglePlayerGame() {
   return <GameUI game={game} isMultiplayer={false} roster={validRoster} />;
 }
 
-function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnType<typeof useBattleGame>, 'moveFormation'> & { moveFormation?: ReturnType<typeof useBattleGame>['moveFormation']; waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; roster?: UnitType[] }) {
+function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnType<typeof useBattleGame>, 'moveFormation' | 'revealAIPlacement'> & { moveFormation?: ReturnType<typeof useBattleGame>['moveFormation']; revealAIPlacement?: ReturnType<typeof useBattleGame>['revealAIPlacement']; waitingForOpponent?: boolean; myRows?: number[]; placeTimer?: number; isMyTurnToPlace?: boolean; placingPhase?: string; opponentMoraleActive?: 'buff' | 'debuff' | null; aiMoraleActive?: 'buff' | 'debuff' | null; isHost?: boolean; opponentLeft?: boolean }; isMultiplayer: boolean; flipped?: boolean; roster?: UnitType[] }) {
   const navigate = useNavigate();
   const { muted, toggleMute } = useMusic('battle');
   const [inspectUnit, setInspectUnit] = useState<{ type: UnitType; color?: ColorGroup } | null>(null);
@@ -100,42 +100,29 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
   const [matchId, setMatchId] = useState(0);
   const prevGameOver = useRef(game.gameOver);
 
-  // === Spy: hold a button during placement to peek at opponent for up to 3s, once per match ===
+  // === Spy: single tap during placement reveals the AI's fully built formation.
+  // Once per placement phase. Resets every new placement phase.
   const [spyUsed, setSpyUsed] = useState(false);
-  const [spying, setSpying] = useState(false);
-  const spyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const startSpy = () => {
-    if (spyUsed || spying || isMultiplayer) return;
+  const [spying, setSpying] = useState(false); // true after spy was triggered for this phase
+  const triggerSpy = () => {
+    if (spyUsed || isMultiplayer) return;
+    if (game.phase !== 'place_player') return;
+    // Flush all pending AI placements so player sees the final formation immediately.
+    game.revealAIPlacement?.();
     setSpying(true);
-    spyTimerRef.current = setTimeout(() => {
-      setSpying(false);
-      setSpyUsed(true);
-      spyTimerRef.current = null;
-    }, 3000);
-  };
-  const stopSpy = () => {
-    if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
-    setSpying(false);
     setSpyUsed(true);
   };
-  // Reset spy state on each new match
+  // Reset spy state on every new placement phase (and on new match).
   useEffect(() => {
-    setSpyUsed(false);
-    setSpying(false);
-    if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
-  }, [matchId]);
-  // Auto-stop spy whenever we leave the placement phase, regardless of
-  // whether the user is still holding the button. This prevents the spy
-  // reveal (and the resulting "build area" view) from bleeding into the
-  // battle phase when the placement timer expires mid-hold.
-  useEffect(() => {
-    if (game.phase !== 'place_player') {
-      if (spyTimerRef.current) { clearTimeout(spyTimerRef.current); spyTimerRef.current = null; }
+    if (game.phase === 'place_player') {
+      setSpyUsed(false);
+      setSpying(false);
+    } else {
+      // Hide enemies again as soon as placement ends.
       setSpying(false);
     }
-  }, [game.phase]);
-  // Only hide enemies during placement AND when not spying. Outside of
-  // placement we never hide enemies, even if `spying` somehow lingered.
+  }, [game.phase, matchId]);
+  // Hide enemies during placement unless the spy was used this phase.
   const hideEnemyUnits = !isMultiplayer && game.phase === 'place_player' && !spying;
 
   // Aura zones (loaded once from DB), recomputed overlay each render based on placed units
@@ -390,21 +377,15 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
             {!isMultiplayer && (
               <div className="flex gap-2">
                 <button
-                  onPointerDown={(e) => { e.preventDefault(); startSpy(); }}
-                  onPointerUp={stopSpy}
-                  onPointerLeave={stopSpy}
-                  onPointerCancel={stopSpy}
-                  onContextMenu={(e) => e.preventDefault()}
-                  disabled={spyUsed && !spying}
-                  className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all select-none touch-none active:scale-[0.98] ${
-                    spying
-                      ? 'bg-primary text-primary-foreground shadow-[0_0_14px_hsl(var(--primary)/0.6)] animate-pulse'
-                      : spyUsed
+                  onClick={triggerSpy}
+                  disabled={spyUsed}
+                  className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all select-none active:scale-[0.98] ${
+                    spyUsed
                       ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
                       : 'bg-card border border-primary/50 text-primary hover:bg-primary/10'
                   }`}
                 >
-                  {spying ? '👁️ SPIONIERE…' : spyUsed ? '👁️ verbraucht' : '👁️ Spionieren (halten)'}
+                  {spyUsed ? '👁️ Spioniert' : '👁️ Spionieren'}
                 </button>
                 <button
                   onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
