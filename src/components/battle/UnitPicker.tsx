@@ -132,7 +132,10 @@ export function UnitPicker({
       onDragHover?.(null, null, null);
       if (didLongPress.current) { didLongPress.current = false; return; }
       if (wasDragging && startInfo && slotIdx !== null) {
-        const cell = findCellAtPoint(e.clientX, e.clientY - DRAG_Y_OFFSET);
+        // Prefer the last hovered cell (matches the +/- aura preview the user saw)
+        // and fall back to a fresh hit-test if no hover was tracked.
+        const cell = lastHover.current ?? findCellAtPoint(e.clientX, e.clientY - DRAG_Y_OFFSET);
+        lastHover.current = null;
         if (cell) onDragDrop?.(cell.row, cell.col, slotIdx);
       }
       // Pure tap: slot is already selected from pointerdown — nothing else to do
