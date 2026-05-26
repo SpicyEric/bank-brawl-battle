@@ -502,6 +502,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
 
 
   // Start battle after both placed
+  const startBattleRef = useRef<(() => Promise<void>) | null>(null);
   const startBattleFromPlacements = useCallback(async () => {
     const { data: room } = await supabase
       .from('game_rooms')
