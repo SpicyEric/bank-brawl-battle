@@ -16,6 +16,7 @@ import {
   tickObeliskAura, tickBomberActions, tickBombFuses, tickShadowpriestHarvest,
   applyPostAttackEffects, applyDeathEffects, applyMirrorReflect, applyChainAttack,
   applyShadowpriestCurse, handleShadowbladeTick,
+  generateAIPlacement,
 } from '@/lib/battleGame';
 import type { BattleEvent } from '@/lib/battleEvents';
 
