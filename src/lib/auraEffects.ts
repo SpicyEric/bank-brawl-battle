@@ -489,10 +489,94 @@ export function applyAuraOnAttack(params: {
   }
 }
 
-/** On-death aura triggers (sniper death bonus, splash on death, etc.). */
-export function applyAuraOnDeath(deadUnit: Unit, allUnits: Unit[], grid: Cell[][], logs: string[]): void {
-  // We don't track on_death effects via stacks (these are properties of the dying unit itself,
-  // not auras projected on it). They live in the unit's own effect key set — handled by
-  // existing hardcoded death logic for now. Reserved for future expansion.
-  void deadUnit; void allUnits; void grid; void logs;
+/** Damage-share + miss-chance + taunt-reduction + doppel bonus.
+ *  Called right before applying damage. Returns adjusted dmg and mutates redirect target. */
+export function applyDefenderShare(
+  attacker: Unit, defender: Unit, dmg: number, allUnits: Unit[], logs: string[],
+): number {
+  const ds = defender.auraStacks;
+  if (!ds || dmg <= 0) return dmg;
+  // Miss chance (obelisk nerf on attacker side actually) — handle if defender forced miss on attacker
+  const as = attacker.auraStacks;
+  if (as && as.missChance10 > 0) {
+    const miss = Math.min(0.95, 0.10 * as.missChance10);
+    if (Math.random() < miss) {
+      attacker._justDodged = Date.now();
+      return 0;
+    }
+  }
+  let adj = dmg;
+  // Taunt damage reduction (magnetiker)
+  if (ds.tauntDmgRed50 > 0) {
+    adj = Math.round(adj * Math.max(0.05, 1 - 0.50 * ds.tauntDmgRed50));
+  }
+  // Damage share to allied icegolem
+  if (ds.damageShareToIce > 0) {
+    const frac = Math.min(0.95, 0.50 * ds.damageShareToIce);
+    const share = Math.round(adj * frac);
+    if (share > 0) {
+      const ice = allUnits.find(u => u.team === defender.team && u.type === 'icegolem' && !u.dead && u.hp > 0 && u.id !== defender.id);
+      if (ice) {
+        ice.hp = Math.max(0, ice.hp - share);
+        logs.push(`🧊 Schadens-Teilen → 🧊 ${share}`);
+        if (ice.hp <= 0) ice.dead = true;
+        adj -= share;
+      }
+    }
+  }
+  return Math.max(0, adj);
 }
+
+/** Doppel 50% chance: bonus +5 ATK per stack on the hit. */
+export function applyDoppelHitBonus(attacker: Unit, dmg: number): number {
+  const s = attacker.auraStacks;
+  if (!s || s.doppelChance50Plus5 <= 0) return dmg;
+  if (Math.random() < 0.5) {
+    return dmg + 5 * s.doppelChance50Plus5;
+  }
+  return dmg;
+}
+
+/** On-death aura triggers (sniper death bonus, bomber death splash, etc.). */
+export function applyAuraOnDeath(
+  deadUnit: Unit, allUnits: Unit[], grid: Cell[][],
+  zones: AuraZoneMap, effects: AuraEffectMap, logs: string[],
+): void {
+  const eff = effects[deadUnit.type as UnitType];
+  const z = zones[deadUnit.type as UnitType];
+  if (!eff) return;
+
+  // === Sniper death nerf: deals 20 dmg to allies that were in its nerf zone ===
+  if (eff.nerf === 'on_sniper_death_20_damage_to_nerved' && z) {
+    for (const pos of ZONE_POSITIONS) {
+      if (z[pos] !== 'nerf') continue;
+      const { dr, dc } = ZONE_DELTA[pos];
+      const r = deadUnit.row + dr, c = deadUnit.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const ally = grid[r]?.[c]?.unit;
+      if (ally && !ally.dead && ally.hp > 0 && ally.team === deadUnit.team) {
+        ally.hp = Math.max(0, ally.hp - 20);
+        logs.push(`🎯 Sniper-Todesnerf → ${UNIT_DEFS[ally.type].emoji} 20`);
+        if (ally.hp <= 0) ally.dead = true;
+      }
+    }
+  }
+
+  // === Bomber death: splash to surrounding allies (death-explosion penalty) ===
+  if (eff.nerf === 'on_death_splash_to_allies') {
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const r = deadUnit.row + dr, c = deadUnit.col + dc;
+      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
+      const ally = grid[r]?.[c]?.unit;
+      if (ally && !ally.dead && ally.hp > 0 && ally.team === deadUnit.team) {
+        ally.hp = Math.max(0, ally.hp - 15);
+        logs.push(`💥 Bomber-Tod → ${UNIT_DEFS[ally.type].emoji} 15`);
+        if (ally.hp <= 0) ally.dead = true;
+      }
+    }
+  }
+
+  void allUnits;
+}
+
