@@ -97,6 +97,13 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
   const [shieldWallActive, setShieldWallActive] = useState(false);
   const shieldWallTicksLeft = useRef(0);
 
+  // Flank state (left=-1, right=+1). One-shot per side per match.
+  const [flankLeftUsed, setFlankLeftUsed] = useState(false);
+  const [flankRightUsed, setFlankRightUsed] = useState(false);
+  const [flankActive, setFlankActive] = useState<'left' | 'right' | null>(null);
+  const flankActiveRef = useRef<{ dir: -1 | 1; step: number } | null>(null);
+
+
   // AI ability state
   const aiMoraleUsed = useRef(false);
   const aiMoralePhase = useRef<'none' | 'buff' | 'debuff'>('none');
