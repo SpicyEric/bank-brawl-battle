@@ -1029,6 +1029,76 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       tickBombFuses(newGrid, allUnits, events, logs);
       // Shadowpriest soul harvest
       tickShadowpriestHarvest(allUnits, newGrid, logs);
+
+      // === SP parity: arena march-in + formation movement ===
+      // Skip these when a flank burst is active (flank handles its own positioning).
+      if (!flankShifting) {
+        // Arena march-in catch-up: off-field units keep marching into the visible 8×8.
+        const rowCount = newGrid.length;
+        const colCount = newGrid[0]?.length ?? GRID_SIZE;
+        const offField = allUnits.filter(u => u.hp > 0 && !u.dead && !inBattlefield(u) && !u.enteredArena);
+        const sortedOff = [...offField].sort((a, b) => {
+          const aDr = a.row < VIEW_TOP ? 1 : -1;
+          const bDr = b.row < VIEW_TOP ? 1 : -1;
+          if (aDr !== bDr) return bDr - aDr;
+          return aDr > 0 ? b.row - a.row : a.row - b.row;
+        });
+        for (const u of sortedOff) {
+          const moveDr = u.row < VIEW_TOP ? 1 : -1;
+          for (let s = 0; s < 3; s++) {
+            const nr = u.row + moveDr;
+            const nc = u.col;
+            if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
+            const tgt = newGrid[nr]?.[nc];
+            if (!tgt) break;
+            if (tgt.terrain === 'water') break;
+            if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
+            if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
+            u.row = nr; u.col = nc;
+            if (u.row >= VIEW_TOP && u.row < VIEW_BOTTOM) u.enteredArena = true;
+            newGrid[u.row][u.col].unit = u;
+            if (u.enteredArena) break;
+          }
+        }
+
+        // Formation movement: groups shift one cell toward nearest opposing unit per tick.
+        const moveTeamFormations = (team: 'player' | 'enemy') => {
+          const formations = findFormations(allUnits, team);
+          const opponentsAlive = allUnits.filter(u => u.team !== team && u.hp > 0 && !u.dead);
+          const forwardDr = team === 'player' ? -1 : 1;
+          for (const grp of formations) {
+            if (grp.length === 0 || opponentsAlive.length === 0) continue;
+            const rowsInGrp = new Set(grp.map(u => u.row));
+            const sharesRow = opponentsAlive.some(o => rowsInGrp.has(o.row));
+            let tgtU: Unit | null = null;
+            let bestDist = Infinity;
+            for (const u of grp) for (const opponent of opponentsAlive) {
+              const d = Math.abs(opponent.row - u.row) + Math.abs(opponent.col - u.col);
+              if (d < bestDist) { bestDist = d; tgtU = opponent; }
+            }
+            if (!tgtU || bestDist <= 1) continue;
+            let cr = 0, cc = 0;
+            for (const u of grp) { cr += u.row; cc += u.col; }
+            cr /= grp.length; cc /= grp.length;
+            const ddr = Math.sign(tgtU.row - cr);
+            const ddc = Math.sign(tgtU.col - cc);
+            const tries: Array<[number, number]> = [];
+            if (sharesRow) {
+              if (ddr !== 0 && ddc !== 0) tries.push([ddr, ddc]);
+              if (ddr !== 0) tries.push([ddr, 0]);
+              if (ddc !== 0) tries.push([0, ddc]);
+            } else {
+              tries.push([forwardDr, 0]);
+            }
+            for (const [mdr, mdc] of tries) {
+              if (applyFormationMove(grp, mdr, mdc, newGrid)) break;
+            }
+          }
+        };
+        moveTeamFormations('player');
+        moveTeamFormations('enemy');
+      }
+
       const currentTurn = turnCount;
       const acting = allUnits.filter(u => {
         if (u.hp <= 0) return false;
