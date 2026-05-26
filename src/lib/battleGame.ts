@@ -1719,7 +1719,10 @@ export function isImmuneToFire(_unit: Unit, _grid: Cell[][]): boolean {
 export function effectiveCooldown(unit: Unit, _grid: Cell[][]): number {
   let cd = unit.maxCooldown;
   if ((unit.obeliskBuff || 0) > 0) cd = Math.max(1, Math.ceil(cd / 2));
-  return cd;
+  // Aura stacks: cooldown ±1 per stack
+  const s = unit.auraStacks;
+  if (s) cd = cd - s.cdMinus1 + s.cdPlus1;
+  return Math.max(1, cd);
 }
 
 export type SeekerResult = 'normal' | 'on_terrain' | 'moved' | 'wait';
