@@ -701,10 +701,11 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const isPlayerZone = isPlacing; // full grid is buildable during placement
           const isEnemyZone = false;
           const unit = cell.unit;
-          // Hide enemy units during placement (unless spying via hideEnemyUnits=false).
-          // Hide own units briefly while spy reveals the enemy formation.
-          const isHiddenEnemy = !!(unit && unit.team === 'enemy' && hideEnemyUnits && isPlacing);
-          const isHiddenPlayer = !!(unit && unit.team === 'player' && hidePlayerUnits && isPlacing);
+          // In multiplayer player2 owns team "enemy" from the host simulation perspective.
+          // Visibility must therefore be role-aware, otherwise player2's own placed icons disappear.
+          const unitIsOwn = !!unit && (flipped ? unit.team === 'enemy' : unit.team === 'player');
+          const isHiddenEnemy = !!(unit && !unitIsOwn && hideEnemyUnits && isPlacing);
+          const isHiddenPlayer = !!(unit && unitIsOwn && hidePlayerUnits && isPlacing);
           const def = unit ? UNIT_DEFS[unit.type] : null;
           const colorGroup = unit && !unit.dead ? (unit.color || UNIT_COLOR_GROUPS[unit.type]) : null;
           const showColorDot = colorGroup && (alwaysShowColorDots || phase === 'place_player' || phase === 'place_enemy') && !isHiddenEnemy;
@@ -729,8 +730,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
           const dragAuraKind = !isDragOrigin ? dragAuraCells.get(cellKey) : undefined;
           const pulseKind = placementPulse.get(cellKey);
           // Enemy live-placement overlay (kept for non-placement spy reveal; suppressed when hiding).
-          const showEnemyOverlay = unit && !isDead && isPlacing && !isHiddenEnemy
-            && (flipped ? unit.team === 'player' : unit.team === 'enemy');
+          const showEnemyOverlay = unit && !isDead && isPlacing && !isHiddenEnemy && !unitIsOwn;
 
 
           // Slide offset
