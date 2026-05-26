@@ -779,6 +779,67 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
           // Generic post-attack effects (mirror reflect, icegolem freeze, spider web, vulkanit lava, shadowblade bonus).
           applyPostAttackEffects(unit, best, dmg, newGrid, logs);
 
+          // Lightning: chain hops within radius 2 around last hit target.
+          let lightningChainCells: { row: number; col: number }[] | undefined;
+          if (unit.type === 'lightning') {
+            lightningChainCells = [{ row: best.row, col: best.col }];
+            const hopMults = [0.3, 0.2, 0.15, 0.1, 0.05];
+            const hitIds = new Set<string>([best.id]);
+            let cur = { row: best.row, col: best.col };
+            for (const mult of hopMults) {
+              let pick: { u: Unit; d: number } | null = null;
+              for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                const ar = cur.row + dr, ac = cur.col + dc;
+                if (ar < 0 || ar >= newGrid.length || ac < 0 || ac >= newGrid[0].length) continue;
+                const cu = newGrid[ar][ac].unit;
+                if (!cu || cu.hp <= 0 || cu.dead) continue;
+                if (cu.team === unit.team || hitIds.has(cu.id)) continue;
+                if (cu.isPhantom && (cu.phantom ?? 0) > 0) continue;
+                const d = Math.max(Math.abs(dr), Math.abs(dc));
+                if (!pick || d < pick.d) pick = { u: cu, d };
+              }
+              if (!pick) break;
+              const cu = pick.u;
+              const chainDmg = Math.max(1, Math.round(dmg * mult));
+              cu.hp = Math.max(0, cu.hp - chainDmg);
+              hitIds.add(cu.id);
+              lightningChainCells.push({ row: cu.row, col: cu.col });
+              logs.push(`⚡ Blitz → ${UNIT_DEFS[cu.type].emoji} ${chainDmg}`);
+              if (cu.hp <= 0) {
+                const survived = applyDeathEffects(cu, allUnits, newGrid, logs, events);
+                if (!survived) (cu as any).dead = true;
+              }
+              cur = { row: cu.row, col: cu.col };
+            }
+          }
+
+          // Chaindancer: chain through up to 2 additional diagonal enemies.
+          let chaindancerCells: { row: number; col: number }[] | undefined;
+          if (unit.type === 'chaindancer') {
+            chaindancerCells = applyChainAttack(unit, best, dmg, newGrid, logs);
+          }
+
+          // Dragon: 3x3 AOE around the dragon (30% splash to other enemies).
+          let aoeCells: { row: number; col: number }[] | undefined;
+          if (unit.type === 'dragon') {
+            aoeCells = [];
+            const splashDmg = Math.round(dmg * 0.3);
+            for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+              const ar = unit.row + dr, ac = unit.col + dc;
+              if (ar < 0 || ar >= newGrid.length || ac < 0 || ac >= newGrid[0].length) continue;
+              aoeCells.push({ row: ar, col: ac });
+              const cu = newGrid[ar][ac].unit;
+              if (!cu || cu === best || cu.team === unit.team || cu.hp <= 0 || cu.dead) continue;
+              cu.hp = Math.max(0, cu.hp - splashDmg);
+              logs.push(`🔥 Drache 🔥→ ${UNIT_DEFS[cu.type].emoji} ${splashDmg}`);
+              if (cu.hp <= 0) {
+                const survived = applyDeathEffects(cu, allUnits, newGrid, logs, events);
+                if (!survived) (cu as any).dead = true;
+              }
+            }
+          }
+
           const def = UNIT_DEFS[unit.type];
           const tDef = UNIT_DEFS[best.type];
           const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
@@ -791,7 +852,21 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
             targetId: best.id, targetRow: best.row, targetCol: best.col,
             damage: dmg, isStrong, isWeak,
             isRanged: bestDist > 1,
+            isAoe: unit.type === 'dragon',
+            aoeCells,
+            chainCells: lightningChainCells,
           });
+
+          if (chaindancerCells && chaindancerCells.length > 1) {
+            events.push({
+              type: 'chain',
+              attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col,
+              attackerEmoji: '🪢', attackerType: unit.type,
+              targetId: best.id, targetRow: best.row, targetCol: best.col,
+              damage: 0, isStrong: false, isWeak: false, isRanged: false,
+              chainCells: chaindancerCells,
+            });
+          }
 
           if (best.hp <= 0) {
             const survived = applyDeathEffects(best, allUnits, newGrid, logs, events);
