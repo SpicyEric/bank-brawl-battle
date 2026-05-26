@@ -398,28 +398,26 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
                 </span>
               </div>
             )}
-            {!isMultiplayer && (
-              <div className="flex gap-2">
-                <button
-                  onClick={triggerSpy}
-                  disabled={spyUsed}
-                  className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all select-none active:scale-[0.98] ${
-                    spyUsed
-                      ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
-                      : 'bg-card border border-primary/50 text-primary hover:bg-primary/10'
-                  }`}
-                >
-                  {spying ? '👁️ Gegner sichtbar…' : spyUsed ? '👁️ Spioniert' : '👁️ Spionieren'}
-                </button>
-                <button
-                  onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
-                  disabled={game.playerUnits.length === 0}
-                  className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                >
-                  ✅ Bereit ({game.playerUnits.length})
-                </button>
-              </div>
-            )}
+            <div className="flex gap-2">
+              <button
+                onClick={triggerSpy}
+                disabled={spyUsed}
+                className={`flex-1 py-2.5 rounded-xl font-semibold text-xs transition-all select-none active:scale-[0.98] ${
+                  spyUsed
+                    ? 'bg-muted text-muted-foreground opacity-40 cursor-not-allowed'
+                    : 'bg-card border border-primary/50 text-primary hover:bg-primary/10'
+                }`}
+              >
+                {spying ? '👁️ Gegner sichtbar…' : spyUsed ? '👁️ Spioniert' : '👁️ Spionieren'}
+              </button>
+              <button
+                onClick={() => { game.confirmPlacement(); sfxConfirm(); }}
+                disabled={game.playerUnits.length === 0}
+                className="flex-1 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                ✅ Bereit ({game.playerUnits.length})
+              </button>
+            </div>
             <UnitPicker
               selected={game.selectedUnit}
               onSelect={game.setSelectedUnit}
