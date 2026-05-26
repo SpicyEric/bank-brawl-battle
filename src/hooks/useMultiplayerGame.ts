@@ -23,6 +23,8 @@ interface MultiplayerConfig {
   role: 'player1' | 'player2';
   roster?: UnitType[];
   opponentRoster?: UnitType[];
+  ownHandicap?: number;
+  opponentHandicap?: number;
 }
 
 // Slot color layout matches UnitRoster: slots 0-2 red, 3-5 green, 6-8 blue
@@ -35,8 +37,9 @@ function createBattleWorldGrid(): Cell[][] {
   );
 }
 
-function getRoundUnitLimit(roundNumber: number): number {
-  return Math.min(9 + (roundNumber - 1) * 2, 17);
+function getRoundUnitLimit(roundNumber: number, handicap: number = 0): number {
+  const base = Math.min(9 + (roundNumber - 1) * 2, 17);
+  return Math.max(1, base - Math.max(0, Math.min(3, handicap | 0)));
 }
 
 // Use MULTI_PLACE_TIME_LIMIT for multiplayer (20s)
