@@ -18,6 +18,8 @@ import {
   applyShadowpriestCurse, handleShadowbladeTick,
   generateAIPlacement,
 } from '@/lib/battleGame';
+import { applyAuraStacks, applyAuraTick, applyAuraSourceEffects, applyAuraOnAttack, applyAuraOnDeath, applyDefenderShare } from '@/lib/auraEffects';
+import { loadAuraData, ZONE_POSITIONS, ZONE_DELTA, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
 import type { BattleEvent } from '@/lib/battleEvents';
 
 const MAX_TICKS = 80;
@@ -48,16 +50,44 @@ export interface PairStat {
   vsWins: number; // a's wins
 }
 
+// Aggregated buff/nerf attribution across the whole simulation.
+// Key encodes recipient + source + effectKey + kind so we can find
+// "this unit, buffed by THIS unit with THIS effect, has X% winrate."
+export interface AuraAttribCell {
+  recipient: UnitType;
+  source: UnitType;
+  effectKey: string;
+  kind: 'buff' | 'nerf';
+  games: number;          // # battles where recipient had ≥1 stack from this source/effect
+  wins: number;           // # of those won by recipient's team
+  stacksSum: number;      // sum of max-stacks per battle (→ avg = stacksSum/games)
+  recipientSurvSum: number; // sum of recipient final HP% (→ avg)
+  recipientDmgSum: number;  // sum of recipient damage dealt (→ avg)
+}
+
+export interface BuffPerUnitCell {
+  recipient: UnitType;
+  effectKey: string;
+  kind: 'buff' | 'nerf';
+  games: number;
+  wins: number;
+  stacksSum: number;
+  recipientSurvSum: number;
+  recipientDmgSum: number;
+}
+
 export interface SimReport {
   battles: number;
   ticksTotal: number;
   draws: number;
   durationMs: number;
   perUnit: Record<UnitType, UnitStat>;
-  // Matchup matrix: matrix[a][b] = win rate (%) of a's team when b is on opposing team
   vsMatrix: Record<UnitType, Record<UnitType, { games: number; wins: number }>>;
-  // Synergy matrix: synergy[a][b] = win rate when a & b on same team (a !== b)
   synergyMatrix: Record<UnitType, Record<UnitType, { games: number; wins: number }>>;
+  // recipient|source|effectKey|kind  →  attribution cell
+  auraAttrib: Map<string, AuraAttribCell>;
+  // recipient|effectKey|kind  →  per-unit buff cell (collapsed across sources)
+  buffPerUnit: Map<string, BuffPerUnitCell>;
   rosterP1?: UnitType[];
   rosterP2?: UnitType[];
 }
@@ -84,7 +114,11 @@ function emptyReport(): SimReport {
       synergyMatrix[t][u] = { games: 0, wins: 0 };
     }
   }
-  return { battles: 0, ticksTotal: 0, draws: 0, durationMs: 0, perUnit, vsMatrix, synergyMatrix };
+  return {
+    battles: 0, ticksTotal: 0, draws: 0, durationMs: 0,
+    perUnit, vsMatrix, synergyMatrix,
+    auraAttrib: new Map(), buffPerUnit: new Map(),
+  };
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -145,10 +179,61 @@ interface BattleResult {
     survivedHpPct: number; died: boolean;
   }>;
   finalAlive: { player: Unit[]; enemy: Unit[] };
+  // For each unit id, the MAX stacks observed for each (sourceType|effectKey|kind)
+  // during the whole battle. Used to attribute "who buffed whom" in the report.
+  auraSources: Record<string, Map<string, { source: UnitType; effectKey: string; kind: 'buff' | 'nerf'; stacks: number }>>;
+}
+
+// Per-tick recorder: walks aura zones (same logic as applyAuraStacks) and pushes
+// 1 stack per affected target into `sink`. We then take the per-(target,src,eff)
+// MAX across all ticks to get the recipient's peak buff exposure for this battle.
+function recordAuraSources(
+  units: Unit[],
+  zones: AuraZoneMap,
+  effects: AuraEffectMap,
+  sink: Record<string, Map<string, { source: UnitType; effectKey: string; kind: 'buff' | 'nerf'; stacks: number }>>,
+): void {
+  // Per-tick scratch: targetId -> key -> stacks-this-tick
+  const tick: Record<string, Map<string, { source: UnitType; effectKey: string; kind: 'buff' | 'nerf'; stacks: number }>> = {};
+  for (const src of units) {
+    if (src.dead || src.hp <= 0) continue;
+    const z = zones[src.type as UnitType];
+    if (!z) continue;
+    const eff = effects[src.type as UnitType];
+    if (!eff) continue;
+    for (const pos of ZONE_POSITIONS) {
+      const kind = z[pos];
+      if (!kind) continue;
+      const ek = kind === 'buff' ? eff.buff : eff.nerf;
+      if (!ek) continue;
+      const { dr, dc } = ZONE_DELTA[pos];
+      const r = src.row + dr, c = src.col + dc;
+      const tgt = units.find(u => u.row === r && u.col === c && u.team === src.team && !u.dead && u.hp > 0);
+      if (!tgt) continue;
+      const key = `${src.type}|${ek}|${kind}`;
+      let m = tick[tgt.id];
+      if (!m) { m = new Map(); tick[tgt.id] = m; }
+      const cur = m.get(key);
+      if (cur) cur.stacks += 1;
+      else m.set(key, { source: src.type, effectKey: ek, kind, stacks: 1 });
+    }
+  }
+  // Merge into sink with MAX per key
+  for (const [id, m] of Object.entries(tick)) {
+    let agg = sink[id];
+    if (!agg) { agg = new Map(); sink[id] = agg; }
+    for (const [k, v] of m) {
+      const prev = agg.get(k);
+      if (!prev || v.stacks > prev.stacks) agg.set(k, { ...v });
+    }
+  }
 }
 
 // ============== The full headless tick loop ==============
-function simulateOneBattle(teamSize: number, difficultyP1: number, difficultyP2: number): BattleResult {
+function simulateOneBattle(
+  teamSize: number, difficultyP1: number, difficultyP2: number,
+  zones: AuraZoneMap, effects: AuraEffectMap,
+): BattleResult {
   const grid = generateTerrain(createEmptyGrid());
   const colorOf = (i: number): ColorGroup => (i < 3 ? 'red' : i < 6 ? 'green' : 'blue');
 
@@ -187,6 +272,9 @@ function simulateOneBattle(teamSize: number, difficultyP1: number, difficultyP2:
   };
   for (const u of [...pUnits, ...eUnits]) ensureStats(u.id);
 
+  // Per-battle aura source attribution: targetId -> Map<src|eff|kind, {…, maxStacks}>
+  const auraSources: BattleResult['auraSources'] = {};
+
   let turn = 0;
   let winner: 'player' | 'enemy' | 'draw' = 'draw';
 
@@ -203,6 +291,12 @@ function simulateOneBattle(teamSize: number, difficultyP1: number, difficultyP2:
 
     const events: BattleEvent[] = [];
     const logs: string[] = [];
+
+    // === Aura engine: recompute per tick + record per-unit attribution ===
+    applyAuraStacks(allUnits, zones, effects);
+    applyAuraTick(allUnits, logs);
+    applyAuraSourceEffects(allUnits, zones, effects, logs);
+    recordAuraSources(allUnits, zones, effects, auraSources);
 
     // === DoTs ===
     for (const u of allUnits) {
@@ -356,12 +450,19 @@ function simulateOneBattle(teamSize: number, difficultyP1: number, difficultyP2:
         }
         let dmg = calcDamage(unit, target, grid);
         if (isFrozenNow) dmg = Math.round(dmg * frozenMul);
+        // Phase-3 aura: damage-share / miss-chance / taunt reduction
+        dmg = applyDefenderShare(unit, target, dmg, allUnits, logs);
 
         const beforeHp = target.hp;
         target.hp = Math.max(0, target.hp - dmg);
         const dealt = beforeHp - target.hp;
         ensureStats(unit.id).damageDealt += dealt;
         ensureStats(target.id).damageTaken += dealt;
+
+        // Phase-2 aura on-attack triggers (splash, chain, bleed, fire, freeze, web, reflect, drain, weaken)
+        if (dmg > 0) {
+          applyAuraOnAttack({ attacker: unit, defender: target, dmg, allUnits, grid, logs, events });
+        }
 
         if (dmg > 0 && unit.type === 'waterwalker') {
           unit.seekerIdleTicks = 0;
@@ -462,6 +563,14 @@ function simulateOneBattle(teamSize: number, difficultyP1: number, difficultyP2:
       }
     }
 
+    // === Aura on-death sweep ===
+    for (const u of allUnits) {
+      if (u.dead && !(u as { _auraDeathHandled?: boolean })._auraDeathHandled) {
+        (u as { _auraDeathHandled?: boolean })._auraDeathHandled = true;
+        applyAuraOnDeath(u, allUnits, grid, zones, effects, logs);
+      }
+    }
+
     // Judge bonus
     for (const u of allUnits) {
       if (u.type !== 'judge' || u.hp <= 0) continue;
@@ -503,7 +612,7 @@ function simulateOneBattle(teamSize: number, difficultyP1: number, difficultyP2:
   }
 
   const unitMeta = Array.from(allUnitsIdx.entries()).map(([id, meta]) => ({ id, type: meta.type, team: meta.team }));
-  return { winner, ticks: turn + 1, unitMeta, perId, finalAlive };
+  return { winner, ticks: turn + 1, unitMeta, perId, finalAlive, auraSources };
 }
 
 // ============== Public API ==============
@@ -515,15 +624,17 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
   // Always 9v9, AI builds full formations (auras, tank-bonds, clustering) per match.
   const n = opts.teamSize ?? 9;
 
+  // Load aura zones/effects once (admin-managed in unit_types table).
+  const { zones, effects } = await loadAuraData();
+
   for (let i = 0; i < battlesTotal; i++) {
     // Randomized difficulty per match → mix of weak / mid / OP formations.
-    // 2..5 covers Normal → Insane (uses counter-color, tank bonds, aura clustering).
     const diffP1 = 2 + Math.floor(Math.random() * 4);
     const diffP2 = 2 + Math.floor(Math.random() * 4);
 
     let result: BattleResult;
     try {
-      result = simulateOneBattle(n, diffP1, diffP2);
+      result = simulateOneBattle(n, diffP1, diffP2, zones, effects);
     } catch (err) {
       console.warn('[headlessSim] battle failed, skipping', err);
       continue;
@@ -546,8 +657,9 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
       const r = result.perId[m.id];
       if (!r) continue;
       s.games += 1;
+      const won = (result.winner === 'player' && m.team === 'player') || (result.winner === 'enemy' && m.team === 'enemy');
       if (result.winner === 'draw') s.draws += 1;
-      else if ((result.winner === 'player' && m.team === 'player') || (result.winner === 'enemy' && m.team === 'enemy')) s.wins += 1;
+      else if (won) s.wins += 1;
       else s.losses += 1;
       s.kills += r.kills;
       if (r.died) s.deaths += 1;
@@ -555,6 +667,43 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
       s.damageTaken += r.damageTaken;
       s.healingGiven += r.healingGiven;
       s.survivedHpPctSum += r.survivedHpPct;
+
+      // === Buff/Nerf attribution for this unit instance ===
+      const auraMap = result.auraSources[m.id];
+      if (auraMap) {
+        // Deduplicate per (effectKey,kind) at unit-level (recipient summary):
+        const seenPerUnit = new Set<string>();
+        for (const { source, effectKey, kind, stacks } of auraMap.values()) {
+          // Per (recipient, source, effect, kind) attribution
+          const akey = `${m.type}|${source}|${effectKey}|${kind}`;
+          let cell = report.auraAttrib.get(akey);
+          if (!cell) {
+            cell = { recipient: m.type, source, effectKey, kind, games: 0, wins: 0, stacksSum: 0, recipientSurvSum: 0, recipientDmgSum: 0 };
+            report.auraAttrib.set(akey, cell);
+          }
+          cell.games += 1;
+          if (won) cell.wins += 1;
+          cell.stacksSum += stacks;
+          cell.recipientSurvSum += r.survivedHpPct;
+          cell.recipientDmgSum += r.damageDealt;
+
+          // Per (recipient, effect, kind) — collapsed across sources
+          const bkey = `${m.type}|${effectKey}|${kind}`;
+          if (!seenPerUnit.has(bkey)) {
+            seenPerUnit.add(bkey);
+            let bcell = report.buffPerUnit.get(bkey);
+            if (!bcell) {
+              bcell = { recipient: m.type, effectKey, kind, games: 0, wins: 0, stacksSum: 0, recipientSurvSum: 0, recipientDmgSum: 0 };
+              report.buffPerUnit.set(bkey, bcell);
+            }
+            bcell.games += 1;
+            if (won) bcell.wins += 1;
+            bcell.stacksSum += stacks;
+            bcell.recipientSurvSum += r.survivedHpPct;
+            bcell.recipientDmgSum += r.damageDealt;
+          }
+        }
+      }
     }
 
     // vs-matrix (a from p1, b from p2)
@@ -578,7 +727,6 @@ export async function runSimulation(battlesTotal: number, opts: SimOptions = {})
 
     if (opts.onProgress && (i % yieldEvery === 0 || i === battlesTotal - 1)) {
       opts.onProgress(i + 1, battlesTotal);
-      // Yield to UI so progress bar updates and tab doesn't lock
       await new Promise(r => setTimeout(r, 0));
     }
   }
@@ -688,5 +836,60 @@ export function reportToCsv(report: SimReport): string {
   for (const s of flattenSynergies(report, 10).sort((x, y) => y.winRate - x.winRate)) {
     lines.push(`${s.a},${s.b},${s.games},${s.winRate.toFixed(1)}`);
   }
+
+  lines.push('');
+  lines.push('# Aura-Effekt pro Einheit (Empfänger × Effekt, min 5 games)');
+  lines.push('recipient,kind,effectKey,games,wins,winRate%,avgStacks,avgSurvivedHp%,avgDmgDealt');
+  for (const b of flattenBuffPerUnit(report, 5).sort((a, b) => b.winRate - a.winRate)) {
+    lines.push([b.recipient, b.kind, b.effectKey, b.games, b.wins, b.winRate.toFixed(1),
+      b.avgStacks.toFixed(2), (b.avgSurvivedHp * 100).toFixed(1), b.avgDmgDealt.toFixed(1)].join(','));
+  }
+
+  lines.push('');
+  lines.push('# Buff/Nerf-Quellen (Quelle → Empfänger × Effekt, min 5 games)');
+  lines.push('source,kind,effectKey,recipient,games,wins,winRate%,avgStacks');
+  for (const a of flattenAuraAttrib(report, 5).sort((a, b) => b.winRate - a.winRate)) {
+    lines.push([a.source, a.kind, a.effectKey, a.recipient, a.games, a.wins,
+      a.winRate.toFixed(1), a.avgStacks.toFixed(2)].join(','));
+  }
+
   return lines.join('\n');
+}
+
+// ============== Buff/Nerf analytics ==============
+export interface FlatBuffCell {
+  recipient: UnitType; effectKey: string; kind: 'buff' | 'nerf';
+  games: number; wins: number; winRate: number;
+  avgStacks: number; avgSurvivedHp: number; avgDmgDealt: number;
+}
+export function flattenBuffPerUnit(report: SimReport, minGames = 5): FlatBuffCell[] {
+  const out: FlatBuffCell[] = [];
+  for (const c of report.buffPerUnit.values()) {
+    if (c.games < minGames) continue;
+    out.push({
+      recipient: c.recipient, effectKey: c.effectKey, kind: c.kind,
+      games: c.games, wins: c.wins, winRate: (c.wins / c.games) * 100,
+      avgStacks: c.stacksSum / c.games,
+      avgSurvivedHp: c.recipientSurvSum / c.games,
+      avgDmgDealt: c.recipientDmgSum / c.games,
+    });
+  }
+  return out;
+}
+
+export interface FlatAttribCell {
+  source: UnitType; recipient: UnitType; effectKey: string; kind: 'buff' | 'nerf';
+  games: number; wins: number; winRate: number; avgStacks: number;
+}
+export function flattenAuraAttrib(report: SimReport, minGames = 5): FlatAttribCell[] {
+  const out: FlatAttribCell[] = [];
+  for (const c of report.auraAttrib.values()) {
+    if (c.games < minGames) continue;
+    out.push({
+      source: c.source, recipient: c.recipient, effectKey: c.effectKey, kind: c.kind,
+      games: c.games, wins: c.wins, winRate: (c.wins / c.games) * 100,
+      avgStacks: c.stacksSum / c.games,
+    });
+  }
+  return out;
 }
