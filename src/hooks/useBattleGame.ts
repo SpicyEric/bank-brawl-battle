@@ -2045,6 +2045,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[]) {
     sacrificeUsed, activateSacrifice,
     shieldWallUsed, shieldWallActive, activateShieldWall,
     flankLeftUsed, flankRightUsed, flankActive, activateFlank,
+    surrenderRound,
     waitingForOpponent: false,
     aiMoraleActive,
     inOvertime: false,
