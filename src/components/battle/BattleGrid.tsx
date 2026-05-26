@@ -897,7 +897,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
                       }}
                     />
                   )}
-                  {isPhantom && (
+                  {isPhantomInvuln && (
                     <div className="absolute inset-0 z-0 pointer-events-none rounded-sm animate-pulse"
                       style={{
                         background: 'linear-gradient(135deg, hsl(280 80% 70% / 0.35), hsl(220 90% 70% / 0.25))',
