@@ -538,8 +538,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     setGrid(newGrid);
     setPhase('battle');
     setBattleTimer(ROUND_TIME_LIMIT);
-    setPlacingPhase('done');
-    setOpponentUnitsVisible([]);
+    setMyReady(false);
+    setOpponentReady(false);
+    myReadyRef.current = false;
+    opponentReadyRef.current = false;
+    setOpponentSnapshot([]);
     // Reset all abilities for battle start
     setMoraleBoostUsed(false);
     setMoraleBoostActive(null);
