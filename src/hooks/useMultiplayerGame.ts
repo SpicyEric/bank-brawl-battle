@@ -790,6 +790,21 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
 
+      // Flank shifts (host applies for both: own = player team, opp = enemy team)
+      if (flankActiveRef.current) {
+        applyFlankStep(newGrid, allUnits, flankActiveRef.current.dir, flankActiveRef.current.step, 'player');
+        const ns = flankActiveRef.current.step + 1;
+        if (ns >= 3) { flankActiveRef.current = null; setFlankActive(null); }
+        else flankActiveRef.current = { dir: flankActiveRef.current.dir, step: ns };
+      }
+      if (opponentFlankRef.current) {
+        applyFlankStep(newGrid, allUnits, opponentFlankRef.current.dir, opponentFlankRef.current.step, 'enemy');
+        const ns = opponentFlankRef.current.step + 1;
+        if (ns >= 3) opponentFlankRef.current = null;
+        else opponentFlankRef.current = { dir: opponentFlankRef.current.dir, step: ns };
+      }
+
+
       // Tick down morale for both players (host tracks both)
       if (moralePhase.current !== 'none' && moraleTicksLeft.current > 0) {
         moraleTicksLeft.current -= 1;
