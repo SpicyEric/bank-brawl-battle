@@ -15,7 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { updateRoom, ensureAnonymousSession } from '@/lib/multiplayer';
 import { matchRecorder } from '@/lib/matchRecorder';
 import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
-import { applyAuraStacks, applyAuraTick, applyAuraSourceEffects } from '@/lib/auraEffects';
+import { applyAuraStacks, applyAuraTick, applyAuraOnDeath, applyAuraSourceEffects } from '@/lib/auraEffects';
 import { findFormations, applyFormationMove } from '@/lib/formations';
 
 interface MultiplayerConfig {
@@ -942,26 +942,11 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         opponentFocusFireTicksLeft.current -= 1;
       }
 
-      // Shield wall tick-down
+      // Shield wall tick-down — formation mode never retreats individual units.
       if (shieldWallTicksLeft.current > 0) {
         shieldWallTicksLeft.current -= 1;
         if (shieldWallTicksLeft.current <= 0) {
           setShieldWallActive(false);
-        }
-        // Retreat player (host) units toward base rows (5,6,7)
-        const playerAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
-        for (const unit of playerAlive) {
-          if (unit.row < 5) {
-            for (let step = 2; step >= 1; step--) {
-              const targetRow = Math.min(7, unit.row + step);
-              if (!newGrid[targetRow][unit.col].unit && newGrid[targetRow][unit.col].terrain !== 'water') {
-                newGrid[unit.row][unit.col].unit = null;
-                unit.row = targetRow;
-                newGrid[unit.row][unit.col].unit = unit;
-                break;
-              }
-            }
-          }
         }
       }
 
