@@ -467,7 +467,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   sniper: {
-    label: 'Scharfschütze', emoji: '🎯', hp: 40, attack: 25, cooldown: 4,
+    label: 'Scharfschütze', emoji: '🎯', hp: 40, attack: 30, cooldown: 5,
     description: 'Bewegt sich nie. Greift immer die Einheit mit niedrigstem HP auf dem ganzen Feld an. Hoher Schaden.',
     movePattern: [],
     attackPattern: (() => {
