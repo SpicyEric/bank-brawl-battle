@@ -1261,10 +1261,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   if (attacker.auraAtkBuff) baseAtk += attacker.auraAtkBuff;
   // Shadowpriest curse: −50% attack permanently on cursed attackers
   if ((attacker.curseAtkMul ?? 1) !== 1) baseAtk = Math.max(0, baseAtk * (attacker.curseAtkMul ?? 1));
-  // Assassin: +4 damage against enemies below 50% HP
-  if (attacker.type === 'assassin' && defender.hp < defender.maxHp * 0.5) {
-    baseAtk += 4;
-  }
+  // (Assassin low-HP bonus removed — uses standard damage.)
+
 
   // --- Aura: attacker atk% modifier (stackable, additive)
   const aStacks = attacker.auraStacks;
