@@ -74,9 +74,15 @@ export async function loadAuraData(): Promise<{ zones: AuraZoneMap; effects: Aur
       if (error) { console.warn('[aura] load failed', error); cachedZones = {}; cachedEffects = {}; return; }
       const zones: AuraZoneMap = {};
       const effects: AuraEffectMap = {};
+      // Two-pass merge: alias rows (e.g. 'frostmage') and canonical rows (e.g. 'frost')
+      // can each carry only zones OR only effects. We merge per-canonical-type so that
+      // a non-empty value never gets overwritten by an empty one — regardless of the
+      // (unordered) row sequence returned by the DB.
       for (const row of data ?? []) {
         const rawType = row.unit_type as string;
         const ut = (UNIT_TYPE_ALIASES[rawType] ?? rawType) as UnitType;
+
+        // --- zones ---
         const z: Partial<Record<ZonePos, Exclude<ZoneType, 'neutral'>>> = {};
         const stored = (row.aura_zones as any)?.zones;
         if (Array.isArray(stored)) {
@@ -86,14 +92,34 @@ export async function loadAuraData(): Promise<{ zones: AuraZoneMap; effects: Aur
             }
           }
         }
-        // Don't overwrite an existing non-empty entry with an empty alias row.
-        const existing = zones[ut];
-        if (!existing || Object.keys(existing).length === 0) zones[ut] = z;
+        const existingZ = zones[ut];
+        const existingHasZones = existingZ && Object.keys(existingZ).length > 0;
+        const newHasZones = Object.keys(z).length > 0;
+        if (!existingHasZones || newHasZones) {
+          // Only overwrite when we actually have something better (or nothing yet).
+          if (newHasZones || !existingZ) zones[ut] = z;
+        }
+
+        // --- effects ---
         const ae = row.aura_effect as any;
         if (ae && typeof ae === 'object') {
           const eff = { buff: ae.buff ?? null, nerf: ae.nerf ?? null };
           const cur = effects[ut];
-          if (!cur || (!cur.buff && !cur.nerf)) effects[ut] = eff;
+          const curHas = !!(cur && (cur.buff || cur.nerf));
+          const newHas = !!(eff.buff || eff.nerf);
+          if (!cur) {
+            effects[ut] = eff;
+          } else if (newHas && !curHas) {
+            // Replace empty with populated.
+            effects[ut] = eff;
+          } else if (newHas && curHas) {
+            // Merge: keep existing fields, fill in missing ones from the new row.
+            effects[ut] = {
+              buff: cur.buff ?? eff.buff,
+              nerf: cur.nerf ?? eff.nerf,
+            };
+          }
+          // else: new row is empty and we already have something → keep current.
         }
       }
       cachedZones = zones;
