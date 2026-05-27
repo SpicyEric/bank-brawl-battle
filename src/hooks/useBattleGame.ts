@@ -225,9 +225,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
 
   const confirmPlacementRef = useRef<(() => void) | null>(null);
 
-  // Rundenskalierung: Runde 1 = 9 Einheiten, +2 pro Runde bis Runde 5 = 17.
+  // Rundenskalierung: Runde 1 = 4 Einheiten, +2 pro Runde bis Runde 9 = 20.
   // Handicap zieht von der eigenen Einheitenzahl ab (Mindestens 1).
-  const rosterMaxUnitsBase = Math.min(9 + (roundNumber - 1) * 2, 17);
+  const rosterMaxUnitsBase = Math.min(2 + roundNumber * 2, 20);
   const rosterMaxUnits = hasRoster ? Math.max(1, rosterMaxUnitsBase - safeHandicap) : rosterMaxUnitsBase;
   const playerMaxUnits = hasRoster ? rosterMaxUnits : getMaxUnits(playerScore, enemyScore, roundNumber);
   const enemyMaxUnits = hasRoster ? rosterMaxUnitsBase : playerMaxUnits;
