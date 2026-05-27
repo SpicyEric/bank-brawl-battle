@@ -202,7 +202,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             const kind = (z as any)[pos];
             if (!kind) continue;
             const [dr, dc] = DELTA[pos];
-            const r = lastPlaced.row + dr;
+            const r = lastPlaced.row + (flipped ? -dr : dr);
             const c = lastPlaced.col + dc;
             if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
             out.set(`${r}-${c}`, kind);
