@@ -1306,43 +1306,15 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           }
         };
         // === Flank maneuver: 3-tick burst — Tick1: 2 back, Tick2: up to 5 sideways, Tick3: up to 5 forward.
-        // Each unit shifts as far as it can per tick, clamped by edges/water/other units.
+        // Multiplayer keeps this as a rigid formation shift, never per-unit movement.
         let flankShifting = false;
         if (flankActiveRef.current) {
           flankShifting = true;
           const { dir, step } = flankActiveRef.current;
-          const rowCount = newGrid.length;
-          const colCount = newGrid[0]?.length ?? GRID_SIZE;
-          let dr = 0, dc = 0, maxSteps = 0;
-          if (step === 0) { dr = 1;  dc = 0;   maxSteps = 2; }   // 2 back
-          else if (step === 1) { dr = 0;  dc = dir; maxSteps = 5; } // up to 5 sideways
-          else if (step === 2) { dr = -1; dc = 0;   maxSteps = 5; } // up to 5 forward
-          if (dr !== 0 || dc !== 0) {
-            const playerAlive = allUnits.filter(u => u.team === 'player' && u.hp > 0 && !u.dead);
-            const sorted = [...playerAlive].sort((a, b) => {
-              if (dr > 0) return b.row - a.row;
-              if (dr < 0) return a.row - b.row;
-              if (dc > 0) return b.col - a.col;
-              if (dc < 0) return a.col - b.col;
-              return 0;
-            });
-            for (const u of sorted) {
-              for (let s = 0; s < maxSteps; s++) {
-                const nr = u.row + dr;
-                const nc = u.col + dc;
-                if (nr < 0 || nr >= rowCount || nc < 0 || nc >= colCount) break;
-                if (u.enteredArena && (nr < VIEW_TOP || nr >= VIEW_BOTTOM)) break;
-                const tgt = newGrid[nr]?.[nc];
-                if (!tgt) break;
-                if (tgt.terrain === 'water') break;
-                if (tgt.unit && tgt.unit.id !== u.id && !tgt.unit.dead && tgt.unit.hp > 0) break;
-                if (newGrid[u.row]?.[u.col]?.unit?.id === u.id) newGrid[u.row][u.col].unit = null;
-                u.row = nr; u.col = nc;
-                if (u.row >= VIEW_TOP && u.row < VIEW_BOTTOM) u.enteredArena = true;
-                newGrid[u.row][u.col].unit = u;
-              }
-            }
-          }
+          const dr = step === 0 ? 1 : step === 2 ? -1 : 0;
+          const dc = step === 1 ? dir : 0;
+          const playerGroup = findFormations(allUnits, 'player').flat();
+          if (playerGroup.length > 0 && (dr !== 0 || dc !== 0)) applyFormationMove(playerGroup, dr, dc, newGrid);
           const nextStep = step + 1;
           if (nextStep >= 3) {
             flankActiveRef.current = null;
