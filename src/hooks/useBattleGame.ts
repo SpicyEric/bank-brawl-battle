@@ -1078,6 +1078,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
             cr /= grp.length; cc /= grp.length;
             const ddr = Math.sign(target.row - cr);
             const ddc = Math.sign(target.col - cc);
+            const approachDr = ddr || forwardDr;
             const tries: Array<[number, number]> = [];
             if (sharesRow) {
               // Engagement mode: free to move diagonally / sideways toward the target.
@@ -1085,8 +1086,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
               if (ddr !== 0) tries.push([ddr, 0]);
               if (ddc !== 0) tries.push([0, ddc]);
             } else {
-              // Approach mode: march straight forward only.
-              tries.push([forwardDr, 0]);
+              // Approach mode: march toward the opposing formation's current row.
+              // This also turns formations around if they crossed past each other.
+              tries.push([approachDr, 0]);
             }
             for (const [mdr, mdc] of tries) {
               if (applyFormationMove(grp, mdr, mdc, newGrid)) break;
