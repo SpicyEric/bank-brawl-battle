@@ -2,20 +2,20 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Unit, UnitType, Cell, Phase,
   createEmptyGrid, createUnit, findTarget, moveToward, canAttack, calcDamage,
-  generateTerrain, getActivationTurn, setBondsForPlacement,
+  generateTerrain, getActivationTurn, setBondsForPlacement, moveTankFormation,
   GRID_SIZE, PLAYER_ROWS, ENEMY_ROWS, UNIT_DEFS, UNIT_TYPES, UNIT_COLOR_GROUPS, ROUNDS_TO_WIN, ROUND_TIME_LIMIT,
   MULTI_PLACE_TIME_LIMIT, getMaxUnits, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, shouldSkipMove, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
   processLavaTick, processGhostTick, tickPhantomTimers,
   tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest,
-  spawnDoppelgangerPhantoms, applyPostAttackEffects, applyDeathEffects, applyChainAttack, applyShadowpriestCurse,
+  spawnDoppelgangerPhantoms, applyPostAttackEffects, applyDeathEffects, applyChainAttack, applyShadowpriestCurse, applyMirrorReflect,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { updateRoom, ensureAnonymousSession } from '@/lib/multiplayer';
 import { matchRecorder } from '@/lib/matchRecorder';
 import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
-import { applyAuraStacks, applyAuraTick, applyAuraOnDeath, applyAuraSourceEffects } from '@/lib/auraEffects';
+import { applyAuraStacks, applyAuraTick, applyAuraOnAttack, applyAuraOnDeath, applyAuraSourceEffects, applyDefenderShare, fireLightningTakenMul, hasImmuneFFP } from '@/lib/auraEffects';
 import { findFormations, applyFormationMove } from '@/lib/formations';
 
 interface MultiplayerConfig {
@@ -29,6 +29,7 @@ interface MultiplayerConfig {
 
 // Slot color layout matches UnitRoster: slots 0-2 red, 3-5 green, 6-8 blue
 const SLOT_COLORS: ('red' | 'green' | 'blue')[] = ['red','red','red','green','green','green','blue','blue','blue'];
+const FORMATION_MODE = true;
 const BATTLE_WORLD_ROWS = GRID_SIZE * 3;
 
 function createBattleWorldGrid(): Cell[][] {
