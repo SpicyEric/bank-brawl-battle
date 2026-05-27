@@ -192,7 +192,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 105,
     attack: 23,
     cooldown: 2,
-    description: 'Nahkämpfer. Beißt sich an einem Ziel fest bis es besiegt ist. Bewegt sich orthogonal (1 Feld). Besonderheit: profitiert extrem vom Farbsystem – +50% Schaden gegen farblich schwächere Gegner (statt +30%) und nur −10% Schaden gegen farblich stärkere (statt −30%).',
+    description: 'Solider Nahkämpfer. Bewegt sich orthogonal (1 Feld). Profitiert extrem vom Farbsystem: +50% Schaden gegen farblich schwächere Gegner (statt +30%) und nur −10% Schaden gegen farblich stärkere (statt −30%).',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: ['tank', 'mage', 'healer'],
