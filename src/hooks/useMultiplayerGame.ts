@@ -171,6 +171,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
   const playerUnitsRef = useRef(playerUnits);
   const enemyUnitsRef = useRef(enemyUnits);
   const turnCountRef = useRef(0);
+  const stalemateHpRef = useRef<number>(-1);
+  const stalemateTicksRef = useRef<number>(0);
+  const stalemateRushRef = useRef<number>(0);
   const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hadBothPlayersRef = useRef(false);
   const myReadyRef = useRef(false);
@@ -1932,6 +1935,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       }
       if (events.length > 0) {
         setBattleEvents(events);
+      }
       const alive = allUnits.filter(u => u.hp > 0);
       // Banshees in mid-revival count as alive (they appear dead on the grid but will return).
       const revivingBanshees: Unit[] = [];
