@@ -192,7 +192,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 105,
     attack: 23,
     cooldown: 2,
-    description: 'Nahkämpfer. Beißt sich an einem Ziel fest bis es besiegt ist. Bewegt sich orthogonal (1 Feld). Besonderheit: profitiert extrem vom Farbsystem – +50% Schaden gegen farblich schwächere Gegner (statt +30%) und nur −10% Schaden gegen farblich stärkere (statt −30%).',
+    description: 'Solider Nahkämpfer. Bewegt sich orthogonal (1 Feld). Profitiert extrem vom Farbsystem: +50% Schaden gegen farblich schwächere Gegner (statt +30%) und nur −10% Schaden gegen farblich stärkere (statt −30%).',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: ['tank', 'mage', 'healer'],
@@ -204,7 +204,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 90,
     attack: 16,
     cooldown: 1,
-    description: 'Schneller Opportunist. Greift jede Runde an und wechselt zum nächsten verwundeten Ziel. Bewegt sich diagonal (2 Felder). Gegner unter 50% HP nehmen 20 Schaden statt 16.',
+    description: 'Schneller Nahkämpfer. Bewegt sich diagonal (bis 2 Felder) und greift diagonal an. Cooldown 1.',
     movePattern: [
       ...DIAGONAL,
       { row: -2, col: -2 }, { row: -2, col: 2 },
@@ -363,7 +363,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   shadowblade: {
     label: 'Schattenklinge', emoji: '🥷', hp: 60, attack: 20, cooldown: 2,
-    description: 'Hält max. Abstand. Alle 5 Ticks: teleportiert sich neben einen Gegner, schlägt zu und teleportiert zurück.',
+    description: 'Hält max. Abstand. Alle 5 Ticks: teleportiert sich in einem einzigen Tick neben einen Gegner, schlägt zu und teleportiert sofort wieder zurück — Formation bleibt erhalten.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -789,11 +789,9 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   if (unit.type === 'sniper') {
     return [...enemies].sort((a, b) => a.hp - b.hp)[0];
   }
-  // === ASSASSIN: ALWAYS hunts the globally lowest-HP enemy. Re-evaluates every tick.
-  //     Tiebreaker: nearest. No lock-on, no column bias, no tank-aggro detour. ===
-  if (unit.type === 'assassin') {
-    return [...enemies].sort((a, b) => a.hp - b.hp || distance(unit, a) - distance(unit, b))[0];
-  }
+  // (Assassin special targeting removed — behaves like a normal melee unit, picks
+  //  the closest enemy via default proximity logic below.)
+
   // === LAMB (own lamb): taunts the strongest enemy ===
   if (unit.type === 'lamb') {
     return [...enemies].sort((a, b) => b.attack * b.hp - a.attack * a.hp)[0];
@@ -818,11 +816,14 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     return nearbyTanks[0];
   }
 
-  // === WARRIOR / STORMRUNNER: lock-on – keeps attacking same target until it dies ===
-  if ((unit.type === 'warrior' || unit.type === 'stormrunner') && unit.lastAttackedId) {
+  // === STORMRUNNER: lock-on – keeps attacking same target until it dies ===
+  // (Warrior "bite" removed — warrior now picks targets via the normal proximity
+  //  logic below so it stays inside its formation movement.)
+  if (unit.type === 'stormrunner' && unit.lastAttackedId) {
     const locked = enemies.find(e => e.id === unit.lastAttackedId);
     if (locked) return locked;
   }
+
 
   // === ARCHER: lock-on while max-distance kiting ===
   if (unit.type === 'archer' && unit.lastAttackedId) {
@@ -1260,10 +1261,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   if (attacker.auraAtkBuff) baseAtk += attacker.auraAtkBuff;
   // Shadowpriest curse: −50% attack permanently on cursed attackers
   if ((attacker.curseAtkMul ?? 1) !== 1) baseAtk = Math.max(0, baseAtk * (attacker.curseAtkMul ?? 1));
-  // Assassin: +4 damage against enemies below 50% HP
-  if (attacker.type === 'assassin' && defender.hp < defender.maxHp * 0.5) {
-    baseAtk += 4;
-  }
+  // (Assassin low-HP bonus removed — uses standard damage.)
+
 
   // --- Aura: attacker atk% modifier (stackable, additive)
   const aStacks = attacker.auraStacks;
@@ -2575,7 +2574,10 @@ export function handleShadowbladeTick(
     return;
   }
 
-  // --- Strike phase (teleport in + attack) ---
+  // --- Strike phase (teleport in + hit + teleport back, ALL IN ONE TICK) ---
+  // Doing strike and return in the same tick guarantees the unit's cell is empty
+  // for less than a tick, so its formation grouping (8-connected) is never broken
+  // and the rest of the formation can't drift away while the shadowblade is gone.
   if (unit.teleportTimer === undefined) unit.teleportTimer = 5;
   if (unit.teleportTimer <= 0) {
     // Pick target: lowest HP enemy first (finish off), tiebreak by closest
@@ -2590,24 +2592,22 @@ export function handleShadowbladeTick(
       { r: -1, c: 0 }, { r: 1, c: 0 }, { r: 0, c: -1 }, { r: 0, c: 1 },
     ];
     for (const t of ranked) {
-      let dest: { row: number; col: number } | null = null;
+      // Find a free adjacent cell next to the target to "blink in" on.
+      let strikeCell: { row: number; col: number } | null = null;
       for (const o of offsets) {
         const r = t.row + o.r, c = t.col + o.c;
         if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
         const cell = grid[r][c];
         if (cell.unit || cell.terrain === 'water') continue;
-        dest = { row: r, col: c };
+        strikeCell = { row: r, col: c };
         break;
       }
-      if (!dest) continue;
-      // Teleport in
-      unit.homeRow = teleportFrom.row;
-      unit.homeCol = teleportFrom.col;
-      grid[unit.row][unit.col].unit = null;
-      unit.row = dest.row; unit.col = dest.col;
-      grid[dest.row][dest.col].unit = unit;
-      emitTeleport(teleportFrom, dest);
-      // Strike
+      if (!strikeCell) continue;
+      // Lift off home cell, emit visual blink-out → blink-in
+      grid[teleportFrom.row][teleportFrom.col].unit = null;
+      emitTeleport(teleportFrom, strikeCell);
+      // Strike (calc damage from the strike cell so range/terrain are honored)
+      unit.row = strikeCell.row; unit.col = strikeCell.col;
       let dmg = calcDamage(unit, t, grid);
       dmg = dmgMod(unit, t, dmg);
       t.hp = Math.max(0, t.hp - dmg);
@@ -2617,21 +2617,58 @@ export function handleShadowbladeTick(
       events.push({
         type: t.hp <= 0 ? 'kill' : 'hit',
         attackerId: unit.id,
-        attackerRow: unit.row, attackerCol: unit.col,
+        attackerRow: strikeCell.row, attackerCol: strikeCell.col,
         attackerEmoji: '🥷', attackerType: 'shadowblade',
         targetId: t.id, targetRow: t.row, targetCol: t.col,
         damage: dmg, isStrong: false, isWeak: false,
         isRanged: false,
       });
       if (t.hp <= 0) (t as any).dead = true;
-      unit.pendingTeleportReturn = true;
-      unit.teleportTimer = 0; // stays 0 so next tick triggers return
+
+      // --- Immediate return to home cell (same tick) ---
+      // Home cell should still be free because we only just lifted off it and no
+      // other unit acts between strike and return inside the same tick.
+      let dest: { row: number; col: number } | null = null;
+      const homeCell = grid[teleportFrom.row]?.[teleportFrom.col];
+      if (homeCell && !homeCell.unit && homeCell.terrain !== 'water') {
+        dest = { row: teleportFrom.row, col: teleportFrom.col };
+      }
+      if (!dest) {
+        // Extremely rare fallback: a unit raced onto the home cell (shouldn't happen
+        // within a single tick, but be defensive). Pick safest free cell.
+        let best: { row: number; col: number; score: number } | null = null;
+        for (let r = 0; r < GRID_SIZE; r++) for (let c = 0; c < GRID_SIZE; c++) {
+          const cell = grid[r][c];
+          if (cell.unit || cell.terrain === 'water') continue;
+          let minD = Infinity;
+          for (const e of enemies) {
+            const d = Math.max(Math.abs(r - e.row), Math.abs(c - e.col));
+            if (d < minD) minD = d;
+          }
+          if (!best || minD > best.score) best = { row: r, col: c, score: minD };
+        }
+        if (best) dest = { row: best.row, col: best.col };
+      }
+      if (dest) {
+        grid[unit.row][unit.col].unit = null;
+        unit.row = dest.row; unit.col = dest.col;
+        grid[dest.row][dest.col].unit = unit;
+        emitTeleport(strikeCell, dest);
+      } else {
+        // No spot to return to — re-place at strike cell so unit still exists on grid.
+        grid[strikeCell.row][strikeCell.col].unit = unit;
+      }
+      unit.pendingTeleportReturn = false;
+      unit.homeRow = undefined;
+      unit.homeCol = undefined;
+      unit.teleportTimer = 5;
       return;
     }
-    // No target reachable; try again next tick
+    // No reachable target this tick — try again next tick (keep timer at 0)
   } else {
     unit.teleportTimer -= 1;
   }
+
 
   // --- Kiting movement: maximize distance from nearest enemy ---
   const moveOffsets = [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }];
