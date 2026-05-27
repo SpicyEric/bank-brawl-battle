@@ -214,8 +214,8 @@ function GameUI({ game, isMultiplayer, flipped, roster }: { game: Omit<ReturnTyp
     if (game.phase !== 'place_player') return undefined;
     // While spying the enemy board, hide our own aura overlays so only the enemy field is visible.
     if (spying) return undefined;
-    return computeAuraOverlay(game.playerUnits ?? [], auraZones);
-  }, [game.playerUnits, game.phase, auraZones, spying]);
+    return computeAuraOverlay(game.playerUnits ?? [], auraZones, flipped);
+  }, [game.playerUnits, game.phase, auraZones, spying, flipped]);
 
   // Formation selection (combat-phase: tap own unit → select formation → tap adjacent cell → move)
   const [selectedFormationId, setSelectedFormationId] = useState<string | null>(null);
