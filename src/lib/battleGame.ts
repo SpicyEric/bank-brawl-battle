@@ -816,11 +816,14 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
     return nearbyTanks[0];
   }
 
-  // === WARRIOR / STORMRUNNER: lock-on – keeps attacking same target until it dies ===
-  if ((unit.type === 'warrior' || unit.type === 'stormrunner') && unit.lastAttackedId) {
+  // === STORMRUNNER: lock-on – keeps attacking same target until it dies ===
+  // (Warrior "bite" removed — warrior now picks targets via the normal proximity
+  //  logic below so it stays inside its formation movement.)
+  if (unit.type === 'stormrunner' && unit.lastAttackedId) {
     const locked = enemies.find(e => e.id === unit.lastAttackedId);
     if (locked) return locked;
   }
+
 
   // === ARCHER: lock-on while max-distance kiting ===
   if (unit.type === 'archer' && unit.lastAttackedId) {
