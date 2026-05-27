@@ -1087,13 +1087,14 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             cr /= grp.length; cc /= grp.length;
             const ddr = Math.sign(tgtU.row - cr);
             const ddc = Math.sign(tgtU.col - cc);
+            const approachDr = ddr || forwardDr;
             const tries: Array<[number, number]> = [];
             if (sharesRow) {
               if (ddr !== 0 && ddc !== 0) tries.push([ddr, ddc]);
               if (ddr !== 0) tries.push([ddr, 0]);
               if (ddc !== 0) tries.push([0, ddc]);
             } else {
-              tries.push([forwardDr, 0]);
+              tries.push([approachDr, 0]);
             }
             for (const [mdr, mdc] of tries) {
               if (applyFormationMove(grp, mdr, mdc, newGrid)) break;
