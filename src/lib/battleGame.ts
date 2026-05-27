@@ -363,7 +363,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   shadowblade: {
     label: 'Schattenklinge', emoji: '🥷', hp: 60, attack: 20, cooldown: 2,
-    description: 'Hält max. Abstand. Alle 5 Ticks: teleportiert sich neben einen Gegner, schlägt zu und teleportiert zurück.',
+    description: 'Hält max. Abstand. Alle 5 Ticks: teleportiert sich in einem einzigen Tick neben einen Gegner, schlägt zu und teleportiert sofort wieder zurück — Formation bleibt erhalten.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
