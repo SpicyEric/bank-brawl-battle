@@ -235,7 +235,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         const kind = (z as any)[pos];
         if (!kind) continue;
         const [dr, dc] = DELTA[pos];
-        const r = dragPreview.row + dr;
+        const r = dragPreview.row + (flipped ? -dr : dr);
         const c = dragPreview.col + dc;
         if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
         dragAuraCells.set(`${r}-${c}`, kind);
