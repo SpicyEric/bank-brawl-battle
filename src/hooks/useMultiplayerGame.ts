@@ -1105,205 +1105,220 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         moveTeamFormations('enemy');
       }
 
-      const currentTurn = turnCount;
-      const acting = allUnits.filter(u => {
-        if (u.hp <= 0) return false;
-        if (u.activationTurn !== undefined && currentTurn < u.activationTurn) return false;
-        return true;
-      }).sort((a, b) => a.maxCooldown - b.maxCooldown);
+      // === FORMATION_MODE attack loop (SP parity) ============================
+      // Per-unit attack only — no individual movement. Formations were already
+      // shifted as a block above. Each unit auto-attacks lowest-HP enemy within
+      // its attackRange (Chebyshev). Status effects, AOE, chains, deaths apply.
+      const acting = allUnits.filter(u => u.hp > 0 && !u.dead)
+        .sort((a, b) => a.maxCooldown - b.maxCooldown);
 
       for (const unit of acting) {
-        if (unit.hp <= 0) continue;
-        // Dragon mid fire-spin: skip movement/attack entirely.
-        if (unit.type === 'dragon' && (unit.spinTicksLeft ?? 0) > 0) continue;
-        // Frozen: skip movement, attack at reduced dmg (50% default, 30% from frost nova)
-        const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
-        const frozenDmgMul = unit.frozenDmgMul ?? 0.5;
-        if (isFrozenNow) {
-          unit.frozen = (unit.frozen || 0) - 1;
-          if ((unit.frozen || 0) <= 0) unit.frozenDmgMul = undefined;
-        }
+        if (unit.hp <= 0 || unit.dead) continue;
+        if (unit.webbed && unit.webbed > 0) { unit.webbed -= 1; continue; }
         unit.cooldown = Math.max(0, unit.cooldown - 1);
+        if (unit.cooldown > 0) continue;
 
-        // === Terrain seekers (ranger / mountaineer / waterwalker) ===
-        let seekerHolds = false;
-        if (!isFrozenNow) {
-          const seek = handleTerrainSeeker(unit, newGrid, allUnits);
-          if (seek === 'moved' || seek === 'wait') continue;
-          if (seek === 'on_terrain') seekerHolds = true;
-        }
-
-
-        // Shadowblade: custom teleport-strike behavior (every 5 ticks)
-        if (unit.type === 'shadowblade') {
-          handleShadowbladeTick(unit, allUnits, newGrid, events, logs, (atk, tgt, dmg) => {
-            let d = dmg;
-            if (atk.team === 'player') d = Math.round(d * playerDmgMod);
-            else {
-              d = Math.round(d * enemyDmgMod);
-              if (tgt.team === 'player') d = Math.round(d * shieldWallDefMod);
-            }
-            return d;
-          });
-          continue;
-        }
-
+        // Healer: heal lowest-HP ally in range first; only attack if nothing to heal.
         if (unit.type === 'healer') {
-          const allies = allUnits.filter(u => u.team === unit.team && u.id !== unit.id && u.hp > 0 && !u.dead);
-          const healable = allies.filter(a => a.hp < a.maxHp);
-          if (healable.length > 0 && unit.cooldown <= 0) {
-            let healed = false;
-            for (const ally of healable) {
-              if (canAttack(unit, ally)) {
-                const healAmt = Math.min(15, ally.maxHp - ally.hp);
-                ally.hp += healAmt;
-                logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
-                healed = true;
-                unit.cooldown = unit.maxCooldown;
-                events.push({
-                  type: 'heal',
-                  attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: '🌿',
-                  attackerType: unit.type,
-                  targetId: ally.id, targetRow: ally.row, targetCol: ally.col,
-                  damage: 0, isStrong: false, isWeak: false,
-                  isRanged: Math.abs(unit.row - ally.row) + Math.abs(unit.col - ally.col) > 1,
-                  healAmount: healAmt,
-                });
-                break;
-              }
-            }
-            if (!healed) {
-              healable.sort((a, b) => a.hp / a.maxHp - b.hp / b.maxHp);
-              const newPos = moveToward(unit, healable[0], newGrid, allUnits);
-              if (newPos.row !== unit.row || newPos.col !== unit.col) {
-                newGrid[unit.row][unit.col].unit = null;
-                unit.row = newPos.row; unit.col = newPos.col;
-                newGrid[unit.row][unit.col].unit = unit;
-              }
-            }
+          const range = UNIT_DEFS.healer.attackRange ?? 1;
+          let healTarget: Unit | null = null;
+          let healPriority = Infinity;
+          for (const ally of allUnits) {
+            if (ally === unit || ally.team !== unit.team) continue;
+            if (ally.hp <= 0 || ally.dead || (ally as any).unhealable) continue;
+            if (ally.hp >= ally.maxHp) continue;
+            const adr = Math.abs(ally.row - unit.row);
+            const adc = Math.abs(ally.col - unit.col);
+            if (Math.max(adr, adc) > range) continue;
+            const p = ally.hp / ally.maxHp;
+            if (p < healPriority) { healPriority = p; healTarget = ally; }
+          }
+          if (healTarget) {
+            const healAmt = Math.min(28, healTarget.maxHp - healTarget.hp);
+            healTarget.hp += healAmt;
+            unit.cooldown = unit.maxCooldown;
+            logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[healTarget.type].emoji} +${healAmt} ❤️`);
+            events.push({
+              type: 'heal',
+              attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col,
+              attackerEmoji: '🌿', attackerType: unit.type,
+              targetId: healTarget.id, targetRow: healTarget.row, targetCol: healTarget.col,
+              damage: 0, isStrong: false, isWeak: false,
+              isRanged: Math.max(Math.abs(unit.row - healTarget.row), Math.abs(unit.col - healTarget.col)) > 1,
+              healAmount: healAmt,
+            });
             continue;
           }
         }
 
-        // Focus fire override
-        const focusOverride = unit.team === 'player' ? playerFocusTarget : unit.team === 'enemy' ? enemyFocusTarget : null;
-        const target = focusOverride ?? findTarget(unit, allUnits);
-        if (!target) continue;
-
-        if (!canAttack(unit, target)) {
-          unit.stuckTurns = (unit.stuckTurns || 0) + 1;
-          const skipMove = isFrozenNow || seekerHolds || shouldSkipMove(unit);
-          const newPos = skipMove ? { row: unit.row, col: unit.col } : moveToward(unit, target, newGrid, allUnits);
-          if (newPos.row !== unit.row || newPos.col !== unit.col) {
-            leaveArsonistTrail(newGrid, unit);
-            newGrid[unit.row][unit.col].unit = null;
-            unit.row = newPos.row; unit.col = newPos.col;
-            newGrid[unit.row][unit.col].unit = unit;
+        const range = UNIT_DEFS[unit.type].attackRange ?? 1;
+        let best: Unit | null = null;
+        let bestDist = Infinity;
+        for (const other of allUnits) {
+          if (other === unit || other.team === unit.team) continue;
+          if (other.hp <= 0 || other.dead) continue;
+          if (!inBattlefield(other)) continue;
+          if (other.isPhantom && (other.phantom ?? 0) > 0) continue;
+          const adr = Math.abs(other.row - unit.row);
+          const adc = Math.abs(other.col - unit.col);
+          const d = Math.max(adr, adc);
+          if (d > range) continue;
+          if (!best || other.hp < best.hp || (other.hp === best.hp && d < bestDist)) {
+            best = other; bestDist = d;
           }
-        } else {
-          // Can attack → reset stuck counter, but ranged kiters still reposition (unless frozen / seeker holding)
-          unit.stuckTurns = 0;
-          if (!isFrozenNow && !seekerHolds) {
-            const kitePos = moveToward(unit, target, newGrid, allUnits);
-            if (kitePos.row !== unit.row || kitePos.col !== unit.col) {
-              leaveArsonistTrail(newGrid, unit);
-              newGrid[unit.row][unit.col].unit = null;
-              unit.row = kitePos.row; unit.col = kitePos.col;
-              newGrid[unit.row][unit.col].unit = unit;
+        }
+        if (!best) continue;
+
+        const isFrozenNow = !!(unit.frozen && unit.frozen > 0);
+        const frozenMul = isFrozenNow ? (unit.frozenDmgMul ?? 0.5) : 1;
+        if (isFrozenNow) {
+          unit.frozen = (unit.frozen || 0) - 1;
+          if ((unit.frozen || 0) <= 0) unit.frozenDmgMul = undefined;
+        }
+        let dmg = Math.round(calcDamage(unit, best, newGrid) * frozenMul);
+        if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
+        else {
+          dmg = Math.round(dmg * enemyDmgMod);
+          if (best.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
+        }
+        best.hp = Math.max(0, best.hp - dmg);
+        unit.cooldown = effectiveCooldown(unit, newGrid);
+        unit.lastAttackedId = best.id;
+
+        const uColor = unit.color || UNIT_COLOR_GROUPS[unit.type];
+        const tColor = best.color || UNIT_COLOR_GROUPS[best.type];
+        const isStrong = (uColor === 'red' && tColor === 'green') || (uColor === 'green' && tColor === 'blue') || (uColor === 'blue' && tColor === 'red');
+        const isWeak = (tColor === 'red' && uColor === 'green') || (tColor === 'green' && uColor === 'blue') || (tColor === 'blue' && uColor === 'red');
+
+        if (unit.type === 'vampire' && dmg > 0) {
+          const heal = Math.round(dmg * 0.3);
+          const before = unit.hp;
+          unit.hp = Math.min(unit.maxHp, unit.hp + heal);
+          if (unit.hp - before > 0) logs.push(`🧛 Vampir saugt ${unit.hp - before} ❤️`);
+          if (best.hp > 0) {
+            best.bleeding = [10, 5, 3, 1];
+            logs.push(`🩸 ${UNIT_DEFS[best.type].emoji} blutet!`);
+          }
+        }
+        if (unit.type === 'arsonist' && best.hp > 0 && !isImmuneToFire(best, newGrid)) {
+          best.burning = [...(best.burning || []), { dmg: 5, turns: 4 }];
+        }
+        let didFreeze = false;
+        if (unit.type === 'frost' && best.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(best, newGrid)) {
+          best.frozen = 3;
+          best.frozenDmgMul = 0.5;
+          didFreeze = true;
+        }
+        if (unit.type === 'shadowpriest' && best.hp > 0) {
+          applyShadowpriestCurse(unit, best, logs, events);
+        }
+
+        applyPostAttackEffects(unit, best, dmg, newGrid, logs);
+
+        let lightningChainCells: { row: number; col: number }[] | undefined;
+        if (unit.type === 'lightning') {
+          lightningChainCells = [{ row: best.row, col: best.col }];
+          const hopMults = [0.3, 0.2, 0.15, 0.1, 0.05];
+          const hitIds = new Set<string>([best.id]);
+          let cur = { row: best.row, col: best.col };
+          for (const mult of hopMults) {
+            let pick: { u: Unit; d: number } | null = null;
+            for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++) {
+              if (dr === 0 && dc === 0) continue;
+              const ar = cur.row + dr, ac = cur.col + dc;
+              if (ar < 0 || ar >= newGrid.length || ac < 0 || ac >= newGrid[0].length) continue;
+              const cu = newGrid[ar][ac].unit;
+              if (!cu || cu.hp <= 0 || cu.dead) continue;
+              if (cu.team === unit.team || hitIds.has(cu.id)) continue;
+              if (cu.isPhantom && (cu.phantom ?? 0) > 0) continue;
+              const d = Math.max(Math.abs(dr), Math.abs(dc));
+              if (!pick || d < pick.d) pick = { u: cu, d };
+            }
+            if (!pick) break;
+            const cu = pick.u;
+            const chainDmg = Math.max(1, Math.round(dmg * mult));
+            cu.hp = Math.max(0, cu.hp - chainDmg);
+            hitIds.add(cu.id);
+            lightningChainCells.push({ row: cu.row, col: cu.col });
+            logs.push(`⚡ Blitz → ${UNIT_DEFS[cu.type].emoji} ${chainDmg}`);
+            if (cu.hp <= 0) {
+              const survived = applyDeathEffects(cu, allUnits, newGrid, logs, events);
+              if (!survived) (cu as any).dead = true;
+            }
+            cur = { row: cu.row, col: cu.col };
+          }
+        }
+
+        let chaindancerCells: { row: number; col: number }[] | undefined;
+        if (unit.type === 'chaindancer') {
+          chaindancerCells = applyChainAttack(unit, best, dmg, newGrid, logs);
+        }
+
+        let aoeCells: { row: number; col: number }[] | undefined;
+        if (unit.type === 'dragon') {
+          aoeCells = [];
+          const splashDmg = Math.round(dmg * 0.3);
+          for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+            const ar = unit.row + dr, ac = unit.col + dc;
+            if (ar < 0 || ar >= newGrid.length || ac < 0 || ac >= newGrid[0].length) continue;
+            aoeCells.push({ row: ar, col: ac });
+            const cu = newGrid[ar][ac].unit;
+            if (!cu || cu === best || cu.team === unit.team || cu.hp <= 0 || cu.dead) continue;
+            cu.hp = Math.max(0, cu.hp - splashDmg);
+            logs.push(`🔥 Drache 🔥→ ${UNIT_DEFS[cu.type].emoji} ${splashDmg}`);
+            if (cu.hp <= 0) {
+              const survived = applyDeathEffects(cu, allUnits, newGrid, logs, events);
+              if (!survived) (cu as any).dead = true;
             }
           }
         }
 
+        const def = UNIT_DEFS[unit.type];
+        const tDef = UNIT_DEFS[best.type];
+        const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
+        logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${best.frozen ? ' 🧊' : ''}${best.hp <= 0 ? ' ☠️' : ''}`);
 
-        if (canAttack(unit, target) && unit.cooldown <= 0) {
-          let dmg = calcDamage(unit, target, newGrid);
-          // Frozen attacker: reduced damage
-          if (isFrozenNow) dmg = Math.round(dmg * frozenDmgMul);
-          // Apply morale damage modifier + shield wall
-          if (unit.team === 'player') dmg = Math.round(dmg * playerDmgMod);
-          else {
-            dmg = Math.round(dmg * enemyDmgMod);
-            if (target.team === 'player') dmg = Math.round(dmg * shieldWallDefMod);
-          }
-          target.hp = Math.max(0, target.hp - dmg);
-          unit.cooldown = effectiveCooldown(unit, newGrid);
-          // Warrior: track last attacked for lock-on behavior
-          if (unit.type === 'warrior') unit.lastAttackedId = target.id;
-          // Rider: track last attacked for target-switching
-          if (unit.type === 'rider') unit.lastAttackedId = target.id;
+        events.push({
+          type: best.hp <= 0 ? 'kill' : 'hit',
+          attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col,
+          attackerEmoji: def.emoji, attackerType: unit.type,
+          targetId: best.id, targetRow: best.row, targetCol: best.col,
+          damage: dmg, isStrong, isWeak,
+          isRanged: bestDist > 1,
+          isAoe: unit.type === 'dragon',
+          aoeCells,
+          chainCells: lightningChainCells,
+          isFrozen: didFreeze,
+        });
 
-          // Frost: 50% chance to freeze the target for 3 ticks at 50% damage (skip immune)
-          let didFreeze = false;
-          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(target, newGrid)) {
-            target.frozen = 3;
-            target.frozenDmgMul = 0.5;
-            didFreeze = true;
-          }
-
-          const def = UNIT_DEFS[unit.type];
-          const tDef = UNIT_DEFS[target.type];
-          const uColor = unit.color || UNIT_COLOR_GROUPS[unit.type];
-          const tColor = target.color || UNIT_COLOR_GROUPS[target.type];
-          const isStrong = (uColor === 'red' && tColor === 'green') || (uColor === 'green' && tColor === 'blue') || (uColor === 'blue' && tColor === 'red');
-          const isWeak = (tColor === 'red' && uColor === 'green') || (tColor === 'green' && uColor === 'blue') || (tColor === 'blue' && uColor === 'red');
-          const suffix = isStrong ? ' 💪' : isWeak ? ' 😰' : '';
-          const dist = Math.abs(unit.row - target.row) + Math.abs(unit.col - target.col);
-          logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.frozen ? ' 🧊' : ''}${target.hp <= 0 ? ' ☠️' : ''}`);
-
-          // Dragon AOE: collect all cells in 3x3 around the dragon for fire effect
-          let aoeCells: { row: number; col: number }[] | undefined;
-          if (unit.type === 'dragon') {
-            aoeCells = [];
-            for (let dr = -1; dr <= 1; dr++) {
-              for (let dc = -1; dc <= 1; dc++) {
-                const ar = unit.row + dr;
-                const ac = unit.col + dc;
-                if (ar >= 0 && ar < GRID_SIZE && ac >= 0 && ac < GRID_SIZE) {
-                  aoeCells.push({ row: ar, col: ac });
-                }
-              }
-            }
-            // Splash damage: 30% to other enemies in the 3x3 area
-            const splashDmg = Math.round(dmg * 0.3);
-            for (const aoePos of aoeCells) {
-              const cellUnit = newGrid[aoePos.row][aoePos.col].unit;
-              if (cellUnit && cellUnit.hp > 0 && !cellUnit.dead && cellUnit.team !== unit.team && cellUnit.id !== target.id) {
-                cellUnit.hp = Math.max(0, cellUnit.hp - splashDmg);
-                const splashDef = UNIT_DEFS[cellUnit.type];
-                logs.push(`🔥 ${unit.team === 'player' ? '👤' : '💀'} Drache 🔥→ ${splashDef.emoji} ${splashDmg} (Flächenschaden)`);
-                events.push({
-                  type: cellUnit.hp <= 0 ? 'kill' : 'hit',
-                  attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: '🔥',
-                  attackerType: unit.type,
-                  targetId: cellUnit.id, targetRow: aoePos.row, targetCol: aoePos.col,
-                  damage: splashDmg, isStrong: false, isWeak: false, isRanged: false, isAoe: true,
-                });
-                if (cellUnit.hp <= 0) (cellUnit as any).dead = true;
-              }
-            }
-          }
-
+        if (chaindancerCells && chaindancerCells.length > 1) {
           events.push({
-            type: target.hp <= 0 ? 'kill' : 'hit',
-            attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: def.emoji,
-            attackerType: unit.type,
-            targetId: target.id, targetRow: target.row, targetCol: target.col,
-            damage: dmg, isStrong, isWeak, isRanged: dist > 1,
-            isAoe: unit.type === 'dragon', aoeCells, isFrozen: didFreeze,
+            type: 'chain',
+            attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col,
+            attackerEmoji: '🪢', attackerType: unit.type,
+            targetId: best.id, targetRow: best.row, targetCol: best.col,
+            damage: 0, isStrong: false, isWeak: false, isRanged: false,
+            chainCells: chaindancerCells,
           });
+        }
 
-          // Emit freeze event for ice animation
-          if (didFreeze) {
-            events.push({
-              type: 'freeze',
-              attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: '🥶',
-              attackerType: unit.type,
-              targetId: target.id, targetRow: target.row, targetCol: target.col,
-              damage: 0, isStrong: false, isWeak: false, isRanged: dist > 1,
-            });
-          }
+        if (didFreeze) {
+          events.push({
+            type: 'freeze',
+            attackerId: unit.id, attackerRow: unit.row, attackerCol: unit.col, attackerEmoji: '🥶',
+            attackerType: unit.type,
+            targetId: best.id, targetRow: best.row, targetCol: best.col,
+            damage: 0, isStrong: false, isWeak: false, isRanged: bestDist > 1,
+          });
+        }
 
-          if (target.hp <= 0) (target as any).dead = true;
+        if (best.hp <= 0) {
+          const survived = applyDeathEffects(best, allUnits, newGrid, logs, events);
+          if (!survived) (best as any).dead = true;
+        }
+        if (unit.hp <= 0) {
+          const survived = applyDeathEffects(unit, allUnits, newGrid, logs, events);
+          if (!survived) (unit as any).dead = true;
         }
       }
 
