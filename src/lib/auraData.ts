@@ -109,7 +109,7 @@ export async function loadAuraData(): Promise<{ zones: AuraZoneMap; effects: Aur
 export type AuraOverlayCell = { buff: number; nerf: number };
 export type AuraOverlayMap = Map<string, AuraOverlayCell>;
 
-export function computeAuraOverlay(units: Unit[], zones: AuraZoneMap): AuraOverlayMap {
+export function computeAuraOverlay(units: Unit[], zones: AuraZoneMap, flipped = false): AuraOverlayMap {
   const out: AuraOverlayMap = new Map();
   for (const u of units) {
     if (!u || u.dead || u.hp <= 0) continue;
@@ -119,7 +119,10 @@ export function computeAuraOverlay(units: Unit[], zones: AuraZoneMap): AuraOverl
       const kind = z[pos];
       if (!kind) continue;
       const { dr, dc } = ZONE_DELTA[pos];
-      const r = u.row + dr;
+      // For the flipped (player2) view the board is rendered vertically mirrored,
+      // so the aura overlay relative to the unit must also be vertically flipped
+      // to keep the visual relationship intact from that player's perspective.
+      const r = u.row + (flipped ? -dr : dr);
       const c = u.col + dc;
       if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
       const key = `${r}-${c}`;
