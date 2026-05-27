@@ -39,7 +39,7 @@ function createBattleWorldGrid(): Cell[][] {
 }
 
 function getRoundUnitLimit(roundNumber: number, handicap: number = 0): number {
-  const base = Math.min(9 + (roundNumber - 1) * 2, 17);
+  const base = Math.min(2 + roundNumber * 2, 20);
   return Math.max(1, base - Math.max(0, Math.min(3, handicap | 0)));
 }
 
