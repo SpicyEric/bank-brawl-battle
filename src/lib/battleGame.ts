@@ -467,7 +467,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   sniper: {
-    label: 'Scharfschütze', emoji: '🎯', hp: 40, attack: 25, cooldown: 4,
+    label: 'Scharfschütze', emoji: '🎯', hp: 40, attack: 30, cooldown: 5,
     description: 'Bewegt sich nie. Greift immer die Einheit mit niedrigstem HP auf dem ganzen Feld an. Hoher Schaden.',
     movePattern: [],
     attackPattern: (() => {
@@ -562,13 +562,14 @@ export const BASE_UNITS = 5;
 export const MAX_UNITS = 20; // absolute cap (limited by available rows: 3×8=24 cells)
 
 // Comeback mechanic: behind by 2+ → +1, behind by 4+ → +2
-// Round escalation: round N allows N units (up to MAX_UNITS), plus comeback bonus.
+// Round escalation: round 1 = 4 units, +2 per round up to round 9 = 20.
 export function getMaxUnits(myScore: number, opponentScore: number, roundNumber: number = 999): number {
   const deficit = opponentScore - myScore;
   let bonus = 0;
   if (deficit >= 4) bonus = 2;
   else if (deficit >= 2) bonus = 1;
-  return Math.min(roundNumber + bonus, MAX_UNITS);
+  const base = 2 + roundNumber * 2;
+  return Math.min(base + bonus, MAX_UNITS);
 }
 export const GRID_SIZE = 8;
 // Full-grid placement: both sides can build anywhere on the 8x8 board.
@@ -576,7 +577,7 @@ export const GRID_SIZE = 8;
 export const PLAYER_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
 export const ENEMY_ROWS = [0, 1, 2, 3, 4, 5, 6, 7];
 export const POINTS_TO_WIN = 8;
-export const ROUNDS_TO_WIN = 3; // singleplayer: best-of-5, first to 3 round wins
+export const ROUNDS_TO_WIN = 5; // first to 5 round wins (max 9 rounds)
 export const OVERTIME_THRESHOLD = 7; // at this score, 2-point lead required
 export const AUTO_OVERTIMES = 3; // first 3 overtimes are automatic
 export const MAX_OVERTIMES = 5; // after 5th overtime → forced draw
