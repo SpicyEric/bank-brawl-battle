@@ -789,11 +789,9 @@ export function findTarget(unit: Unit, allUnits: Unit[]): Unit | null {
   if (unit.type === 'sniper') {
     return [...enemies].sort((a, b) => a.hp - b.hp)[0];
   }
-  // === ASSASSIN: ALWAYS hunts the globally lowest-HP enemy. Re-evaluates every tick.
-  //     Tiebreaker: nearest. No lock-on, no column bias, no tank-aggro detour. ===
-  if (unit.type === 'assassin') {
-    return [...enemies].sort((a, b) => a.hp - b.hp || distance(unit, a) - distance(unit, b))[0];
-  }
+  // (Assassin special targeting removed — behaves like a normal melee unit, picks
+  //  the closest enemy via default proximity logic below.)
+
   // === LAMB (own lamb): taunts the strongest enemy ===
   if (unit.type === 'lamb') {
     return [...enemies].sort((a, b) => b.attack * b.hp - a.attack * a.hp)[0];
