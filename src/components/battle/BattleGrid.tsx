@@ -202,7 +202,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
             const kind = (z as any)[pos];
             if (!kind) continue;
             const [dr, dc] = DELTA[pos];
-            const r = lastPlaced.row + dr;
+            const r = lastPlaced.row + (flipped ? -dr : dr);
             const c = lastPlaced.col + dc;
             if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
             out.set(`${r}-${c}`, kind);
@@ -217,7 +217,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
       setPlacementPulse(new Map());
       setImpactCell(null);
     }, 750);
-  }, [lastPlaced, auraZones]);
+  }, [lastPlaced, auraZones, flipped]);
 
   // Compute drag preview aura cells (shown while a unit is being dragged over a cell)
   let dragAuraCells = new Map<string, 'buff' | 'nerf'>();
@@ -235,7 +235,7 @@ export function BattleGrid({ grid, phase, onCellClick, lastPlaced, battleEvents 
         const kind = (z as any)[pos];
         if (!kind) continue;
         const [dr, dc] = DELTA[pos];
-        const r = dragPreview.row + dr;
+        const r = dragPreview.row + (flipped ? -dr : dr);
         const c = dragPreview.col + dc;
         if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
         dragAuraCells.set(`${r}-${c}`, kind);
