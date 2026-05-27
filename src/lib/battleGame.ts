@@ -204,7 +204,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 90,
     attack: 16,
     cooldown: 1,
-    description: 'Schneller Opportunist. Greift jede Runde an und wechselt zum nächsten verwundeten Ziel. Bewegt sich diagonal (2 Felder). Gegner unter 50% HP nehmen 20 Schaden statt 16.',
+    description: 'Schneller Nahkämpfer. Bewegt sich diagonal (bis 2 Felder) und greift diagonal an. Cooldown 1.',
     movePattern: [
       ...DIAGONAL,
       { row: -2, col: -2 }, { row: -2, col: 2 },
