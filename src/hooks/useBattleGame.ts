@@ -1593,6 +1593,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
                   (cellUnit as any).dead = true;
                 }
               }
+            }
+          }
+
 
           events.push({
             type: target.hp <= 0 ? 'kill' : 'hit',
