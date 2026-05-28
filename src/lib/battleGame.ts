@@ -1322,8 +1322,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
 
   // Rider horn buff: +80% damage while hornBuff active (buff, not a reduction)
   if ((attacker.hornBuff || 0) > 0) dmg *= 1.8;
-  // Obelisk buff: +50% damage while obeliskBuff active
-  if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.5;
+  // Obelisk buff: +20% damage while obeliskBuff active (non-stackable)
+  if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.2;
 
   // --- Aura: own-damage nerfs on attacker (MULTIPLICATIVE — diminishing returns)
   if (aStacks) {
