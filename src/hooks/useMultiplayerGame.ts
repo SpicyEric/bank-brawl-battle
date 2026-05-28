@@ -18,6 +18,17 @@ import { matchRecorder } from '@/lib/matchRecorder';
 import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
 import { applyAuraStacks, applyAuraTick, applyAuraOnAttack, applyAuraOnDeath, applyAuraSourceEffects, applyDefenderShare, fireLightningTakenMul, hasImmuneFFP } from '@/lib/auraEffects';
 import { findFormations, applyFormationMove } from '@/lib/formations';
+import { playUnitSound } from '@/lib/unitSounds';
+
+function playEventSounds(events: BattleEvent[]) {
+  const played = new Set<string>();
+  for (const evt of events) {
+    const t = evt.attackerType;
+    if (t && (evt.type === 'hit' || evt.type === 'kill') && !played.has(t)) {
+      if (playUnitSound(t)) played.add(t);
+    }
+  }
+}
 
 interface MultiplayerConfig {
   roomId: string;
@@ -280,9 +291,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           setMoraleBoostActive(data.enemyMorale || null);
           setOpponentMoraleActive(data.playerMorale || null);
           // Sync focus fire state
-          if (data.enemyFocusFire) setFocusFireActive(true);
-          else setFocusFireActive(false);
-          // Sync flank active state from host (guest's units = enemy team on host)
+          setBattleEvents(data.events || []);
+          if (data.events?.length) playEventSounds(data.events);
+          setBattleTimer(data.timer);
           const myFlank = data.enemyFlankActive as -1 | 1 | null | undefined;
           setFlankActive(myFlank === -1 ? 'left' : myFlank === 1 ? 'right' : null);
         }
