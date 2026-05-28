@@ -50,22 +50,28 @@ function tick() {
   let sum = 0;
   for (let i = 1; i <= 5; i++) sum += bins[i];
   const energy = sum / 5;
+function tick() {
+  if (!analyser) { rafId = null; return; }
+  const bins = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(bins);
+  // Low band: first ~8 bins (~ 0-350 Hz at 44.1kHz / fftSize 512)
+  let sum = 0;
+  for (let i = 1; i <= 7; i++) sum += bins[i];
+  const energy = sum / 7;
 
   // Slow EMA for adaptive threshold
-  bassEMA = bassEMA * 0.96 + energy * 0.04;
+  bassEMA = bassEMA * 0.93 + energy * 0.07;
 
   const now = performance.now();
-  const threshold = Math.max(140, bassEMA * 1.45);
-  if (energy > threshold && now - lastKickAt > 140) {
+  // Lower floor + lower multiplier => catches lighter kicks too
+  const threshold = Math.max(60, bassEMA * 1.15);
+  if (energy > threshold && now - lastKickAt > 90) {
     lastKickAt = now;
     kickListeners.forEach(l => { try { l(); } catch {} });
   }
   rafId = requestAnimationFrame(tick);
 }
 
-function startLoop() {
-  if (rafId != null) return;
-  rafId = requestAnimationFrame(tick);
 }
 
 /** Start (or restart) the menu track from the beginning. Idempotent per call. */
