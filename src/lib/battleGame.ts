@@ -1659,7 +1659,7 @@ export function applyPostAttackEffects(
   }
 
   // Spiderqueen: 25% chance to web target for 5 ticks (no move, no attack at all)
-  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.25) {
+  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.15) {
     target.webbed = Math.max(target.webbed || 0, 5);
     logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} 5 Ticks gefangen`);
   }
