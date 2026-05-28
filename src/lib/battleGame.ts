@@ -1664,6 +1664,28 @@ export function applyPostAttackEffects(
     logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} 5 Ticks gefangen`);
   }
 
+  // Mage formation-break: 10% chance to fling the target to the enemy back row.
+  if (attacker.type === 'mage' && target.hp > 0 && !target.dead && Math.random() < 0.1) {
+    // Target's "back row" = opposite end of the board relative to its team's direction.
+    // Try same column first, otherwise scan outward to the closest free cell on that row.
+    const targetBackRow = target.team === 'player' ? GRID_SIZE - 1 : 0;
+    let landed: { r: number; c: number } | null = null;
+    for (let dCol = 0; dCol < GRID_SIZE && !landed; dCol++) {
+      for (const sign of dCol === 0 ? [0] : [-1, 1]) {
+        const c = target.col + sign * dCol;
+        if (c < 0 || c >= GRID_SIZE) continue;
+        const cell = grid[targetBackRow]?.[c];
+        if (cell && !cell.unit && cell.terrain !== 'water') { landed = { r: targetBackRow, c }; break; }
+      }
+    }
+    if (landed) {
+      grid[target.row][target.col].unit = null;
+      target.row = landed.r; target.col = landed.c;
+      grid[landed.r][landed.c].unit = target;
+      logs.push(`🔮 Formationsaufbruch! ${UNIT_DEFS[target.type].emoji} an Kartenrand geschleudert`);
+    }
+  }
+
   // Magnetiker pull is no longer per-attack — handled by tickMagnetPull every 4 ticks.
 
 
