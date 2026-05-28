@@ -15,7 +15,8 @@ import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { updateRoom, ensureAnonymousSession } from '@/lib/multiplayer';
 import { matchRecorder } from '@/lib/matchRecorder';
-import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
+import { loadAuraData, detectPlacementAura, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
+
 import { applyAuraStacks, applyAuraTick, applyAuraOnAttack, applyAuraOnDeath, applyAuraSourceEffects, applyDefenderShare, fireLightningTakenMul, hasImmuneFFP } from '@/lib/auraEffects';
 import { findFormations, applyFormationMove } from '@/lib/formations';
 import { playUnitSound } from '@/lib/unitSounds';
