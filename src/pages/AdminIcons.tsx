@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Minus } from 'lucide-react';
 import { UNIT_TYPES, UNIT_DEFS, type UnitType } from '@/lib/battleGame';
@@ -11,6 +11,9 @@ import {
 } from '@/lib/unitIcons';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
+
+const LONG_PRESS_MS = 400;
 
 type Slot = 'unit' | 'attack' | 'clone' | 'buff';
 type ZoneType = 'neutral' | 'buff' | 'nerf';
@@ -39,6 +42,21 @@ const AdminIcons = () => {
   const [selectedUnit, setSelectedUnit] = useState<UnitType>(UNIT_TYPES[0]);
   const [slot, setSlot] = useState<Slot>('unit');
   const [filter, setFilter] = useState('');
+  const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPress = useRef(false);
+
+  const startPress = (t: UnitType) => {
+    didLongPress.current = false;
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      didLongPress.current = true;
+      setInfoUnit(t);
+    }, LONG_PRESS_MS);
+  };
+  const cancelPress = () => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  };
 
   // Aura zones: per-unit
   const [auraMap, setAuraMap] = useState<Partial<Record<UnitType, Record<ZonePos, ZoneType>>>>({});
@@ -158,12 +176,17 @@ const AdminIcons = () => {
             return (
               <button
                 key={t}
-                onClick={() => setSelectedUnit(t)}
-                className={`p-1.5 rounded-lg border-2 text-center transition-all ${isSel ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
+                onClick={() => { if (didLongPress.current) { didLongPress.current = false; return; } setSelectedUnit(t); }}
+                onPointerDown={() => startPress(t)}
+                onPointerUp={cancelPress}
+                onPointerLeave={cancelPress}
+                onPointerCancel={cancelPress}
+                onContextMenu={(e) => e.preventDefault()}
+                className={`p-1.5 rounded-lg border-2 text-center transition-all select-none ${isSel ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
               >
                 <div className="h-8 flex items-center justify-center">
                   {assigned
-                    ? <img src={iconUrl(assigned)} alt="" className="w-7 h-7" style={{ imageRendering: 'pixelated' }} />
+                    ? <img src={iconUrl(assigned)} alt="" className="w-7 h-7" style={{ imageRendering: 'pixelated' }} draggable={false} />
                     : <span className="text-xl">{UNIT_DEFS[t].emoji}</span>}
                 </div>
                 <p className="text-[9px] truncate mt-0.5">{UNIT_DEFS[t].label}</p>
@@ -306,6 +329,7 @@ const AdminIcons = () => {
           </div>
         </>
       )}
+      {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
     </div>
   );
 };
