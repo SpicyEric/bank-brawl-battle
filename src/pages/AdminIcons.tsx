@@ -230,6 +230,102 @@ const AdminIcons = () => {
       </div>
 
 
+      {/* PLACEMENT SOUND MODE (speaker tile selected) */}
+      {placementMode ? (
+        <>
+          <div className="px-3 py-2 border-b border-border">
+            <p className="text-xs text-muted-foreground mb-2">Welcher Platzierungs-Sound?</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {placeKinds.map(pk => {
+                const active = pk.key === selectedPlaceKind;
+                const has = !!getPlacementSound(pk.key);
+                return (
+                  <button
+                    key={pk.key}
+                    onClick={() => setSelectedPlaceKind(pk.key)}
+                    className={`p-1.5 rounded-lg border-2 text-center text-[10px] font-semibold ${active ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
+                  >
+                    <div className="h-6 flex items-center justify-center text-lg">{pk.emoji}</div>
+                    <div className="flex items-center justify-center gap-1">
+                      <Volume2 size={10} className={has ? 'text-primary' : 'opacity-40'} />
+                      <span className="truncate">{pk.label}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1.5">
+              {selectedPlaceKind === 'default' && 'Spielt bei jeder Einheit-Platzierung (Standard).'}
+              {selectedPlaceKind === 'buff'    && 'Spielt, wenn die platzierte Einheit einen Buff erzeugt oder einen empfängt.'}
+              {selectedPlaceKind === 'nerf'    && 'Spielt, wenn die Platzierung einen Nerf auslöst.'}
+              {selectedPlaceKind === 'mixed'   && 'Spielt, wenn Platzierung gleichzeitig Buff und Nerf erzeugt.'}
+              {selectedPlaceKind === 'full'    && 'Spielt, wenn das Einheiten-Maximum erreicht ist.'}
+            </p>
+          </div>
+
+          {/* Selected placement sound detail */}
+          <div className="px-3 py-2 border-b border-border flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg border-2 border-primary bg-primary/5 flex items-center justify-center">
+              <Volume2 size={22} className={getPlacementSound(selectedPlaceKind) ? 'text-primary' : 'opacity-50'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm">Platzierung · <span className="text-muted-foreground font-normal">{placeKinds.find(p => p.key === selectedPlaceKind)?.label}</span></p>
+              <p className="text-[10px] text-muted-foreground truncate">{getPlacementSound(selectedPlaceKind) ?? 'Kein Sound (stumm)'}</p>
+            </div>
+            {getPlacementSound(selectedPlaceKind) && (
+              <>
+                <button onClick={() => previewSound(getPlacementSound(selectedPlaceKind)!)} className="text-xs px-2 py-1 rounded-md bg-secondary"><Play size={12} /></button>
+                <button
+                  onClick={() => { setPlacementSound(selectedPlaceKind, null); setPlaceTick(t => t + 1); }}
+                  className="text-xs px-2 py-1 rounded-md bg-secondary"
+                >Entfernen</button>
+              </>
+            )}
+          </div>
+
+          {/* Category tabs */}
+          <div className="px-3 py-2 border-b border-border flex gap-1.5">
+            {(['buffs','magic','dungeon'] as SoundCategory[]).map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSoundCategory(cat)}
+                className={`flex-1 px-2 py-1.5 rounded-lg border-2 text-xs font-semibold capitalize ${soundCategory === cat ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
+              >{cat} ({soundManifest[cat].length})</button>
+            ))}
+          </div>
+
+          {/* Sound list */}
+          <div className="flex-1 overflow-y-auto p-2">
+            <div className="flex flex-col gap-1">
+              {soundManifest[soundCategory].map(file => {
+                const rel = `${soundCategory}/${file}`;
+                const isAssigned = getPlacementSound(selectedPlaceKind) === rel;
+                return (
+                  <div
+                    key={file}
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded-md border-2 ${isAssigned ? 'border-primary bg-primary/20' : 'border-border bg-card'}`}
+                  >
+                    <button
+                      onClick={(e) => { e.stopPropagation(); previewSound(rel); }}
+                      className="p-1.5 rounded-md bg-secondary hover:bg-secondary/80"
+                      aria-label="Vorhören"
+                    ><Play size={12} /></button>
+                    <button
+                      onClick={() => { setPlacementSound(selectedPlaceKind, rel); setPlaceTick(t => t + 1); }}
+                      className="flex-1 text-left text-xs truncate"
+                    >{file}</button>
+                  </div>
+                );
+              })}
+              {soundManifest[soundCategory].length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4">Keine Dateien.</p>
+              )}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+
       {/* Slot tabs */}
       <div className="px-3 pt-3 border-b border-border">
         <div className="flex gap-1.5 flex-wrap">
