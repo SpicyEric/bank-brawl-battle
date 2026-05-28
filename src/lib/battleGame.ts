@@ -2289,22 +2289,8 @@ export function tickRiderHorn(
     logs.push(`📯 ${r.team === 'player' ? '👤' : '💀'} Reiter-Horn! (+80% Schaden für ${buffed} Verbündete im 3×3, 2 Ticks)`);
   }
 }
-      attackerCol: r.col,
-      attackerEmoji: '📯',
-      attackerType: 'rider',
-      targetId: r.id,
-      targetRow: r.row,
-      targetCol: r.col,
-      damage: 0,
-      isStrong: false,
-      isWeak: false,
-      isRanged: false,
-      innerCells,
-      outerCells,
-    });
-    logs.push(`📯 ${r.team === 'player' ? '👤' : '💀'} Reiter-Horn! (+100% Schaden für ${buffed} Verbündete, 2 Ticks)`);
-  }
-}
+
+
 
 /** Archer volley: every 4 ticks each archer fires 8 arrows simultaneously in
  *  every orthogonal + diagonal direction with infinite range. Each arrow
