@@ -949,7 +949,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
           if (unit.type === 'arsonist' && best.hp > 0 && !isImmuneToFire(best, newGrid)) {
             best.burning = [...(best.burning || []), { dmg: 5, turns: 4 }];
           }
-          if (unit.type === 'frost' && best.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(best, newGrid)) {
+          if (unit.type === 'frost' && best.hp > 0 && Math.random() < 0.2 && !isImmuneToFreeze(best, newGrid)) {
             best.frozen = 3;
             best.frozenDmgMul = 0.5;
           }
@@ -1001,13 +1001,13 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
             chaindancerCells = applyChainAttack(unit, best, dmg, newGrid, logs);
           }
 
-          // Dragon: 3x3 AOE around the dragon (30% splash to other enemies).
+          // Dragon: 3x3 AOE around the TARGET (20% splash to nearby enemies, flames everywhere).
           let aoeCells: { row: number; col: number }[] | undefined;
           if (unit.type === 'dragon') {
             aoeCells = [];
-            const splashDmg = Math.round(dmg * 0.3);
+            const splashDmg = Math.max(3, Math.round(dmg * 0.2));
             for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-              const ar = unit.row + dr, ac = unit.col + dc;
+              const ar = best.row + dr, ac = best.col + dc;
               if (ar < 0 || ar >= newGrid.length || ac < 0 || ac >= newGrid[0].length) continue;
               aoeCells.push({ row: ar, col: ac });
               const cu = newGrid[ar][ac].unit;
@@ -1227,18 +1227,14 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
       // === Doppelganger phantom timers === handled before the mode split.
       // === Cloner: spawn clones every 6 ticks (max 3 lifetime) ===
       tickClonerSpawns(allUnits, newGrid, logs);
-      // === Mage impulse: every 7 ticks push enemies in 7x7 outward ===
-      tickMageImpulse(allUnits, newGrid, events, logs);
+      // (Mage impulse removed — Magier hat jetzt 10% Push-Spezial bei Treffer.)
       // === Magnetiker pull: every 4 ticks, yank all enemies in 7x7 to adjacency ===
       tickMagnetPull(allUnits, newGrid, events, logs);
-      // === Frost Nova: every 7 ticks freeze enemies in 3x3 for 5 ticks at 30% dmg ===
-      tickFrostNova(allUnits, newGrid, events, logs);
-      // === Rider horn: every 9 ticks, +50% dmg buff to allies in 5x5 for 2 ticks ===
+      // (Frost Nova removed — Frostmagier hat jetzt 20% Freeze-Chance bei Treffer.)
+      // === Rider horn: every 9 ticks, +80% dmg buff to allies in 3x3 for 2 ticks ===
       tickRiderHorn(allUnits, newGrid, events, logs);
-      // === Archer volley: every 4 ticks, 8-direction infinite-range arrow salvo ===
-      tickArcherVolley(allUnits, newGrid, events, logs);
-      // === Dragon fire-spin: every 10 ticks, dragon spins 8 ticks firing beams ===
-      tickDragonSpin(allUnits, newGrid, events, logs);
+      // (Archer volley removed — Bogenschütze hat jetzt 20% Crit-Chance.)
+      // (Dragon fire-spin removed — Drache hat nur noch 3×3 Splash bei jedem Angriff.)
       // === Terrain regen: waterwalker heals on water ===
       tickTerrainHeals(allUnits, newGrid, logs);
       // === v3: Obelisk aura/beam (refresh buffs each tick) ===
@@ -1471,7 +1467,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
 
           // Frost: 50% chance to freeze target for 3 ticks at 50% damage (skip immune)
           let didFreeze = false;
-          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(target, newGrid)) {
+          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.2 && !isImmuneToFreeze(target, newGrid)) {
             target.frozen = 3;
             target.frozenDmgMul = 0.5;
             didFreeze = true;
@@ -1556,22 +1552,22 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
           const dist = Math.abs(unit.row - target.row) + Math.abs(unit.col - target.col);
           logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.frozen ? ' 🧊' : ''}${target.hp <= 0 ? ' ☠️' : ''}`);
 
-          // Dragon AOE: collect all cells in 3x3 around the dragon for fire effect
+          // Dragon AOE: 3×3 around the TARGET — flames on every cell, 20% splash to other enemies.
           let aoeCells: { row: number; col: number }[] | undefined;
           if (unit.type === 'dragon') {
             aoeCells = [];
             for (let dr = -1; dr <= 1; dr++) {
               for (let dc = -1; dc <= 1; dc++) {
-                const ar = unit.row + dr;
-                const ac = unit.col + dc;
+                const ar = target.row + dr;
+                const ac = target.col + dc;
                 if (ar >= 0 && ar < GRID_SIZE && ac >= 0 && ac < GRID_SIZE) {
                   aoeCells.push({ row: ar, col: ac });
                 }
               }
             }
 
-            // Splash damage: 30% to other enemies in the 3x3 area
-            const splashDmg = Math.round(dmg * 0.3);
+            // Splash damage: 20% to other enemies in the 3x3 area around target
+            const splashDmg = Math.max(3, Math.round(dmg * 0.2));
             for (const aoePos of aoeCells) {
               const cellUnit = newGrid[aoePos.row][aoePos.col].unit;
               if (cellUnit && cellUnit.hp > 0 && !cellUnit.dead && cellUnit.team !== unit.team && cellUnit.id !== target.id) {
@@ -1599,6 +1595,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
               }
             }
           }
+
 
           events.push({
             type: target.hp <= 0 ? 'kill' : 'hit',
