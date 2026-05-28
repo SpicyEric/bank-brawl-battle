@@ -1276,6 +1276,10 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   }
 
   let baseAtk = attacker.attack + (attacker.judgeBonus || 0) + (attacker.permAtkBonus || 0);
+  // Magnetiker: deals 19 damage instead of 12 when target is directly adjacent (Chebyshev ≤ 1).
+  if (attacker.type === 'magnetiker' && Math.max(Math.abs(attacker.row - defender.row), Math.abs(attacker.col - defender.col)) <= 1) {
+    baseAtk = 19;
+  }
   // Aura: archer-DoT temporary ATK debuff/buff applied to this attacker
   if (attacker.auraAtkDebuff) baseAtk = Math.max(0, baseAtk - attacker.auraAtkDebuff);
   if (attacker.auraAtkBuff) baseAtk += attacker.auraAtkBuff;
