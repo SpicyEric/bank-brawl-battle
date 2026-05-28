@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMusic } from '@/hooks/useMusic';
 import { ArrowLeft, Swords, BookOpen, Trophy, ChevronRight, FileBarChart2, Loader2, Zap } from 'lucide-react';
 import menuBg from '@/assets/menu-bg.png';
+import { MenuBackground } from '@/components/MenuBackground';
 import { fetchAllMatches } from '@/lib/matchRecorder';
 import { generateMatchesPdf, downloadBlob } from '@/lib/matchPdf';
 import { toast } from 'sonner';
@@ -50,7 +51,8 @@ const SinglePlayer = () => {
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
       {/* Background image - dimmed */}
       <img src={menuBg} alt="" className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300" />
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-none transition-opacity duration-300" />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-none transition-opacity duration-300" />
+      <MenuBackground />
 
       {/* Back button */}
       <button

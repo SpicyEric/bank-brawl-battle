@@ -4,6 +4,8 @@ import { createRoom, joinRoom, subscribeToRoom, updateRoom, getRoomById } from '
 import { ArrowLeft, Copy, Check, Users, Loader2, Play } from 'lucide-react';
 import { toast } from 'sonner';
 import menuBg from '@/assets/menu-bg.png';
+import { MenuBackground } from '@/components/MenuBackground';
+import { useMusic } from '@/hooks/useMusic';
 
 type LobbyState = 'menu' | 'creating' | 'hosting' | 'joining' | 'waiting' | 'joined' | 'starting';
 type PlayerRole = 'player1' | 'player2';
@@ -11,6 +13,7 @@ type PlayerRole = 'player1' | 'player2';
 const Multiplayer = () => {
   const navigate = useNavigate();
   const [state, setState] = useState<LobbyState>('menu');
+  useMusic('menu');
   const [roomCode, setRoomCode] = useState('');
   const [roomId, setRoomId] = useState('');
   const [myRole, setMyRole] = useState<PlayerRole | null>(null);
@@ -156,7 +159,8 @@ const Multiplayer = () => {
     <div className="min-h-[100dvh] flex flex-col items-center justify-center px-6 relative overflow-hidden">
       <img src={menuBg} alt="" className="absolute inset-0 w-full h-full object-cover transition-opacity duration-300" />
       <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-none transition-opacity duration-300" />
-
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-none transition-opacity duration-300" />
+      <MenuBackground />
       <button
         onClick={() => state === 'menu' ? navigate('/') : resetLobby()}
         className="absolute top-6 left-6 p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors z-10"
