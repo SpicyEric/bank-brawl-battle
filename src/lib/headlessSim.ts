@@ -487,7 +487,7 @@ function simulateOneBattle(
           if (target.hp > 0) target.bleeding = [10, 5, 3, 1];
         }
         if (unit.type === 'arsonist' && target.hp > 0 && !isImmuneToFire(target, grid)) {
-          target.burning = [...(target.burning || []), { dmg: 5, turns: 4 }];
+          target.burning = [...(target.burning || []), { dmg: 3, turns: 4 }];
         }
 
         // Lightning chain

@@ -350,28 +350,28 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   vampire: {
     label: 'Vampir', emoji: '🧛', hp: 80, attack: 19, cooldown: 2,
-    description: 'Lifesteal 30% des verursachten Schadens. Fügt jedem Ziel Blutung zu (10/5/3/1 HP über die nächsten 4 Ticks). Wechselt nach jedem Angriff das Ziel.',
+    description: 'Lifesteal: heilt sich um 20% des verursachten Schadens. Jedes Ziel blutet 4 Ticks lang (10/5/3/1 HP).',
     movePattern: DIAGONAL,
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
   },
   vulkanit: {
     label: 'Vulkanit', emoji: '🌋', hp: 90, attack: 20, cooldown: 3,
-    description: 'Hinterlässt nach jedem Angriff ein Lava-Plus (5 Felder) um das Ziel (6 Schaden / Runde, 3 Runden).',
+    description: 'Setzt das getroffene Feld in Brand: 5 Damage pro Tick für 6 Ticks an alle Einheiten, die darauf stehen.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   shadowblade: {
     label: 'Schattenklinge', emoji: '🥷', hp: 60, attack: 20, cooldown: 2,
-    description: 'Hält max. Abstand. Alle 5 Ticks: teleportiert sich in einem einzigen Tick neben einen Gegner, schlägt zu und teleportiert sofort wieder zurück — Formation bleibt erhalten.',
+    description: 'Alle 5 Ticks: teleportiert sich neben einen zufälligen Gegner, schlägt einmal zu und teleportiert sofort zurück – der eigene Spot bleibt reserviert.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
   },
   stormrunner: {
     label: 'Sturmläufer', emoji: '⚡', hp: 60, attack: 16, cooldown: 1,
-    description: 'Greift jeden Tick an. Bewegt sich bis zu 2 Felder in jede Richtung (5×5-Bereich). Startet sofort, unabhängig von der Platzierungsreihe.',
+    description: 'Sehr schneller Angreifer (Cooldown 1). Bringt Tempo in jeden Kampf.',
     movePattern: [
       ...ALL_ADJACENT,
       { row: -2, col: -2 }, { row: -2, col: -1 }, { row: -2, col: 0 }, { row: -2, col: 1 }, { row: -2, col: 2 },
@@ -385,14 +385,14 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   arsonist: {
     label: 'Brandstifter', emoji: '🔥', hp: 65, attack: 4, cooldown: 2,
-    description: 'Geringer Sofortschaden, zündet aber an: 5 Schaden pro Tick für 4 Ticks. Stapelbar. Hinterlässt zudem eine Brandspur (6 Ticks), die nur Feinden Schaden zufügt.',
+    description: 'Geringer Sofortschaden, aber zündet das Ziel an: 3 Damage pro Tick für 4 Ticks (stapelbar). Hinterlässt zudem eine brennende Spur (6 Ticks), die nur Feinden Schaden zufügt.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   lightning: {
     label: 'Blitzmagier', emoji: '🌩️', hp: 70, attack: 18, cooldown: 2,
-    description: 'Kettenblitz: springt vom Ziel zu Feinden im Radius 2 weiter (30/20/15/10/5% Schaden).',
+    description: 'Kettenblitz: Schaden springt vom Ziel zu Feinden im Radius 2 weiter (30 / 20 / 15 / 10 / 5% des Originalschadens).',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
@@ -402,49 +402,49 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   mirror: {
     label: 'Spiegelkämpfer', emoji: '🪞', hp: 75, attack: 14, cooldown: 2,
-    description: 'Reflektiert 30% des erlittenen Schadens (auch bei Ketten-/Splash-Treffern). Explodiert beim Tod für 30 Schaden im 3×3-Umkreis.',
+    description: 'Reflektiert 30% des erlittenen Schadens (auch bei Ketten- und Splash-Treffern) zurück an den Angreifer.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
   lamb: {
-    label: 'Opferlamm', emoji: '🐑', hp: 120, attack: 5, cooldown: 5,
-    description: 'Provoziert! Wird immer als Primärziel anvisiert. Heilt beim Tod alle Verbündeten um 30% HP.',
+    label: 'Opferlamm', emoji: '🐑', hp: 120, attack: 5, cooldown: 4,
+    description: 'Provoziert! Wird immer prioritär anvisiert, sobald in Reichweite. Heilt beim Tod alle Verbündeten um 35% ihrer maximalen HP.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
   judge: {
     label: 'Richter', emoji: '⚖️', hp: 100, attack: 8, cooldown: 2,
-    description: 'Pro gefallenem Verbündeten: +8 ATK permanent in dieser Runde.',
+    description: 'Pro gefallenem Verbündeten in dieser Runde: +5 ATK permanent.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
   icegolem: {
     label: 'Eisgolem', emoji: '🧊', hp: 200, attack: 25, cooldown: 4,
-    description: 'Riesiger Tank. Bewegt sich nur jede zweite Runde. 25% Chance, Angreifer einzufrieren.',
+    description: 'Schwerer Tank. 25% Chance bei jedem erlittenen Treffer, den Angreifer einzufrieren (50% Schaden für 3 Ticks).',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
   cloner: {
     label: 'Kloner', emoji: '🧬', hp: 90, attack: 16, cooldown: 2,
-    description: 'Hält maximal Abstand zu Feinden, bewegt sich nur jeden 2. Tick. Spawnt ersten Klon sofort, danach alle 6 Ticks (max. 3 Klone). Klone: 12 HP, 6 ATK.',
+    description: 'Spawnt alle 6 Ticks einen Klon (max. 3) auf einem zufälligen freien Feld im 8×8-Schlachtfeld. Klone: 12 HP, 6 ATK.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
   magnetiker: {
     label: 'Magnetiker', emoji: '🧲', hp: 80, attack: 12, cooldown: 2,
-    description: 'Alle 4 Ticks: zieht alle Feinde im 7×7-Umkreis maximal nah heran (bis auf 1 Feld) und fügt jedem gezogenen Gegner sofort 15 Damage zu.',
+    description: 'Reichweite 2. Steht das Ziel direkt daneben (Reichweite 1), macht er 19 Damage statt 12.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: [], weakVs: [],
   },
   spiderqueen: {
     label: 'Spinnenkönigin', emoji: '🕷️', hp: 70, attack: 15, cooldown: 2,
-    description: 'Bewegt sich in alle 8 Richtungen (bis 2 Felder). 25% Chance, Ziel im Netz zu fangen (5 Ticks: kein Move, kein Angriff).',
+    description: '15% Chance: fängt das Ziel im Netz – es kann sich 5 Ticks lang noch bewegen, aber nicht mehr angreifen.',
     movePattern: [
       ...ALL_ADJACENT,
       { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
@@ -455,21 +455,21 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   },
   waterwalker: {
     label: 'Wasserwandler', emoji: '🌊', hp: 85, attack: 24, cooldown: 2,
-    description: 'Strebt zwanghaft in den nächsten Tümpel. Auf Wasser: -30% erlittener Schaden, regeneriert +3 HP pro Tick. Wechselt nach 4 Idle-Ticks zu einem neuen Wasserfeld.',
+    description: 'Solide Standard-Einheit ohne eigene Spezialfähigkeit. Wertvoll durch Aura-Effekte für Verbündete.',
     movePattern: ALL_ADJACENT,
     attackPattern: ALL_ADJACENT,
     strongVs: [], weakVs: [],
   },
   doppelganger: {
     label: 'Doppelgänger', emoji: '👥', hp: 85, attack: 19, cooldown: 2,
-    description: 'Spawnt zu Rundenstart ein lila leuchtendes Phantom (80 HP, 5 Dmg, 5 Ticks unverwundbar) irgendwo in den 3 Gegnerlinien. Original kämpft normal weiter.',
+    description: 'Spawnt zu Rundenstart ein Phantom (80 HP, 5 ATK) so nah wie möglich an der gegnerischen Formation. Phantom ist direkt angreifbar.',
     movePattern: DIAGONAL,
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
   },
   sniper: {
-    label: 'Scharfschütze', emoji: '🎯', hp: 40, attack: 30, cooldown: 5,
-    description: 'Bewegt sich nie. Greift immer die Einheit mit niedrigstem HP auf dem ganzen Feld an. Hoher Schaden.',
+    label: 'Scharfschütze', emoji: '🎯', hp: 40, attack: 30, cooldown: 6,
+    description: 'Bewegt sich nie. Greift immer die Einheit mit den niedrigsten HP auf dem Feld an. Reichweite 4.',
     movePattern: [],
     attackPattern: (() => {
       const p: Position[] = [];
@@ -483,8 +483,8 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     strongVs: [], weakVs: [],
   },
   chaindancer: {
-    label: 'Kettentänzer', emoji: '🪢', hp: 75, attack: 22, cooldown: 2,
-    description: 'Kettenangriff: Schaden springt diagonal durch bis zu 3 Feinde (jeweils 70% Schaden). Diagonale Bewegung bis 2 Felder.',
+    label: 'Kettentänzer', emoji: '🪢', hp: 75, attack: 22, cooldown: 3,
+    description: 'Kettenangriff: nach jedem Treffer springt der Schaden zu 1 weiteren diagonalen Gegner über (50% des Originalschadens). Diagonale Bewegung bis 2 Felder.',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
@@ -525,7 +525,7 @@ export const UNIT_ATTACK_RANGE: Record<UnitType, number> = {
   stormrunner: 1, arsonist: 1, lightning: 2,
   mirror: 2, lamb: 1, judge: 1, icegolem: 1, cloner: 1,
   magnetiker: 2, spiderqueen: 2, waterwalker: 2,
-  doppelganger: 1, sniper: 3, chaindancer: 2,
+  doppelganger: 1, sniper: 4, chaindancer: 2,
   bomber: 2, shadowpriest: 2, obelisk: 1,
 };
 
@@ -1276,6 +1276,10 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   }
 
   let baseAtk = attacker.attack + (attacker.judgeBonus || 0) + (attacker.permAtkBonus || 0);
+  // Magnetiker: deals 19 damage instead of 12 when target is directly adjacent (Chebyshev ≤ 1).
+  if (attacker.type === 'magnetiker' && Math.max(Math.abs(attacker.row - defender.row), Math.abs(attacker.col - defender.col)) <= 1) {
+    baseAtk = 19;
+  }
   // Aura: archer-DoT temporary ATK debuff/buff applied to this attacker
   if (attacker.auraAtkDebuff) baseAtk = Math.max(0, baseAtk - attacker.auraAtkDebuff);
   if (attacker.auraAtkBuff) baseAtk += attacker.auraAtkBuff;
@@ -1659,7 +1663,7 @@ export function applyPostAttackEffects(
   }
 
   // Spiderqueen: 25% chance to web target for 5 ticks (no move, no attack at all)
-  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.25) {
+  if (attacker.type === 'spiderqueen' && target.hp > 0 && Math.random() < 0.15) {
     target.webbed = Math.max(target.webbed || 0, 5);
     logs.push(`🕸️ Netz! ${UNIT_DEFS[target.type].emoji} 5 Ticks gefangen`);
   }
@@ -1715,50 +1719,17 @@ export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[]
     logs.push(`💀 Banshee gefallen – erhebt sich in 3 Runden wieder`);
     return false; // truly dead for now (cell stays blocked); caller leaves dead=true
   }
-  // Mirror death explosion: 30 dmg to all enemies in 3x3 around the mirror
-  if (deadUnit.type === 'mirror') {
-    const blastCells: { row: number; col: number }[] = [];
-    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-      const r = deadUnit.row + dr, c = deadUnit.col + dc;
-      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
-      blastCells.push({ row: r, col: c });
-      if (dr === 0 && dc === 0) continue;
-      const cu = grid[r][c].unit;
-      if (cu && cu.team !== deadUnit.team && cu.hp > 0 && !cu.dead) {
-        cu.hp = Math.max(0, cu.hp - 30);
-        if (cu.hp <= 0) (cu as any).dead = true;
-        logs.push(`🪞 Spiegel-Explosion → ${UNIT_DEFS[cu.type].emoji} 30${cu.hp <= 0 ? ' ☠️' : ''}`);
-      }
-    }
-    if (events) {
-      events.push({
-        type: 'mirrorExplode',
-        attackerId: deadUnit.id,
-        attackerRow: deadUnit.row,
-        attackerCol: deadUnit.col,
-        attackerEmoji: '🪞',
-        attackerType: 'mirror',
-        targetId: deadUnit.id,
-        targetRow: deadUnit.row,
-        targetCol: deadUnit.col,
-        damage: 30,
-        isStrong: false,
-        isWeak: false,
-        isRanged: false,
-        aoeCells: blastCells,
-      });
-    }
-  }
+  // Mirror death explosion entfernt (Plan v3): Spiegelkämpfer reflektiert nur, keine Todes-Explosion mehr.
   // Lamb: heal all allies +30% maxHp (capped by per-tick max)
   if (deadUnit.type === 'lamb') {
     const allies = allUnits.filter(u => u.team === deadUnit.team && u.hp > 0 && !u.dead && u.id !== deadUnit.id && !u.unhealable);
     let totalHealed = 0;
     for (const a of allies) {
-      const heal = Math.round(a.maxHp * 0.30);
+      const heal = Math.round(a.maxHp * 0.35);
       const actual = applyHealing(a, heal);
       totalHealed += actual;
     }
-    if (allies.length > 0) logs.push(`🐑 Opferlamm heilt ${allies.length} Verbündete (+30%, max ${MAX_HEAL_PER_TICK}/Tick)`);
+    if (allies.length > 0) logs.push(`🐑 Opferlamm heilt ${allies.length} Verbündete (+35%, max ${MAX_HEAL_PER_TICK}/Tick)`);
   }
   return false;
 }
@@ -2825,8 +2796,8 @@ export function tickPhantomTimers(allUnits: Unit[], grid: Cell[][], logs: string
   }
 }
 
-/** Chaindancer chain attack: jumps DIAGONALLY through up to 2 additional enemies
- *  (3 enemies total counting the primary). Each chain hop deals 70% of original damage. */
+/** Chaindancer chain attack: jumps DIAGONALLY through 1 additional enemy.
+ *  Chain hop deals 50% of original damage. */
 export function applyChainAttack(
   attacker: Unit, primaryTarget: Unit, primaryDmg: number,
   grid: Cell[][], logs: string[]
@@ -2836,12 +2807,12 @@ export function applyChainAttack(
   ];
   const visited = new Set<string>([primaryTarget.id]);
   let current = primaryTarget;
-  const hopDmg = Math.round(primaryDmg * 0.7);
+  const hopDmg = Math.round(primaryDmg * 0.5);
   const diag = [
     { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
     { r: -2, c: -2 }, { r: -2, c: 2 }, { r: 2, c: -2 }, { r: 2, c: 2 },
   ];
-  for (let hop = 0; hop < 2; hop++) {
+  for (let hop = 0; hop < 1; hop++) {
     let next: Unit | null = null;
     let bestDist = Infinity;
     for (const o of diag) {

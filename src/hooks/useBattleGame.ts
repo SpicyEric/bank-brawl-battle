@@ -947,7 +947,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
             }
           }
           if (unit.type === 'arsonist' && best.hp > 0 && !isImmuneToFire(best, newGrid)) {
-            best.burning = [...(best.burning || []), { dmg: 5, turns: 4 }];
+            best.burning = [...(best.burning || []), { dmg: 3, turns: 4 }];
           }
           if (unit.type === 'frost' && best.hp > 0 && Math.random() < 0.2 && !isImmuneToFreeze(best, newGrid)) {
             best.frozen = 3;
@@ -1474,9 +1474,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
           }
 
           // === NEW UNIT EFFECTS ===
-          // Vampire: lifesteal 30% (capped to maxHp, no overheal/explosion) + bleeding DoT (10/5/3/1)
+          // Vampire: lifesteal 20% (capped to maxHp) + bleeding DoT (10/5/3/1)
           if (unit.type === 'vampire' && dmg > 0) {
-            const heal = Math.round(dmg * 0.3);
+            const heal = Math.round(dmg * 0.2);
             const before = unit.hp;
             unit.hp = Math.min(unit.maxHp, unit.hp + heal);
             const healed = unit.hp - before;
@@ -1490,9 +1490,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
             }
           }
 
-          // Arsonist: apply burning DoT stack (5 dmg / turn, 4 turns) – skip fire-immune
+          // Arsonist: apply burning DoT stack (3 dmg / turn, 4 turns) – skip fire-immune
           if (unit.type === 'arsonist' && target.hp > 0 && !isImmuneToFire(target, newGrid)) {
-            target.burning = [...(target.burning || []), { dmg: 5, turns: 4 }];
+            target.burning = [...(target.burning || []), { dmg: 3, turns: 4 }];
           }
 
 
@@ -1676,7 +1676,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
         if (u.type !== 'judge' || u.hp <= 0) continue;
         const fallenAllies = allUnits.filter(a => a.team === u.team && a.dead && a.id !== u.id).length
           + (u.team === 'player' ? (playerUnits.length - allUnits.filter(a => a.team === 'player' && a.hp > 0).length) : 0);
-        u.judgeBonus = Math.max(u.judgeBonus || 0, fallenAllies * 8);
+        u.judgeBonus = Math.max(u.judgeBonus || 0, fallenAllies * 5);
       }
 
 
