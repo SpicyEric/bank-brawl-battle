@@ -283,6 +283,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           setGrid(data.grid as Cell[][]);
           setBattleLog(data.logs);
           setBattleEvents(data.events || []);
+          if (data.events?.length) playEventSounds(data.events);
           setBattleTimer(data.timer);
           setPlayerUnits(data.playerUnits || []);
           setEnemyUnits(data.enemyUnits || []);
@@ -291,9 +292,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           setMoraleBoostActive(data.enemyMorale || null);
           setOpponentMoraleActive(data.playerMorale || null);
           // Sync focus fire state
-          setBattleEvents(data.events || []);
-          if (data.events?.length) playEventSounds(data.events);
-          setBattleTimer(data.timer);
+          if (data.enemyFocusFire) setFocusFireActive(true);
+          else setFocusFireActive(false);
           const myFlank = data.enemyFlankActive as -1 | 1 | null | undefined;
           setFlankActive(myFlank === -1 ? 'left' : myFlank === 1 ? 'right' : null);
         }
