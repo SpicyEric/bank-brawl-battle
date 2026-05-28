@@ -537,13 +537,26 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     } else {
       if (!selectedUnit) return;
       if (playerBannedUnits.includes(selectedUnit)) return;
-      type = selectedUnit;
-    }
-
     const unit = createUnit(type, myTeam, row, col, color, slotIdx);
     setPlayerUnits(prev => [...prev, unit]);
     setGrid(prev => {
       const next = prev.map(r => r.map(c => ({ ...c })));
+      next[row][col] = { ...next[row][col], unit };
+      return next;
+    });
+
+    // Placement sound: detect buff/nerf/mixed/full, fall back to default.
+    try {
+      const allUnits = [...playerUnits, ...enemyUnitsRef.current];
+      const aura = detectPlacementAura(type, row, col, allUnits, myTeam);
+      const willBeFull = playerUnits.length + 1 >= playerMaxUnits;
+      if (willBeFull) playPlacementSound('full');
+      else if (aura.buff && aura.nerf) playPlacementSound('mixed');
+      else if (aura.buff) playPlacementSound('buff');
+      else if (aura.nerf) playPlacementSound('nerf');
+      else playPlacementSound('default');
+    } catch {}
+
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
