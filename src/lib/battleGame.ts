@@ -492,21 +492,21 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // ===== NEW UNITS v3 =====
   bomber: {
     label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 23, cooldown: 5,
-    description: 'Bewegt sich in alle 8 Richtungen (1 Feld). Greift nicht direkt an. Alle 5 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (23 Dmg auf das Zentrum, 17 Dmg im 3×3 außenrum). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
+    description: 'Greift nicht direkt an. Alle 5 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (23 Dmg im Zentrum, 17 Dmg im 3×3 außenrum). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
     movePattern: ALL_ADJACENT,
-    attackPattern: [], // never attacks directly
+    attackPattern: [],
     strongVs: [], weakVs: [],
   },
   obelisk: {
     label: 'Obelisk', emoji: '🗿', hp: 150, attack: 0, cooldown: 0,
-    description: 'Steht still. Adjacent (Plus) Verbündete dauerhaft gebufft: +50% Schaden & Cooldown halbiert (min 1). Alle 3 Ticks für 2 Ticks: Strahl in 4 Richtungen über das ganze Feld.',
+    description: 'Steht still und greift nicht selbst an. Verbündete im 3×3-Umkreis bekommen +20% Schaden und ihr Cooldown wird um 1 verkürzt (min. 1, nicht stapelbar mit weiteren Obelisken).',
     movePattern: [],
     attackPattern: [],
     strongVs: [], weakVs: [],
   },
   shadowpriest: {
-    label: 'Schattenpriester', emoji: '🕯️', hp: 80, attack: 10, cooldown: 3,
-    description: 'Bewegt sich diagonal (1 Feld), greift orthogonal bis 2 Felder an. Jeder Treffer legt einen Fluch-Stack. Bei 2 Stacks: Ziel verliert sofort 30 HP, dauerhaft −60% Schaden & nicht mehr heilbar. Alle 7 Ticks: +5 ATK pro verfluchtem Gegner (permanent).',
+    label: 'Schattenpriester', emoji: '🕯️', hp: 80, attack: 12, cooldown: 4,
+    description: 'Jeder Treffer legt einen Fluch-Stack. Bei 2 Stacks: Ziel verliert sofort 15 HP, macht dauerhaft 50% weniger Schaden und ist nicht mehr heilbar.',
     movePattern: DIAGONAL,
     attackPattern: [
       ...ORTHOGONAL,
