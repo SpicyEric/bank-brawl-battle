@@ -1715,40 +1715,7 @@ export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[]
     logs.push(`💀 Banshee gefallen – erhebt sich in 3 Runden wieder`);
     return false; // truly dead for now (cell stays blocked); caller leaves dead=true
   }
-  // Mirror death explosion: 30 dmg to all enemies in 3x3 around the mirror
-  if (deadUnit.type === 'mirror') {
-    const blastCells: { row: number; col: number }[] = [];
-    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-      const r = deadUnit.row + dr, c = deadUnit.col + dc;
-      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
-      blastCells.push({ row: r, col: c });
-      if (dr === 0 && dc === 0) continue;
-      const cu = grid[r][c].unit;
-      if (cu && cu.team !== deadUnit.team && cu.hp > 0 && !cu.dead) {
-        cu.hp = Math.max(0, cu.hp - 30);
-        if (cu.hp <= 0) (cu as any).dead = true;
-        logs.push(`🪞 Spiegel-Explosion → ${UNIT_DEFS[cu.type].emoji} 30${cu.hp <= 0 ? ' ☠️' : ''}`);
-      }
-    }
-    if (events) {
-      events.push({
-        type: 'mirrorExplode',
-        attackerId: deadUnit.id,
-        attackerRow: deadUnit.row,
-        attackerCol: deadUnit.col,
-        attackerEmoji: '🪞',
-        attackerType: 'mirror',
-        targetId: deadUnit.id,
-        targetRow: deadUnit.row,
-        targetCol: deadUnit.col,
-        damage: 30,
-        isStrong: false,
-        isWeak: false,
-        isRanged: false,
-        aoeCells: blastCells,
-      });
-    }
-  }
+  // Mirror death explosion entfernt (Plan v3): Spiegelkämpfer reflektiert nur, keine Todes-Explosion mehr.
   // Lamb: heal all allies +30% maxHp (capped by per-tick max)
   if (deadUnit.type === 'lamb') {
     const allies = allUnits.filter(u => u.team === deadUnit.team && u.hp > 0 && !u.dead && u.id !== deadUnit.id && !u.unhealable);
