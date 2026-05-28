@@ -492,21 +492,21 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // ===== NEW UNITS v3 =====
   bomber: {
     label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 23, cooldown: 5,
-    description: 'Bewegt sich in alle 8 Richtungen (1 Feld). Greift nicht direkt an. Alle 5 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (23 Dmg auf das Zentrum, 17 Dmg im 3×3 außenrum). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
+    description: 'Greift nicht direkt an. Alle 5 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (23 Dmg im Zentrum, 17 Dmg im 3×3 außenrum). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
     movePattern: ALL_ADJACENT,
-    attackPattern: [], // never attacks directly
+    attackPattern: [],
     strongVs: [], weakVs: [],
   },
   obelisk: {
     label: 'Obelisk', emoji: '🗿', hp: 150, attack: 0, cooldown: 0,
-    description: 'Steht still. Adjacent (Plus) Verbündete dauerhaft gebufft: +50% Schaden & Cooldown halbiert (min 1). Alle 3 Ticks für 2 Ticks: Strahl in 4 Richtungen über das ganze Feld.',
+    description: 'Steht still und greift nicht selbst an. Verbündete im 3×3-Umkreis bekommen +20% Schaden und ihr Cooldown wird um 1 verkürzt (min. 1, nicht stapelbar mit weiteren Obelisken).',
     movePattern: [],
     attackPattern: [],
     strongVs: [], weakVs: [],
   },
   shadowpriest: {
-    label: 'Schattenpriester', emoji: '🕯️', hp: 80, attack: 10, cooldown: 3,
-    description: 'Bewegt sich diagonal (1 Feld), greift orthogonal bis 2 Felder an. Jeder Treffer legt einen Fluch-Stack. Bei 2 Stacks: Ziel verliert sofort 30 HP, dauerhaft −60% Schaden & nicht mehr heilbar. Alle 7 Ticks: +5 ATK pro verfluchtem Gegner (permanent).',
+    label: 'Schattenpriester', emoji: '🕯️', hp: 80, attack: 12, cooldown: 4,
+    description: 'Jeder Treffer legt einen Fluch-Stack. Bei 2 Stacks: Ziel verliert sofort 15 HP, macht dauerhaft 50% weniger Schaden und ist nicht mehr heilbar.',
     movePattern: DIAGONAL,
     attackPattern: [
       ...ORTHOGONAL,
@@ -1322,8 +1322,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
 
   // Rider horn buff: +80% damage while hornBuff active (buff, not a reduction)
   if ((attacker.hornBuff || 0) > 0) dmg *= 1.8;
-  // Obelisk buff: +50% damage while obeliskBuff active
-  if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.5;
+  // Obelisk buff: +20% damage while obeliskBuff active (non-stackable)
+  if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.2;
 
   // --- Aura: own-damage nerfs on attacker (MULTIPLICATIVE — diminishing returns)
   if (aStacks) {
@@ -1802,7 +1802,7 @@ export function isImmuneToFire(_unit: Unit, _grid: Cell[][]): boolean {
 /** Effective cooldown (considers obelisk buff). */
 export function effectiveCooldown(unit: Unit, _grid: Cell[][]): number {
   let cd = unit.maxCooldown;
-  if ((unit.obeliskBuff || 0) > 0) cd = Math.max(1, Math.ceil(cd / 2));
+  if ((unit.obeliskBuff || 0) > 0) cd = Math.max(1, cd - 1);
   // Aura stacks: cooldown ±1 per stack
   const s = unit.auraStacks;
   if (s) cd = cd - s.cdMinus1 + s.cdPlus1;
@@ -1953,7 +1953,7 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
   const colCount = grid[0]?.length ?? GRID_SIZE;
   for (const c of cloners) {
     if ((c.clonesSpawnedTotal ?? 0) >= 3) continue;
-    if (c.cloneTimer === undefined) c.cloneTimer = 1;
+    if (c.cloneTimer === undefined) c.cloneTimer = 6;
     c.cloneTimer -= 1;
     if (c.cloneTimer > 0) continue;
     // BFS from the cloner outward → first free non-water cell becomes spawn location.
@@ -2759,8 +2759,8 @@ export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs
       ...orig,
       id: crypto.randomUUID(),
       row: pick.r, col: pick.c,
-      hp: 20, maxHp: 20,
-      attack: 10,
+      hp: 80, maxHp: 80,
+      attack: 5,
       cooldown: 0, maxCooldown: 2,
       isPhantom: true,
       phantom: 0, // no invulnerability — phantom is immediately attackable
@@ -2778,7 +2778,7 @@ export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs
     grid[pick.r][pick.c].unit = phantom;
     spawned.push(phantom);
     orig.phantomId = phantom.id;
-    logs.push(`👥 Doppelgänger spawnt Phantom (20 HP, 10 ATK)`);
+    logs.push(`👥 Doppelgänger spawnt Phantom (80 HP, 5 ATK)`);
   }
   allUnits.push(...spawned);
   return spawned;
@@ -3022,11 +3022,11 @@ export function applyShadowpriestCurse(
   target.curseStacks = (target.curseStacks || 0) + 1;
   if (target.curseStacks >= 2) {
     target.cursed = true;
-    const burst = Math.min(target.hp, 30);
+    const burst = Math.min(target.hp, 15);
     target.hp = Math.max(0, target.hp - burst);
     target.unhealable = true;
-    target.curseAtkMul = 0.4;
-    logs.push(`🕯️ Fluch ausgelöst! → ${UNIT_DEFS[target.type].emoji} −${burst} ❤️ (unheilbar, −60% Angriff)`);
+    target.curseAtkMul = 0.5;
+    logs.push(`🕯️ Fluch ausgelöst! → ${UNIT_DEFS[target.type].emoji} −${burst} ❤️ (unheilbar, −50% Angriff)`);
     if (target.hp <= 0) (target as any).dead = true;
     if (events) {
       events.push({
