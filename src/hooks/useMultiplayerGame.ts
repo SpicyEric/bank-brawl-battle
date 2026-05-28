@@ -1838,7 +1838,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
         if (u.type !== 'judge' || u.hp <= 0) continue;
         const fallenAllies = allUnits.filter(a => a.team === u.team && a.dead && a.id !== u.id).length
           + (u.team === 'player' ? (playerUnits.length - allUnits.filter(a => a.team === 'player' && a.hp > 0).length) : 0);
-        u.judgeBonus = Math.max(u.judgeBonus || 0, fallenAllies * 8);
+        u.judgeBonus = Math.max(u.judgeBonus || 0, fallenAllies * 5);
       }
 
 
