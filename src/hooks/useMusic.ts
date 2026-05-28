@@ -7,60 +7,32 @@ import {
   subscribeMute,
 } from '@/lib/menuAudio';
 
-const BATTLE_TRACKS = [
-  '/music/cracked-sand.mp3',
-  '/music/cracked-sand-1.mp3',
-];
+const BATTLE_TRACK = '/music/Cracked_Sand_2.mp3';
 
 let battleAudio: HTMLAudioElement | null = null;
 let battleStarted = false;
-let battleQueue: string[] = [];
-let battleQueueIndex = 0;
 let currentMode: 'menu' | 'battle' | null = null;
 
-function shuffle<T>(arr: T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-function onBattleTrackEnded() {
-  if (currentMode !== 'battle') return;
-  battleQueueIndex++;
-  if (battleQueueIndex >= battleQueue.length) {
-    battleQueue = shuffle(BATTLE_TRACKS);
-    battleQueueIndex = 0;
-  }
-  playBattleTrack(battleQueue[battleQueueIndex]);
-}
-
-function playBattleTrack(src: string) {
+function playBattleTrack() {
   if (battleAudio) {
     battleAudio.pause();
-    battleAudio.removeEventListener('ended', onBattleTrackEnded);
   }
-  const a = new Audio(src);
-  a.volume = 0.15;
+  const a = new Audio(BATTLE_TRACK);
+  a.volume = 0.25;
+  a.loop = true;
   a.muted = isMenuMuted();
-  a.addEventListener('ended', onBattleTrackEnded);
   battleAudio = a;
   a.play().catch(() => {});
 }
 
 function startBattleMusic() {
   currentMode = 'battle';
-  battleQueue = shuffle(BATTLE_TRACKS);
-  battleQueueIndex = 0;
-  playBattleTrack(battleQueue[0]);
+  playBattleTrack();
 }
 
 function stopBattleMusic() {
   if (battleAudio) {
     battleAudio.pause();
-    battleAudio.removeEventListener('ended', onBattleTrackEnded);
   }
 }
 
@@ -72,8 +44,9 @@ export function useMusic(mode: 'menu' | 'battle' = 'menu') {
       // Stop battle audio if it was playing
       if (currentMode === 'battle') stopBattleMusic();
       currentMode = 'menu';
-      // Restart menu track from beginning on every menu mount
-      startMenuTrack(true);
+      // Continue menu track across screens — never restart from 0 here.
+      startMenuTrack(false);
+
 
       // Fallback if autoplay was blocked: kick off on first interaction
       const resume = () => {
