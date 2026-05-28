@@ -329,6 +329,7 @@ const AdminIcons = () => {
           </div>
         </>
       )}
+      {infoUnit && <UnitInfoModal unitType={infoUnit} onClose={() => setInfoUnit(null)} />}
     </div>
   );
 };
