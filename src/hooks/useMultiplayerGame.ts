@@ -1598,9 +1598,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
           // Aura: generic lifesteal from stacks (independent of vampire-specific block below)
           if (dmg > 0 && unit.auraStacks && unit.auraStacks.lifesteal30 > 0 && unit.hp < unit.maxHp) {
             const pct = Math.min(1, 0.30 * unit.auraStacks.lifesteal30);
-            const heal = Math.min(unit.maxHp - unit.hp, Math.round(dmg * pct));
+            const requestedHeal = Math.min(unit.maxHp - unit.hp, Math.round(dmg * pct));
+            const heal = applyHealing(unit, requestedHeal);
             if (heal > 0) {
-              unit.hp += heal;
               unit._justRegen = Date.now();
             }
           }
