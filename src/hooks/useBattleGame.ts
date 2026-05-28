@@ -277,6 +277,18 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
       return next;
     });
 
+    // Placement sound: detect buff/nerf/mixed/full, fall back to default.
+    try {
+      const allUnits = [...playerUnits, ...enemyUnitsRef.current];
+      const aura = detectPlacementAura(type, row, col, allUnits, 'player');
+      const willBeFull = playerUnits.length + 1 >= playerMaxUnits;
+      if (willBeFull) playPlacementSound('full');
+      else if (aura.buff && aura.nerf) playPlacementSound('mixed');
+      else if (aura.buff) playPlacementSound('buff');
+      else if (aura.nerf) playPlacementSound('nerf');
+      else playPlacementSound('default');
+    } catch {}
+
     // Keep current slot selected so the user can place the same unit again (mono comps).
   }, [phase, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, playerMaxUnits, playerBannedUnits, playerBannedSlots, placedSlots]);
 
