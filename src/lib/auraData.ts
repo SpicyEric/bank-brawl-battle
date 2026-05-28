@@ -159,3 +159,42 @@ export function computeAuraOverlay(units: Unit[], zones: AuraZoneMap, flipped = 
   }
   return out;
 }
+
+/** Synchronously returns the cached zones (or {} if not yet loaded). */
+export function getCachedAuraZones(): AuraZoneMap { return cachedZones ?? {}; }
+
+/** Detect whether placing `type` at (row,col) would trigger any buff or nerf
+ *  given the units currently on the grid. Uses cached zones (sync). */
+export function detectPlacementAura(
+  type: UnitType,
+  row: number,
+  col: number,
+  units: Unit[],
+  team: 'player' | 'enemy',
+): { buff: boolean; nerf: boolean } {
+  const zones = getCachedAuraZones();
+  let buff = false;
+  let nerf = false;
+
+  // 1) Aura zones of the freshly placed unit covering an existing unit on the grid.
+  const ownCells = auraCellsAround(type, row, col, zones);
+  for (const u of units) {
+    if (!u || u.dead || u.hp <= 0) continue;
+    const kind = ownCells.get(`${u.row}-${u.col}`);
+    if (!kind) continue;
+    if (kind === 'buff' && u.team === team) buff = true;
+    if (kind === 'nerf' && u.team !== team) nerf = true;
+  }
+
+  // 2) The placement cell itself stepping into an existing aura zone.
+  for (const u of units) {
+    if (!u || u.dead || u.hp <= 0) continue;
+    const otherCells = auraCellsAround(u.type, u.row, u.col, zones);
+    const k = otherCells.get(`${row}-${col}`);
+    if (!k) continue;
+    if (k === 'buff' && u.team === team) buff = true;
+    if (k === 'nerf' && u.team !== team) nerf = true;
+  }
+  return { buff, nerf };
+}
+
