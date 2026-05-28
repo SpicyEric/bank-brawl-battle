@@ -5,6 +5,7 @@ const STORAGE_KEY = 'unitIconMap.v1';
 const ATTACK_KEY = 'unitAttackIconMap.v1';
 const CLONE_KEY = 'unitCloneIconMap.v1';
 const ANIM_KEY = 'unitAnimationMap.v1';
+const SOUND_KEY = 'unitSoundMap.v1';
 const MIGRATED_FLAG = 'unitIconMap.migratedToCloud.v1';
 
 export type UnitIconMap = Partial<Record<UnitType, string>>;
@@ -65,7 +66,6 @@ function loadLocal(key: string): UnitIconMap {
     return {};
   }
 }
-
 function writeLocalMirror() {
   // Keep localStorage as offline mirror
   try {
@@ -73,7 +73,9 @@ function writeLocalMirror() {
     localStorage.setItem(ATTACK_KEY, JSON.stringify(cache.attack));
     localStorage.setItem(CLONE_KEY, JSON.stringify(cache.clone));
     localStorage.setItem(ANIM_KEY, JSON.stringify(cache.animation));
+    localStorage.setItem(SOUND_KEY, JSON.stringify(cache.sound));
   } catch {}
+}
 }
 
 /** Loads assignments from backend. If backend is empty and we have local data, migrate it up. */
