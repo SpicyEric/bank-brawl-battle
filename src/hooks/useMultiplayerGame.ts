@@ -18,7 +18,8 @@ import { matchRecorder } from '@/lib/matchRecorder';
 import { loadAuraData, detectPlacementAura, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
 
 import { applyAuraStacks, applyAuraTick, applyAuraOnAttack, applyAuraOnDeath, applyAuraSourceEffects, applyDefenderShare, fireLightningTakenMul, hasImmuneFFP } from '@/lib/auraEffects';
-import { findFormations, applyFormationMove } from '@/lib/formations';
+import { playUnitSound, playPlacementSound } from '@/lib/unitSounds';
+
 import { playUnitSound } from '@/lib/unitSounds';
 
 function playEventSounds(events: BattleEvent[]) {
