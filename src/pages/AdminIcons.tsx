@@ -189,16 +189,27 @@ const AdminIcons = () => {
       </header>
 
       {/* Unit roster (selectable) */}
+      {/* Unit roster (selectable) + Speaker tile for placement sounds */}
       <div className="p-3 border-b border-border">
-        <p className="text-xs text-muted-foreground mb-2">Einheit auswählen ({UNIT_TYPES.length})</p>
+        <p className="text-xs text-muted-foreground mb-2">Einheit oder 🔊 auswählen ({UNIT_TYPES.length + 1})</p>
         <div className="grid grid-cols-5 gap-1.5">
+          {/* Speaker pseudo-tile */}
+          <button
+            onClick={() => setPlacementMode(true)}
+            className={`p-1.5 rounded-lg border-2 text-center transition-all select-none ${placementMode ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
+          >
+            <div className="h-8 flex items-center justify-center">
+              <Volume2 size={22} className={placementMode ? 'text-primary' : ''} />
+            </div>
+            <p className="text-[9px] truncate mt-0.5">Platzieren</p>
+          </button>
           {UNIT_TYPES.map(t => {
-            const isSel = t === selectedUnit;
+            const isSel = !placementMode && t === selectedUnit;
             const assigned = unitMap[t];
             return (
               <button
                 key={t}
-                onClick={() => { if (didLongPress.current) { didLongPress.current = false; return; } setSelectedUnit(t); }}
+                onClick={() => { if (didLongPress.current) { didLongPress.current = false; return; } setPlacementMode(false); setSelectedUnit(t); }}
                 onPointerDown={() => startPress(t)}
                 onPointerUp={cancelPress}
                 onPointerLeave={cancelPress}
@@ -217,6 +228,7 @@ const AdminIcons = () => {
           })}
         </div>
       </div>
+
 
       {/* Slot tabs */}
       <div className="px-3 pt-3 border-b border-border">
