@@ -2792,8 +2792,8 @@ export function tickPhantomTimers(allUnits: Unit[], grid: Cell[][], logs: string
   }
 }
 
-/** Chaindancer chain attack: jumps DIAGONALLY through up to 2 additional enemies
- *  (3 enemies total counting the primary). Each chain hop deals 70% of original damage. */
+/** Chaindancer chain attack: jumps DIAGONALLY through 1 additional enemy.
+ *  Chain hop deals 50% of original damage. */
 export function applyChainAttack(
   attacker: Unit, primaryTarget: Unit, primaryDmg: number,
   grid: Cell[][], logs: string[]
@@ -2803,12 +2803,12 @@ export function applyChainAttack(
   ];
   const visited = new Set<string>([primaryTarget.id]);
   let current = primaryTarget;
-  const hopDmg = Math.round(primaryDmg * 0.7);
+  const hopDmg = Math.round(primaryDmg * 0.5);
   const diag = [
     { r: -1, c: -1 }, { r: -1, c: 1 }, { r: 1, c: -1 }, { r: 1, c: 1 },
     { r: -2, c: -2 }, { r: -2, c: 2 }, { r: 2, c: -2 }, { r: 2, c: 2 },
   ];
-  for (let hop = 0; hop < 2; hop++) {
+  for (let hop = 0; hop < 1; hop++) {
     let next: Unit | null = null;
     let bestDist = Infinity;
     for (const o of diag) {
