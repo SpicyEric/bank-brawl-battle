@@ -1367,7 +1367,7 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
     }
   }
 
-  return Math.floor(dmg);
+  return Math.max(3, Math.floor(dmg));
 }
 
 // Difficulty levels:
