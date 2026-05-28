@@ -46,14 +46,6 @@ function tick() {
   if (!analyser) { rafId = null; return; }
   const bins = new Uint8Array(analyser.frequencyBinCount);
   analyser.getByteFrequencyData(bins);
-  // Low band: first ~6 bins (~ 0-260 Hz at 44.1kHz / fftSize 512)
-  let sum = 0;
-  for (let i = 1; i <= 5; i++) sum += bins[i];
-  const energy = sum / 5;
-function tick() {
-  if (!analyser) { rafId = null; return; }
-  const bins = new Uint8Array(analyser.frequencyBinCount);
-  analyser.getByteFrequencyData(bins);
   // Low band: first ~8 bins (~ 0-350 Hz at 44.1kHz / fftSize 512)
   let sum = 0;
   for (let i = 1; i <= 7; i++) sum += bins[i];
@@ -72,7 +64,11 @@ function tick() {
   rafId = requestAnimationFrame(tick);
 }
 
+function startLoop() {
+  if (rafId != null) return;
+  rafId = requestAnimationFrame(tick);
 }
+
 
 /** Start (or restart) the menu track from the beginning. Idempotent per call. */
 export function startMenuTrack(restart = true) {
