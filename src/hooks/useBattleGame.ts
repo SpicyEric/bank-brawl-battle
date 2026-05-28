@@ -858,8 +858,25 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
         for (const unit of acting) {
           if (unit.hp <= 0 || unit.dead) continue;
           if (unit.webbed && unit.webbed > 0) { unit.webbed -= 1; continue; }
+
+          // Shadowblade: teleport-strike (every 5 ticks). Manages its own cooldown.
+          const sbFrozen = !!(unit.frozen && unit.frozen > 0);
+          if (unit.type === 'shadowblade' && !sbFrozen) {
+            handleShadowbladeTick(unit, allUnits, newGrid, events, logs, (atk, tgt, dmg) => {
+              let d = dmg;
+              if (atk.team === 'player') d = Math.round(d * playerDmgMod);
+              else {
+                d = Math.round(d * enemyDmgMod);
+                if (tgt.team === 'player') d = Math.round(d * shieldWallDefMod);
+              }
+              return d;
+            });
+            continue;
+          }
+
           unit.cooldown = Math.max(0, unit.cooldown - 1);
           if (unit.cooldown > 0) continue;
+
 
           // Healer: heal lowest-HP ally in range first; only attack if nothing to heal.
           if (unit.type === 'healer') {
