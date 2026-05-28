@@ -1861,6 +1861,7 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       }
       if (events.length > 0) {
         setBattleEvents(events);
+        playEventSounds(events);
       }
       const alive = allUnits.filter(u => u.hp > 0);
       // Banshees in mid-revival count as alive (they appear dead on the grid but will return).
