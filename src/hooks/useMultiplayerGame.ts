@@ -15,10 +15,13 @@ import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
 import { updateRoom, ensureAnonymousSession } from '@/lib/multiplayer';
 import { matchRecorder } from '@/lib/matchRecorder';
-import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
+import { loadAuraData, detectPlacementAura, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
+
 import { applyAuraStacks, applyAuraTick, applyAuraOnAttack, applyAuraOnDeath, applyAuraSourceEffects, applyDefenderShare, fireLightningTakenMul, hasImmuneFFP } from '@/lib/auraEffects';
-import { findFormations, applyFormationMove } from '@/lib/formations';
-import { playUnitSound } from '@/lib/unitSounds';
+import { findFormations, applyFormationMove, findFormationContaining } from '@/lib/formations';
+
+import { playUnitSound, playPlacementSound } from '@/lib/unitSounds';
+
 
 function playEventSounds(events: BattleEvent[]) {
   const played = new Set<string>();
@@ -534,9 +537,6 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     } else {
       if (!selectedUnit) return;
       if (playerBannedUnits.includes(selectedUnit)) return;
-      type = selectedUnit;
-    }
-
     const unit = createUnit(type, myTeam, row, col, color, slotIdx);
     setPlayerUnits(prev => [...prev, unit]);
     setGrid(prev => {
@@ -544,7 +544,20 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
+
+    // Placement sound: detect buff/nerf/mixed/full, fall back to default.
+    try {
+      const allUnits = [...playerUnits, ...enemyUnitsRef.current];
+      const aura = detectPlacementAura(type, row, col, allUnits, myTeam);
+      const willBeFull = playerUnits.length + 1 >= playerMaxUnits;
+      if (willBeFull) playPlacementSound('full');
+      else if (aura.buff && aura.nerf) playPlacementSound('mixed');
+      else if (aura.buff) playPlacementSound('buff');
+      else if (aura.nerf) playPlacementSound('nerf');
+      else playPlacementSound('default');
+    } catch {}
   }, [phase, isMyTurnToPlace, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, myTeam, playerBannedUnits, playerMaxUnits]);
+
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {

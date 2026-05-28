@@ -208,6 +208,26 @@ export function soundUrl(rel: string): string {
   return `/sounds/${rel}`;
 }
 
+// === Placement sounds (pseudo unit-types reusing the `sound` slot) ===
+export type PlacementSoundKind = 'default' | 'buff' | 'nerf' | 'mixed' | 'full';
+export const PLACEMENT_SOUND_KEYS: Record<PlacementSoundKind, string> = {
+  default: '__place_default',
+  buff: '__place_buff',
+  nerf: '__place_nerf',
+  mixed: '__place_mixed',
+  full: '__place_full',
+};
+export function getPlacementSound(kind: PlacementSoundKind): string | null {
+  return (cache.sound as Record<string, string>)[PLACEMENT_SOUND_KEYS[kind]] ?? null;
+}
+export function setPlacementSound(kind: PlacementSoundKind, file: string | null) {
+  const next = { ...cache.sound } as Record<string, string>;
+  if (file) next[PLACEMENT_SOUND_KEYS[kind]] = file;
+  else delete next[PLACEMENT_SOUND_KEYS[kind]];
+  setMap('sound', next as UnitIconMap);
+}
+
+
 async function persistDiff(slot: Slot, next: UnitIconMap) {
   const prev = cache[slot];
   const toUpsert: { slot: Slot; unit_type: string; icon_filename: string }[] = [];

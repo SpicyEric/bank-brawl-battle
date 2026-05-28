@@ -15,9 +15,11 @@ import {
 import { BattleEvent } from '@/lib/battleEvents';
 import { findFormations, applyFormationMove, findFormationContaining } from '@/lib/formations';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
-import { playUnitSound } from '@/lib/unitSounds';
+import { playUnitSound, playPlacementSound } from '@/lib/unitSounds';
 import { matchRecorder } from '@/lib/matchRecorder';
-import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
+import { loadAuraData, detectPlacementAura, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
+
+
 import { applyAuraStacks, applyAuraTick, applyAuraOnAttack, applyAuraOnDeath, applyAuraSourceEffects, applyDefenderShare, fireLightningTakenMul, hasImmuneFFP } from '@/lib/auraEffects';
 
 // Roster slots: 0..2 = red, 3..5 = green, 6..8 = blue
@@ -274,6 +276,18 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
       next[row][col] = { ...next[row][col], unit };
       return next;
     });
+
+    // Placement sound: detect buff/nerf/mixed/full, fall back to default.
+    try {
+      const allUnits = [...playerUnits, ...enemyUnitsRef.current];
+      const aura = detectPlacementAura(type, row, col, allUnits, 'player');
+      const willBeFull = playerUnits.length + 1 >= playerMaxUnits;
+      if (willBeFull) playPlacementSound('full');
+      else if (aura.buff && aura.nerf) playPlacementSound('mixed');
+      else if (aura.buff) playPlacementSound('buff');
+      else if (aura.nerf) playPlacementSound('nerf');
+      else playPlacementSound('default');
+    } catch {}
 
     // Keep current slot selected so the user can place the same unit again (mono comps).
   }, [phase, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, playerMaxUnits, playerBannedUnits, playerBannedSlots, placedSlots]);
