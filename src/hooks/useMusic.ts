@@ -1,15 +1,22 @@
 import { useEffect, useState, useCallback } from 'react';
+import {
+  startMenuTrack,
+  stopMenuTrack,
+  isMenuMuted,
+  setMenuMuted,
+  subscribeMute,
+} from '@/lib/menuAudio';
 
-const MENU_TRACK = '/music/cracked-sand.mp3';
 const BATTLE_TRACKS = [
   '/music/cracked-sand.mp3',
   '/music/cracked-sand-1.mp3',
 ];
 
-let globalAudio: HTMLAudioElement | null = null;
-let globalMuted = false;
-let globalStarted = false;
-let currentMode: 'menu' | 'battle' = 'menu';
+let battleAudio: HTMLAudioElement | null = null;
+let battleStarted = false;
+let battleQueue: string[] = [];
+let battleQueueIndex = 0;
+let currentMode: 'menu' | 'battle' | null = null;
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr];
@@ -20,25 +27,6 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-let battleQueue: string[] = [];
-let battleQueueIndex = 0;
-
-function playTrack(src: string, loop: boolean) {
-  if (globalAudio) {
-    globalAudio.pause();
-    globalAudio.removeEventListener('ended', onBattleTrackEnded);
-  }
-  const audio = new Audio(src);
-  audio.volume = 0.15;
-  audio.muted = globalMuted;
-  audio.loop = loop;
-  if (!loop) {
-    audio.addEventListener('ended', onBattleTrackEnded);
-  }
-  globalAudio = audio;
-  audio.play().catch(() => {});
-}
-
 function onBattleTrackEnded() {
   if (currentMode !== 'battle') return;
   battleQueueIndex++;
@@ -46,71 +34,77 @@ function onBattleTrackEnded() {
     battleQueue = shuffle(BATTLE_TRACKS);
     battleQueueIndex = 0;
   }
-  playTrack(battleQueue[battleQueueIndex], false);
+  playBattleTrack(battleQueue[battleQueueIndex]);
 }
 
-function startMenuMusic() {
-  currentMode = 'menu';
-  playTrack(MENU_TRACK, true);
+function playBattleTrack(src: string) {
+  if (battleAudio) {
+    battleAudio.pause();
+    battleAudio.removeEventListener('ended', onBattleTrackEnded);
+  }
+  const a = new Audio(src);
+  a.volume = 0.15;
+  a.muted = isMenuMuted();
+  a.addEventListener('ended', onBattleTrackEnded);
+  battleAudio = a;
+  a.play().catch(() => {});
 }
 
 function startBattleMusic() {
-  if (currentMode === 'battle') return;
   currentMode = 'battle';
   battleQueue = shuffle(BATTLE_TRACKS);
   battleQueueIndex = 0;
-  playTrack(battleQueue[0], false);
+  playBattleTrack(battleQueue[0]);
 }
 
-function tryAutoplay(mode: 'menu' | 'battle') {
-  if (globalStarted) return;
-  globalStarted = true;
-  if (mode === 'menu') startMenuMusic();
-  else startBattleMusic();
+function stopBattleMusic() {
+  if (battleAudio) {
+    battleAudio.pause();
+    battleAudio.removeEventListener('ended', onBattleTrackEnded);
+  }
 }
 
 export function useMusic(mode: 'menu' | 'battle' = 'menu') {
-  const [muted, setMuted] = useState(globalMuted);
+  const [muted, setMutedState] = useState(isMenuMuted());
 
   useEffect(() => {
-    if (!globalStarted) {
-      // Try autoplay immediately
-      tryAutoplay(mode);
+    if (mode === 'menu') {
+      // Stop battle audio if it was playing
+      if (currentMode === 'battle') stopBattleMusic();
+      currentMode = 'menu';
+      // Restart menu track from beginning on every menu mount
+      startMenuTrack(true);
 
-      // Fallback: start on first user interaction if autoplay was blocked
-      const startOnInteraction = () => {
-        if (globalStarted && globalAudio) {
-          // Already started but might be blocked — try playing
-          globalAudio.play().catch(() => {});
-          document.removeEventListener('click', startOnInteraction);
-          document.removeEventListener('touchstart', startOnInteraction);
-          return;
-        }
-        tryAutoplay(mode);
-        document.removeEventListener('click', startOnInteraction);
-        document.removeEventListener('touchstart', startOnInteraction);
+      // Fallback if autoplay was blocked: kick off on first interaction
+      const resume = () => {
+        startMenuTrack(false);
+        document.removeEventListener('pointerdown', resume);
+        document.removeEventListener('keydown', resume);
       };
-      document.addEventListener('click', startOnInteraction);
-      document.addEventListener('touchstart', startOnInteraction);
+      document.addEventListener('pointerdown', resume);
+      document.addEventListener('keydown', resume);
       return () => {
-        document.removeEventListener('click', startOnInteraction);
-        document.removeEventListener('touchstart', startOnInteraction);
+        document.removeEventListener('pointerdown', resume);
+        document.removeEventListener('keydown', resume);
       };
-    }
-
-    // Already started – switch mode if needed
-    if (mode === 'menu' && currentMode !== 'menu') {
-      startMenuMusic();
-    } else if (mode === 'battle' && currentMode !== 'battle') {
-      startBattleMusic();
+    } else {
+      // Battle: stop menu, start battle
+      stopMenuTrack();
+      if (!battleStarted || currentMode !== 'battle') {
+        battleStarted = true;
+        startBattleMusic();
+      }
     }
   }, [mode]);
 
+  // Stay in sync with global mute changes (e.g. toggled elsewhere)
+  useEffect(() => subscribeMute(setMutedState), []);
+
   const toggleMute = useCallback(() => {
-    const next = !globalMuted;
-    globalMuted = next;
-    if (globalAudio) globalAudio.muted = next;
-    setMuted(next);
+    const next = !isMenuMuted();
+    setMenuMuted(next);
+    if (battleAudio) battleAudio.muted = next;
+    setMutedState(next);
   }, []);
 
   return { muted, toggleMute };

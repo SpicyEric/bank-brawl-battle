@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMusic } from '@/hooks/useMusic';
 import { Swords, Users, Volume2, VolumeX, Settings } from 'lucide-react';
 import menuBg from '@/assets/menu-bg.png';
+import { MenuBackground } from '@/components/MenuBackground';
 
 const MainMenu = () => {
   const navigate = useNavigate();
@@ -12,8 +13,10 @@ const MainMenu = () => {
       {/* Background image with blur */}
       <div className="absolute inset-0 z-0">
         <img src={menuBg} alt="" className="w-full h-full object-cover blur-sm scale-105" />
-        <div className="absolute inset-0 bg-background/50" />
+        <div className="absolute inset-0 bg-background/60" />
       </div>
+      <MenuBackground />
+
 
       {/* Menu buttons */}
       <div className="w-full max-w-xs space-y-3 z-10 relative">
