@@ -1,0 +1,2 @@
+ALTER TABLE public.unit_icon_assignments DROP CONSTRAINT IF EXISTS unit_icon_assignments_slot_check;
+ALTER TABLE public.unit_icon_assignments ADD CONSTRAINT unit_icon_assignments_slot_check CHECK (slot = ANY (ARRAY['unit'::text, 'attack'::text, 'clone'::text, 'animation'::text, 'sound'::text]));
