@@ -2929,7 +2929,7 @@ export function tickBombFuses(
       if (!u || u.hp <= 0 || u.dead) continue;
       if (u.team === ex.ownerTeam) continue;
       const isCenter = dr === 0 && dc === 0;
-      const dmg = isCenter ? 23 : 17;
+      const dmg = isCenter ? ex.dmg : Math.max(1, Math.round(ex.dmg * 0.7));
       u.hp = Math.max(0, u.hp - dmg);
       logs.push(`💥 Bombe → ${UNIT_DEFS[u.type].emoji} ${dmg}${u.hp <= 0 ? ' ☠️' : ''}`);
       if (u.hp <= 0) (u as any).dead = true;
