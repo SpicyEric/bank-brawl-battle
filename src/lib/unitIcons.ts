@@ -8,7 +8,7 @@ const ANIM_KEY = 'unitAnimationMap.v1';
 const MIGRATED_FLAG = 'unitIconMap.migratedToCloud.v1';
 
 export type UnitIconMap = Partial<Record<UnitType, string>>;
-export type Slot = 'unit' | 'attack' | 'clone' | 'animation';
+export type Slot = 'unit' | 'attack' | 'clone' | 'animation' | 'sound';
 
 // Build list of available icon filenames (1023 icons)
 export const ALL_ICONS: string[] = Array.from({ length: 1023 }, (_, i) =>
@@ -46,8 +46,9 @@ interface Caches {
   attack: UnitIconMap;
   clone: UnitIconMap;
   animation: UnitIconMap;
+  sound: UnitIconMap;
 }
-const cache: Caches = { unit: {}, attack: {}, clone: {}, animation: {} };
+const cache: Caches = { unit: {}, attack: {}, clone: {}, animation: {}, sound: {} };
 const listeners = new Set<() => void>();
 let loaded = false;
 let loadingPromise: Promise<void> | null = null;
