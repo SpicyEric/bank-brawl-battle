@@ -2778,7 +2778,7 @@ export function spawnDoppelgangerPhantoms(allUnits: Unit[], grid: Cell[][], logs
     grid[pick.r][pick.c].unit = phantom;
     spawned.push(phantom);
     orig.phantomId = phantom.id;
-    logs.push(`👥 Doppelgänger spawnt Phantom (20 HP, 10 ATK)`);
+    logs.push(`👥 Doppelgänger spawnt Phantom (80 HP, 5 ATK)`);
   }
   allUnits.push(...spawned);
   return spawned;
