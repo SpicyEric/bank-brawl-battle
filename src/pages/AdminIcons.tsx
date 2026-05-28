@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Minus } from 'lucide-react';
 import { UNIT_TYPES, UNIT_DEFS, type UnitType } from '@/lib/battleGame';
@@ -11,6 +11,9 @@ import {
 } from '@/lib/unitIcons';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
+
+const LONG_PRESS_MS = 400;
 
 type Slot = 'unit' | 'attack' | 'clone' | 'buff';
 type ZoneType = 'neutral' | 'buff' | 'nerf';
