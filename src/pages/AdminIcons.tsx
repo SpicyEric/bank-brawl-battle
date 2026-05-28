@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, Minus } from 'lucide-react';
-import { UNIT_TYPES, UNIT_DEFS, type UnitType } from '@/lib/battleGame';
 import { ChevronLeft, Plus, Minus, Play, Volume2 } from 'lucide-react';
 import { UNIT_TYPES, UNIT_DEFS, type UnitType } from '@/lib/battleGame';
 import {
