@@ -1264,10 +1264,10 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // (Assassin low-HP bonus removed — uses standard damage.)
 
 
-  // --- Aura: attacker atk% modifier (stackable, additive)
+  // --- Aura: attacker atk% modifier (stackable, MULTIPLICATIVE — diminishing returns)
   const aStacks = attacker.auraStacks;
   if (aStacks) {
-    const atkMul = Math.max(0, 1 + 0.50 * aStacks.atkPlus50 - 0.50 * aStacks.atkMinus50);
+    const atkMul = Math.pow(1.5, aStacks.atkPlus50) * Math.pow(0.5, aStacks.atkMinus50);
     baseAtk *= atkMul;
   }
 
