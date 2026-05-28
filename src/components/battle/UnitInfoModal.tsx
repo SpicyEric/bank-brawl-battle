@@ -45,15 +45,7 @@ export function UnitInfoModal({ unitType, onClose, hideColorInfo, colorOverride 
         <div className="flex items-center gap-3">
           <UnitGlyph type={unitType} className="w-10 h-10" />
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="font-bold text-foreground text-lg">{def.label}</h2>
-              {!hideColorInfo && (
-                <span className="text-xs px-2 py-0.5 rounded-full" style={{
-                  backgroundColor: `hsl(var(--unit-${colorGroup}) / 0.2)`,
-                  color: `hsl(var(--unit-${colorGroup}))`,
-                }}>{COLOR_LABEL[colorGroup]}</span>
-              )}
-            </div>
+            <h2 className="font-bold text-foreground text-lg">{def.label}</h2>
             <p className="text-xs text-muted-foreground">{def.description}</p>
           </div>
         </div>
@@ -81,20 +73,6 @@ export function UnitInfoModal({ unitType, onClose, hideColorInfo, colorOverride 
             </div>
           </div>
         </div>
-
-        {/* Color counter info */}
-        {!hideColorInfo && (
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-semibold" style={{ color: `hsl(var(--unit-${colorGroup}))` }}>💪 Stark gegen:</span>
-              <span className="text-foreground">{COLOR_LABEL[beats]}</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-semibold" style={{ color: `hsl(var(--unit-${losesTo}))` }}>😰 Schwach gegen:</span>
-              <span className="text-foreground">{COLOR_LABEL[losesTo]}</span>
-            </div>
-          </div>
-        )}
 
         <button
           onClick={onClose}
