@@ -1953,7 +1953,7 @@ export function tickClonerSpawns(allUnits: Unit[], grid: Cell[][], logs: string[
   const colCount = grid[0]?.length ?? GRID_SIZE;
   for (const c of cloners) {
     if ((c.clonesSpawnedTotal ?? 0) >= 3) continue;
-    if (c.cloneTimer === undefined) c.cloneTimer = 1;
+    if (c.cloneTimer === undefined) c.cloneTimer = 6;
     c.cloneTimer -= 1;
     if (c.cloneTimer > 0) continue;
     // BFS from the cloner outward → first free non-water cell becomes spawn location.
