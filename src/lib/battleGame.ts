@@ -1888,11 +1888,7 @@ export function tickTerrainHeals(allUnits: Unit[], grid: Cell[][], logs: string[
     if (u.hp <= 0 || (u as any).dead) continue;
     if (u.unhealable) continue;
     if (u.type === 'waterwalker' && grid[u.row]?.[u.col]?.terrain === 'water' && u.hp < u.maxHp) {
-      const heal = Math.min(3, u.maxHp - u.hp);
-      if (heal > 0) {
-        u.hp += heal;
-        logs.push(`🌊 Wasserwandler regeneriert +${heal} ❤️`);
-      }
+      applyHealing(u, 3, logs, '🌊 Wasserwandler regeneriert');
     }
   }
 }
