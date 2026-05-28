@@ -5,10 +5,11 @@ const STORAGE_KEY = 'unitIconMap.v1';
 const ATTACK_KEY = 'unitAttackIconMap.v1';
 const CLONE_KEY = 'unitCloneIconMap.v1';
 const ANIM_KEY = 'unitAnimationMap.v1';
+const SOUND_KEY = 'unitSoundMap.v1';
 const MIGRATED_FLAG = 'unitIconMap.migratedToCloud.v1';
 
 export type UnitIconMap = Partial<Record<UnitType, string>>;
-export type Slot = 'unit' | 'attack' | 'clone' | 'animation';
+export type Slot = 'unit' | 'attack' | 'clone' | 'animation' | 'sound';
 
 // Build list of available icon filenames (1023 icons)
 export const ALL_ICONS: string[] = Array.from({ length: 1023 }, (_, i) =>
@@ -46,8 +47,9 @@ interface Caches {
   attack: UnitIconMap;
   clone: UnitIconMap;
   animation: UnitIconMap;
+  sound: UnitIconMap;
 }
-const cache: Caches = { unit: {}, attack: {}, clone: {}, animation: {} };
+const cache: Caches = { unit: {}, attack: {}, clone: {}, animation: {}, sound: {} };
 const listeners = new Set<() => void>();
 let loaded = false;
 let loadingPromise: Promise<void> | null = null;
@@ -64,7 +66,6 @@ function loadLocal(key: string): UnitIconMap {
     return {};
   }
 }
-
 function writeLocalMirror() {
   // Keep localStorage as offline mirror
   try {
@@ -72,6 +73,7 @@ function writeLocalMirror() {
     localStorage.setItem(ATTACK_KEY, JSON.stringify(cache.attack));
     localStorage.setItem(CLONE_KEY, JSON.stringify(cache.clone));
     localStorage.setItem(ANIM_KEY, JSON.stringify(cache.animation));
+    localStorage.setItem(SOUND_KEY, JSON.stringify(cache.sound));
   } catch {}
 }
 
@@ -85,6 +87,7 @@ export async function initIconAssignments(): Promise<void> {
   cache.attack = loadLocal(ATTACK_KEY);
   cache.clone = loadLocal(CLONE_KEY);
   cache.animation = loadLocal(ANIM_KEY);
+  cache.sound = loadLocal(SOUND_KEY);
   emit();
 
   loadingPromise = (async () => {
@@ -98,7 +101,7 @@ export async function initIconAssignments(): Promise<void> {
       return;
     }
 
-    const remote: Caches = { unit: {}, attack: {}, clone: {}, animation: {} };
+    const remote: Caches = { unit: {}, attack: {}, clone: {}, animation: {}, sound: {} };
     for (const row of data ?? []) {
       const slot = row.slot as Slot;
       if (remote[slot]) remote[slot][row.unit_type as UnitType] = row.icon_filename;
@@ -108,7 +111,8 @@ export async function initIconAssignments(): Promise<void> {
       Object.keys(remote.unit).length === 0 &&
       Object.keys(remote.attack).length === 0 &&
       Object.keys(remote.clone).length === 0 &&
-      Object.keys(remote.animation).length === 0;
+      Object.keys(remote.animation).length === 0 &&
+      Object.keys(remote.sound).length === 0;
 
     const alreadyMigrated = (() => {
       try { return localStorage.getItem(MIGRATED_FLAG) === '1'; } catch { return false; }
@@ -118,12 +122,13 @@ export async function initIconAssignments(): Promise<void> {
       Object.keys(cache.unit).length +
       Object.keys(cache.attack).length +
       Object.keys(cache.clone).length +
-      Object.keys(cache.animation).length > 0;
+      Object.keys(cache.animation).length +
+      Object.keys(cache.sound).length > 0;
 
     if (remoteEmpty && localHasData && !alreadyMigrated) {
       // Migrate local → cloud (one-time)
       const rows: { slot: Slot; unit_type: string; icon_filename: string }[] = [];
-      (['unit','attack','clone','animation'] as Slot[]).forEach(slot => {
+      (['unit','attack','clone','animation','sound'] as Slot[]).forEach(slot => {
         for (const [unit_type, icon_filename] of Object.entries(cache[slot])) {
           if (icon_filename) rows.push({ slot, unit_type, icon_filename });
         }
@@ -140,6 +145,7 @@ export async function initIconAssignments(): Promise<void> {
       cache.attack = remote.attack;
       cache.clone = remote.clone;
       cache.animation = remote.animation;
+      cache.sound = remote.sound;
       writeLocalMirror();
       emit();
     }
@@ -177,6 +183,7 @@ export function loadIconMap(): UnitIconMap { return cache.unit; }
 export function loadAttackIconMap(): UnitIconMap { return cache.attack; }
 export function loadCloneIconMap(): UnitIconMap { return cache.clone; }
 export function loadAnimationMap(): UnitIconMap { return cache.animation; }
+export function loadSoundMap(): UnitIconMap { return cache.sound; }
 
 export function getUnitIcon(type: UnitType): string | null {
   return cache.unit[type] ?? null;
@@ -191,6 +198,14 @@ export function getCloneIcon(type: UnitType): string | null {
 export function getAnimation(type: UnitType | string | undefined): string | null {
   if (!type) return null;
   return cache.animation[type as UnitType] ?? null;
+}
+export function getUnitSound(type: UnitType | string | undefined): string | null {
+  if (!type) return null;
+  return cache.sound[type as UnitType] ?? null;
+}
+export function soundUrl(rel: string): string {
+  // rel is "category/file.wav" (e.g. "magic/07_Fireball_01.wav")
+  return `/sounds/${rel}`;
 }
 
 async function persistDiff(slot: Slot, next: UnitIconMap) {
@@ -232,6 +247,7 @@ export function saveIconMap(map: UnitIconMap) { setMap('unit', map); }
 export function saveAttackIconMap(map: UnitIconMap) { setMap('attack', map); }
 export function saveCloneIconMap(map: UnitIconMap) { setMap('clone', map); }
 export function saveAnimationMap(map: UnitIconMap) { setMap('animation', map); }
+export function saveSoundMap(map: UnitIconMap) { setMap('sound', map); }
 
 export function subscribeIconMap(cb: () => void): () => void {
   listeners.add(cb);

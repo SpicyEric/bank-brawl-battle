@@ -15,6 +15,7 @@ import {
 import { BattleEvent } from '@/lib/battleEvents';
 import { findFormations, applyFormationMove, findFormationContaining } from '@/lib/formations';
 import { sfxHit, sfxCriticalHit, sfxKill, sfxFreeze, sfxProjectile } from '@/lib/sfx';
+import { playUnitSound } from '@/lib/unitSounds';
 import { matchRecorder } from '@/lib/matchRecorder';
 import { loadAuraData, type AuraZoneMap, type AuraEffectMap } from '@/lib/auraData';
 import { applyAuraStacks, applyAuraTick, applyAuraOnAttack, applyAuraOnDeath, applyAuraSourceEffects, applyDefenderShare, fireLightningTakenMul, hasImmuneFFP } from '@/lib/auraEffects';
@@ -1702,16 +1703,26 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
         let hasHit = false;
         let hasCrit = false;
         let hasRanged = false;
+        const playedCustom = new Set<string>();
         for (const evt of events) {
           if (evt.type === 'kill') hasKill = true;
           else if (evt.isStrong) hasCrit = true;
           else hasHit = true;
           if (evt.isRanged) hasRanged = true;
+          // Per-unit custom attack sound (dedupe per attacker type per tick)
+          const t = evt.attackerType;
+          if (t && (evt.type === 'hit' || evt.type === 'kill') && !playedCustom.has(t)) {
+            if (playUnitSound(t)) playedCustom.add(t);
+          }
         }
-        // Play most impactful sound (don't stack too many)
-        if (hasKill) sfxKill();
-        else if (hasCrit) sfxCriticalHit();
-        else if (hasHit) sfxHit();
+        // Generic fallback sounds (skipped if any custom unit sound played)
+        if (playedCustom.size === 0) {
+          if (hasKill) sfxKill();
+          else if (hasCrit) sfxCriticalHit();
+          else if (hasHit) sfxHit();
+        } else if (hasKill) {
+          sfxKill();
+        }
         if (hasRanged) sfxProjectile();
       }
 

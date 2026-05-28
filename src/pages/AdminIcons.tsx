@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, Minus } from 'lucide-react';
+import { ChevronLeft, Plus, Minus, Play, Volume2 } from 'lucide-react';
 import { UNIT_TYPES, UNIT_DEFS, type UnitType } from '@/lib/battleGame';
 import {
   ALL_ICONS, iconUrl,
   loadIconMap, saveIconMap,
   loadAttackIconMap, saveAttackIconMap,
   loadCloneIconMap, saveCloneIconMap,
+  loadSoundMap, saveSoundMap,
   type UnitIconMap,
 } from '@/lib/unitIcons';
+import { loadSoundManifest, previewSound, type SoundCategory } from '@/lib/unitSounds';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 
 const LONG_PRESS_MS = 400;
 
-type Slot = 'unit' | 'attack' | 'clone' | 'buff';
+type Slot = 'unit' | 'attack' | 'clone' | 'buff' | 'sound';
 type ZoneType = 'neutral' | 'buff' | 'nerf';
 type ZonePos =
   | 'top-left' | 'top' | 'top-right'
@@ -39,6 +41,10 @@ const AdminIcons = () => {
   const [unitMap, setUnitMap] = useState<UnitIconMap>(() => ({ ...loadIconMap() }));
   const [attackMap, setAttackMap] = useState<UnitIconMap>(() => ({ ...loadAttackIconMap() }));
   const [cloneMap, setCloneMap] = useState<UnitIconMap>(() => ({ ...loadCloneIconMap() }));
+  const [soundMap, setSoundMap] = useState<UnitIconMap>(() => ({ ...loadSoundMap() }));
+  const [soundCategory, setSoundCategory] = useState<SoundCategory>('buffs');
+  const [soundManifest, setSoundManifest] = useState<{ buffs: string[]; magic: string[]; dungeon: string[] }>({ buffs: [], magic: [], dungeon: [] });
+  useEffect(() => { loadSoundManifest().then(m => setSoundManifest(m)); }, []);
   const [selectedUnit, setSelectedUnit] = useState<UnitType>(UNIT_TYPES[0]);
   const [slot, setSlot] = useState<Slot>('unit');
   const [filter, setFilter] = useState('');
@@ -136,11 +142,11 @@ const AdminIcons = () => {
   };
 
   const assign = (file: string) => {
-    if (effectiveSlot === 'buff') return;
+    if (effectiveSlot === 'buff' || effectiveSlot === 'sound') return;
     setCurrentMap({ ...currentMap, [selectedUnit]: file });
   };
   const clear = () => {
-    if (effectiveSlot === 'buff') return;
+    if (effectiveSlot === 'buff' || effectiveSlot === 'sound') return;
     const next = { ...currentMap };
     delete next[selectedUnit];
     setCurrentMap(next);
@@ -150,6 +156,7 @@ const AdminIcons = () => {
     effectiveSlot === 'unit' ? 'Einheit-Icon' :
     effectiveSlot === 'attack' ? 'Angriffs-/Projektil-Icon' :
     effectiveSlot === 'clone' ? 'Klon-Icon' :
+    effectiveSlot === 'sound' ? 'Angriffs-Sound' :
     'Buff-Zonen';
 
   return (
@@ -199,11 +206,12 @@ const AdminIcons = () => {
       {/* Slot tabs */}
       <div className="px-3 pt-3 border-b border-border">
         <div className="flex gap-1.5 flex-wrap">
-          {(['unit','attack', ...(selectedUnit === 'cloner' ? ['clone' as Slot] : []), 'buff'] as Slot[]).map(s => {
-            const label = s === 'unit' ? 'Einheit' : s === 'attack' ? 'Angriff' : s === 'clone' ? 'Klon' : 'Buff';
+          {(['unit','attack', ...(selectedUnit === 'cloner' ? ['clone' as Slot] : []), 'buff', 'sound'] as Slot[]).map(s => {
+            const label = s === 'unit' ? 'Einheit' : s === 'attack' ? 'Angriff' : s === 'clone' ? 'Klon' : s === 'buff' ? 'Buff' : 'Sound';
             const active = effectiveSlot === s;
             const map = s === 'unit' ? unitMap : s === 'attack' ? attackMap : s === 'clone' ? cloneMap : null;
             const ic = map ? map[selectedUnit] : null;
+            const hasSound = s === 'sound' && !!soundMap[selectedUnit];
             return (
               <button
                 key={s}
@@ -212,6 +220,8 @@ const AdminIcons = () => {
               >
                 {s === 'buff'
                   ? <span className="text-sm">✦</span>
+                  : s === 'sound'
+                  ? <Volume2 size={14} className={hasSound ? 'text-primary' : 'opacity-60'} />
                   : ic
                   ? <img src={iconUrl(ic)} alt="" className="w-4 h-4" style={{ imageRendering: 'pixelated' }} />
                   : <span className="text-sm opacity-60">·</span>}
@@ -225,11 +235,84 @@ const AdminIcons = () => {
           {effectiveSlot === 'unit' && 'Wird auf dem Spielfeld als Einheit angezeigt.'}
           {effectiveSlot === 'clone' && 'Aussehen der vom Kloner erzeugten Klone.'}
           {effectiveSlot === 'buff' && 'Aura-Zonen rund um diese Einheit (Buff = grün, Nerf = rot).'}
+          {effectiveSlot === 'sound' && 'Sound, der bei jedem Angriff dieser Einheit abgespielt wird.'}
         </p>
       </div>
 
-      {/* BUFF PANEL */}
-      {effectiveSlot === 'buff' ? (
+      {/* SOUND PANEL */}
+      {effectiveSlot === 'sound' ? (
+        <>
+          <div className="px-3 py-2 border-b border-border flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg border-2 border-primary bg-primary/5 flex items-center justify-center">
+              <Volume2 size={22} className={soundMap[selectedUnit] ? 'text-primary' : 'opacity-50'} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm">{UNIT_DEFS[selectedUnit].label} · <span className="text-muted-foreground font-normal">Angriffs-Sound</span></p>
+              <p className="text-[10px] text-muted-foreground truncate">{soundMap[selectedUnit] ?? 'Kein Sound (Standard)'}</p>
+            </div>
+            {soundMap[selectedUnit] && (
+              <>
+                <button
+                  onClick={() => previewSound(soundMap[selectedUnit]!)}
+                  className="text-xs px-2 py-1 rounded-md bg-secondary"
+                ><Play size={12} /></button>
+                <button
+                  onClick={() => {
+                    const next = { ...soundMap }; delete next[selectedUnit];
+                    setSoundMap(next); saveSoundMap(next);
+                  }}
+                  className="text-xs px-2 py-1 rounded-md bg-secondary"
+                >Entfernen</button>
+              </>
+            )}
+          </div>
+
+          {/* Category tabs */}
+          <div className="px-3 py-2 border-b border-border flex gap-1.5">
+            {(['buffs','magic','dungeon'] as SoundCategory[]).map(cat => (
+              <button
+                key={cat}
+                onClick={() => setSoundCategory(cat)}
+                className={`flex-1 px-2 py-1.5 rounded-lg border-2 text-xs font-semibold capitalize ${soundCategory === cat ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
+              >{cat} ({soundManifest[cat].length})</button>
+            ))}
+          </div>
+
+          {/* Sound list */}
+          <div className="flex-1 overflow-y-auto p-2">
+            <div className="flex flex-col gap-1">
+              {soundManifest[soundCategory].map(file => {
+                const rel = `${soundCategory}/${file}`;
+                const isAssigned = soundMap[selectedUnit] === rel;
+                return (
+                  <div
+                    key={file}
+                    className={`flex items-center gap-2 px-2 py-1.5 rounded-md border-2 transition-all ${
+                      isAssigned ? 'border-primary bg-primary/20' : 'border-border bg-card'
+                    }`}
+                  >
+                    <button
+                      onClick={(e) => { e.stopPropagation(); previewSound(rel); }}
+                      className="p-1.5 rounded-md bg-secondary hover:bg-secondary/80"
+                      aria-label="Vorhören"
+                    ><Play size={12} /></button>
+                    <button
+                      onClick={() => {
+                        const next = { ...soundMap, [selectedUnit]: rel };
+                        setSoundMap(next); saveSoundMap(next);
+                      }}
+                      className="flex-1 text-left text-xs truncate"
+                    >{file}</button>
+                  </div>
+                );
+              })}
+              {soundManifest[soundCategory].length === 0 && (
+                <p className="text-xs text-muted-foreground text-center py-4">Keine Dateien.</p>
+              )}
+            </div>
+          </div>
+        </>
+      ) : effectiveSlot === 'buff' ? (
         <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center gap-4">
           <p className="text-xs text-muted-foreground text-center">
             Klicke eine Zelle, um den Zustand zu wechseln:<br />
