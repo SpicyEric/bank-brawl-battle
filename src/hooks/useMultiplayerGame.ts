@@ -1463,9 +1463,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             let healed = false;
             for (const ally of healable) {
               if (canAttack(unit, ally)) {
-                const healAmt = Math.min(28, ally.maxHp - ally.hp);
-                ally.hp += healAmt;
-                logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
+                const requestedHeal = Math.min(28, ally.maxHp - ally.hp);
+                const healAmt = applyHealing(ally, requestedHeal, logs, `🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji}`);
                 healed = true;
                 unit.cooldown = unit.maxCooldown;
 
