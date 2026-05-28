@@ -1381,14 +1381,13 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             opponentFlankRef.current = { dir, step: nextStep };
           }
         }
-        // Freeze the opposing team during an active flank.
+        // Freeze the opposing team during an active flank: if either side is flanking,
+        // the other side does not perform its normal formation move this tick.
         if (!myFlankShifting && !oppFlankShifting) {
           moveTeamFormations('player');
           moveTeamFormations('enemy');
-        } else {
-          if (!myFlankShifting) moveTeamFormations('player');
-          if (!oppFlankShifting) moveTeamFormations('enemy');
         }
+
 
 
         // No individual arena catch-up in multiplayer: off-field units enter only as formations.
