@@ -1264,10 +1264,10 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // (Assassin low-HP bonus removed — uses standard damage.)
 
 
-  // --- Aura: attacker atk% modifier (stackable, additive)
+  // --- Aura: attacker atk% modifier (stackable, MULTIPLICATIVE — diminishing returns)
   const aStacks = attacker.auraStacks;
   if (aStacks) {
-    const atkMul = Math.max(0, 1 + 0.50 * aStacks.atkPlus50 - 0.50 * aStacks.atkMinus50);
+    const atkMul = Math.pow(1.5, aStacks.atkPlus50) * Math.pow(0.5, aStacks.atkMinus50);
     baseAtk *= atkMul;
   }
 
@@ -1311,12 +1311,11 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   // Obelisk buff: +50% damage while obeliskBuff active
   if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.5;
 
-  // --- Aura: own-damage nerfs on attacker (stack additively)
+  // --- Aura: own-damage nerfs on attacker (MULTIPLICATIVE — diminishing returns)
   if (aStacks) {
-    const ownMul = Math.max(0,
-      1 - 0.20 * aStacks.ownDmgMinus20
-        - 0.50 * aStacks.ownDmgMinus50
-        - 0.60 * aStacks.weaken60);
+    const ownMul = Math.pow(0.80, aStacks.ownDmgMinus20)
+                 * Math.pow(0.50, aStacks.ownDmgMinus50)
+                 * Math.pow(0.40, aStacks.weaken60);
     dmg *= ownMul;
 
     // Crit roll (mage buff): up to 95% chance, +100% dmg per stack (additive)
@@ -1328,8 +1327,9 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   }
 
   // --- Aura: incoming damage reduction on defender (shieldbearer)
+  // MULTIPLICATIVE stacking — prevents 100% immunity (e.g. 2× −60% = −84%, not −120%)
   if (defStacks && defStacks.incomingMinus60 > 0) {
-    dmg *= Math.max(0, 1 - 0.60 * defStacks.incomingMinus60);
+    dmg *= Math.pow(0.40, defStacks.incomingMinus60);
   }
 
   // --- Aura: weaken_50%_2t multiplier on defender's incoming dmg
