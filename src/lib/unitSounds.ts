@@ -52,3 +52,18 @@ export function previewSound(rel: string, volume = 0.4): HTMLAudioElement | null
     return a;
   } catch { return null; }
 }
+
+import { getPlacementSound, type PlacementSoundKind } from './unitIcons';
+
+export function playPlacementSound(kind: PlacementSoundKind, volume = 0.38): boolean {
+  if (isSfxMuted()) return false;
+  const rel = getPlacementSound(kind);
+  if (!rel) return false;
+  try {
+    const a = new Audio(soundUrl(rel));
+    a.volume = volume;
+    a.play().catch(() => {});
+    return true;
+  } catch { return false; }
+}
+
