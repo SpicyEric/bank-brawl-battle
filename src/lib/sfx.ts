@@ -313,7 +313,7 @@ export function sfxFreeze() {
   osc.type = 'sine';
   osc.frequency.setValueAtTime(2000, t);
   osc.frequency.exponentialRampToValueAtTime(800, t + 0.15);
-  gain.gain.setValueAtTime(0.08, t);
+  gain.gain.setValueAtTime(0.064, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
   osc.connect(gain);
   gain.connect(ctx.destination);
@@ -321,7 +321,7 @@ export function sfxFreeze() {
   osc.stop(t + 0.2);
 
   // Shimmer
-  setTimeout(() => playTone(3000, 0.1, 'sine', 0.04), 50);
+  setTimeout(() => playTone(3000, 0.1, 'sine', 0.032), 50);
 }
 
 /** Focus Fire – targeting lock-on beeps */
@@ -336,7 +336,7 @@ export function sfxFocusFire() {
     const gain = ctx.createGain();
     osc.type = 'square';
     osc.frequency.setValueAtTime(1400 + i * 200, t + i * 0.08);
-    gain.gain.setValueAtTime(0.12, t + i * 0.08);
+    gain.gain.setValueAtTime(0.096, t + i * 0.08);
     gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.08 + 0.06);
     osc.connect(gain);
     gain.connect(ctx.destination);
@@ -345,7 +345,7 @@ export function sfxFocusFire() {
   }
 
   // Lock-on confirmation tone
-  setTimeout(() => playTone(2000, 0.15, 'sine', 0.1), 250);
+  setTimeout(() => playTone(2000, 0.15, 'sine', 0.08), 250);
 }
 
 /** Sacrifice Ritual – dark rumble + soul release */
@@ -360,7 +360,7 @@ export function sfxSacrifice() {
   osc1.type = 'sawtooth';
   osc1.frequency.setValueAtTime(80, t);
   osc1.frequency.exponentialRampToValueAtTime(40, t + 0.4);
-  gain1.gain.setValueAtTime(0.2, t);
+  gain1.gain.setValueAtTime(0.16, t);
   gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
   osc1.connect(gain1);
   gain1.connect(ctx.destination);
@@ -374,7 +374,7 @@ export function sfxSacrifice() {
     osc2.type = 'sine';
     osc2.frequency.setValueAtTime(300, t + 0.15);
     osc2.frequency.exponentialRampToValueAtTime(2000, t + 0.5);
-    gain2.gain.setValueAtTime(0.1, t + 0.15);
+    gain2.gain.setValueAtTime(0.08, t + 0.15);
     gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
     osc2.connect(gain2);
     gain2.connect(ctx.destination);
@@ -382,7 +382,7 @@ export function sfxSacrifice() {
     osc2.stop(t + 0.55);
   }, 150);
 
-  playNoise(0.2, 0.08);
+  playNoise(0.2, 0.064);
 }
 
 /** Shield Wall – defensive horn + marching drums */
@@ -397,8 +397,8 @@ export function sfxShieldWall() {
   osc1.type = 'sawtooth';
   osc1.frequency.setValueAtTime(130, t);
   osc1.frequency.linearRampToValueAtTime(110, t + 0.3);
-  gain1.gain.setValueAtTime(0.15, t);
-  gain1.gain.setValueAtTime(0.15, t + 0.25);
+  gain1.gain.setValueAtTime(0.12, t);
+  gain1.gain.setValueAtTime(0.12, t + 0.25);
   gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
   osc1.connect(gain1);
   gain1.connect(ctx.destination);
@@ -407,13 +407,13 @@ export function sfxShieldWall() {
 
   // Shield impact
   setTimeout(() => {
-    playTone(200, 0.15, 'square', 0.12);
-    playNoise(0.1, 0.1);
+    playTone(200, 0.15, 'square', 0.096);
+    playNoise(0.1, 0.08);
   }, 100);
 
   // Second impact
   setTimeout(() => {
-    playTone(180, 0.12, 'square', 0.1);
+    playTone(180, 0.12, 'square', 0.08);
   }, 250);
 }
 
@@ -433,7 +433,7 @@ export function sfxSlotSpin() {
     const gain = ctx.createGain();
     osc.type = 'square';
     osc.frequency.setValueAtTime(1800 + Math.random() * 400, t);
-    gain.gain.setValueAtTime(0.05, t);
+    gain.gain.setValueAtTime(0.04, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
     osc.connect(gain);
     gain.connect(ctx.destination);
@@ -458,13 +458,13 @@ export function sfxSlotKlonk() {
   osc.type = 'sine';
   osc.frequency.setValueAtTime(220, t);
   osc.frequency.exponentialRampToValueAtTime(80, t + 0.08);
-  gain.gain.setValueAtTime(0.25, t);
+  gain.gain.setValueAtTime(0.2, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
   osc.connect(gain);
   gain.connect(ctx.destination);
   osc.start(t);
   osc.stop(t + 0.1);
-  playNoise(0.05, 0.06);
+  playNoise(0.05, 0.048);
 }
 
 /** Final stop – cheerful 3-tone ascending fanfare/ding. */
@@ -472,7 +472,7 @@ export function sfxSlotFanfare() {
   if (sfxMuted) return;
   const notes = [784, 988, 1319]; // G5 B5 E6
   notes.forEach((freq, i) => {
-    setTimeout(() => playTone(freq, 0.18, 'triangle', 0.14), i * 90);
+    setTimeout(() => playTone(freq, 0.18, 'triangle', 0.112), i * 90);
   });
-  setTimeout(() => playTone(1568, 0.3, 'sine', 0.1), 300);
+  setTimeout(() => playTone(1568, 0.3, 'sine', 0.08), 300);
 }
