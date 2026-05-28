@@ -142,11 +142,11 @@ const AdminIcons = () => {
   };
 
   const assign = (file: string) => {
-    if (effectiveSlot === 'buff') return;
+    if (effectiveSlot === 'buff' || effectiveSlot === 'sound') return;
     setCurrentMap({ ...currentMap, [selectedUnit]: file });
   };
   const clear = () => {
-    if (effectiveSlot === 'buff') return;
+    if (effectiveSlot === 'buff' || effectiveSlot === 'sound') return;
     const next = { ...currentMap };
     delete next[selectedUnit];
     setCurrentMap(next);
