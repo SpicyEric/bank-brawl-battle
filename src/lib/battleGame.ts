@@ -1727,10 +1727,6 @@ export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[]
     }
     if (allies.length > 0) logs.push(`🐑 Opferlamm heilt ${allies.length} Verbündete (+35%, max ${MAX_HEAL_PER_TICK}/Tick)`);
   }
-      totalHealed += actual;
-    }
-    if (allies.length > 0) logs.push(`🐑 Opferlamm heilt ${allies.length} Verbündete (+30%, max ${MAX_HEAL_PER_TICK}/Tick)`);
-  }
   return false;
 }
 
