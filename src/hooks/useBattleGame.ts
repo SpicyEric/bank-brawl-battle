@@ -582,6 +582,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
 
+      // Reset per-tick healing cap tracker
+      for (const u of allUnits) u._healedThisTick = 0;
+
       // === Aura stacks: recompute every tick from current positions ===
       applyAuraStacks(allUnits, auraRef.current.zones, auraRef.current.effects);
       // Apply per-tick regen / drain auras
