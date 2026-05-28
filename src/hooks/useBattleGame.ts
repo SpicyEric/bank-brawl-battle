@@ -10,6 +10,7 @@ import {
   spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
   tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest, applyShadowpriestCurse,
+  applyHealing, MAX_HEAL_PER_TICK,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { findFormations, applyFormationMove, findFormationContaining } from '@/lib/formations';
@@ -580,6 +581,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
       const newGrid = prevGrid.map(r => r.map(c => ({ ...c, unit: c.unit ? { ...c.unit } : null })));
       const allUnits: Unit[] = [];
       for (const row of newGrid) for (const cell of row) if (cell.unit && cell.unit.hp > 0 && !cell.unit.dead) allUnits.push(cell.unit);
+
+      // Reset per-tick healing cap tracker
+      for (const u of allUnits) u._healedThisTick = 0;
 
       // === Aura stacks: recompute every tick from current positions ===
       applyAuraStacks(allUnits, auraRef.current.zones, auraRef.current.effects);
@@ -1306,9 +1310,8 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
             let healed = false;
             for (const ally of healable) {
               if (canAttack(unit, ally)) {
-                const healAmt = Math.min(28, ally.maxHp - ally.hp);
-                ally.hp += healAmt;
-                logs.push(`🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji} +${healAmt} ❤️`);
+                const requestedHeal = Math.min(28, ally.maxHp - ally.hp);
+                const healAmt = applyHealing(ally, requestedHeal, logs, `🌿 ${unit.team === 'player' ? '👤' : '💀'} Schamane → ${UNIT_DEFS[ally.type].emoji}`);
                 healed = true;
                 unit.cooldown = unit.maxCooldown;
 
@@ -1442,9 +1445,9 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
           // Aura: generic lifesteal from stacks (independent of vampire-specific block below)
           if (dmg > 0 && unit.auraStacks && unit.auraStacks.lifesteal30 > 0 && unit.hp < unit.maxHp) {
             const pct = Math.min(1, 0.30 * unit.auraStacks.lifesteal30);
-            const heal = Math.min(unit.maxHp - unit.hp, Math.round(dmg * pct));
+            const requestedHeal = Math.min(unit.maxHp - unit.hp, Math.round(dmg * pct));
+            const heal = applyHealing(unit, requestedHeal);
             if (heal > 0) {
-              unit.hp += heal;
               unit._justRegen = Date.now();
             }
           }

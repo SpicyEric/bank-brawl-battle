@@ -96,6 +96,7 @@ export interface Unit {
   _justRegen?: number;
   _justDrain?: number;
   _justAuraTrigger?: number;
+  _healedThisTick?: number; // healing cap tracker (max 10 HP per tick)
   // Phase-2 temporary debuffs applied by aura triggers
   auraDmgTakenMul?: number;     // weaken_50%_2t: incoming dmg multiplier
   auraWeakenTicks?: number;
@@ -587,6 +588,25 @@ export const MULTI_PLACE_TIME_LIMIT = 60; // seconds for multiplayer placement p
 
 export const COUNTER_MULTIPLIER = 1.3;
 export const WEAKNESS_MULTIPLIER = 0.7;
+
+export const MAX_HEAL_PER_TICK = 10;
+
+/** Apply healing to a unit, respecting the per-tick cap.
+ *  Returns the actual amount healed (may be less than requested if cap reached). */
+export function applyHealing(unit: Unit, amount: number, logs?: string[], logPrefix?: string): number {
+  if (amount <= 0 || unit.hp <= 0 || (unit as any).dead || unit.unhealable) return 0;
+  const alreadyHealed = unit._healedThisTick || 0;
+  const remainingCap = Math.max(0, MAX_HEAL_PER_TICK - alreadyHealed);
+  const actualHeal = Math.min(amount, remainingCap, unit.maxHp - unit.hp);
+  if (actualHeal > 0) {
+    unit.hp += actualHeal;
+    unit._healedThisTick = alreadyHealed + actualHeal;
+    if (logs && logPrefix) {
+      logs.push(`${logPrefix} +${actualHeal} ❤️`);
+    }
+  }
+  return actualHeal;
+}
 
 export function createEmptyGrid(): Cell[][] {
   return Array.from({ length: GRID_SIZE }, (_, row) =>
@@ -1693,14 +1713,16 @@ export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[]
       });
     }
   }
-  // Lamb: heal all allies +30% maxHp
+  // Lamb: heal all allies +30% maxHp (capped by per-tick max)
   if (deadUnit.type === 'lamb') {
     const allies = allUnits.filter(u => u.team === deadUnit.team && u.hp > 0 && !u.dead && u.id !== deadUnit.id && !u.unhealable);
+    let totalHealed = 0;
     for (const a of allies) {
       const heal = Math.round(a.maxHp * 0.30);
-      a.hp = Math.min(a.maxHp, a.hp + heal);
+      const actual = applyHealing(a, heal);
+      totalHealed += actual;
     }
-    if (allies.length > 0) logs.push(`🐑 Opferlamm heilt ${allies.length} Verbündete (+30%)`);
+    if (allies.length > 0) logs.push(`🐑 Opferlamm heilt ${allies.length} Verbündete (+30%, max ${MAX_HEAL_PER_TICK}/Tick)`);
   }
   return false;
 }
@@ -1868,11 +1890,7 @@ export function tickTerrainHeals(allUnits: Unit[], grid: Cell[][], logs: string[
     if (u.hp <= 0 || (u as any).dead) continue;
     if (u.unhealable) continue;
     if (u.type === 'waterwalker' && grid[u.row]?.[u.col]?.terrain === 'water' && u.hp < u.maxHp) {
-      const heal = Math.min(3, u.maxHp - u.hp);
-      if (heal > 0) {
-        u.hp += heal;
-        logs.push(`🌊 Wasserwandler regeneriert +${heal} ❤️`);
-      }
+      applyHealing(u, 3, logs, '🌊 Wasserwandler regeneriert');
     }
   }
 }
