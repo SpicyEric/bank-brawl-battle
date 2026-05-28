@@ -30,7 +30,7 @@ function playTone(
   frequency: number,
   duration: number,
   type: OscillatorType = 'square',
-  volume: number = 0.15,
+  volume: number = 0.12,
   detune: number = 0,
 ) {
   if (sfxMuted) return;
@@ -50,7 +50,7 @@ function playTone(
   osc.stop(ctx.currentTime + duration);
 }
 
-function playNoise(duration: number, volume: number = 0.08) {
+function playNoise(duration: number, volume: number = 0.064) {
   if (sfxMuted) return;
   const ctx = getCtx();
   const bufferSize = ctx.sampleRate * duration;
@@ -89,7 +89,7 @@ export function sfxPlace() {
   osc.type = 'sine';
   osc.frequency.setValueAtTime(600, t);
   osc.frequency.exponentialRampToValueAtTime(1200, t + 0.05);
-  gain.gain.setValueAtTime(0.2, t);
+  gain.gain.setValueAtTime(0.16, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
   osc.connect(gain);
   gain.connect(ctx.destination);
@@ -108,7 +108,7 @@ export function sfxRemove() {
   osc.type = 'sine';
   osc.frequency.setValueAtTime(1000, t);
   osc.frequency.exponentialRampToValueAtTime(400, t + 0.08);
-  gain.gain.setValueAtTime(0.15, t);
+  gain.gain.setValueAtTime(0.12, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
   osc.connect(gain);
   gain.connect(ctx.destination);
@@ -128,8 +128,8 @@ export function sfxBattleStart() {
   osc1.type = 'sawtooth';
   osc1.frequency.setValueAtTime(220, t);
   osc1.frequency.linearRampToValueAtTime(440, t + 0.3);
-  gain1.gain.setValueAtTime(0.12, t);
-  gain1.gain.setValueAtTime(0.12, t + 0.25);
+  gain1.gain.setValueAtTime(0.096, t);
+  gain1.gain.setValueAtTime(0.096, t + 0.25);
   gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
   osc1.connect(gain1);
   gain1.connect(ctx.destination);
@@ -143,7 +143,7 @@ export function sfxBattleStart() {
   osc2.frequency.setValueAtTime(330, t + 0.1);
   osc2.frequency.linearRampToValueAtTime(550, t + 0.4);
   gain2.gain.setValueAtTime(0, t);
-  gain2.gain.linearRampToValueAtTime(0.08, t + 0.15);
+  gain2.gain.linearRampToValueAtTime(0.064, t + 0.15);
   gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
   osc2.connect(gain2);
   gain2.connect(ctx.destination);
@@ -163,7 +163,7 @@ export function sfxHit() {
   osc.type = 'sine';
   osc.frequency.setValueAtTime(150, t);
   osc.frequency.exponentialRampToValueAtTime(50, t + 0.15);
-  gain.gain.setValueAtTime(0.25, t);
+  gain.gain.setValueAtTime(0.2, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
   osc.connect(gain);
   gain.connect(ctx.destination);
@@ -171,14 +171,14 @@ export function sfxHit() {
   osc.stop(t + 0.15);
 
   // Noise crack
-  playNoise(0.08, 0.12);
+  playNoise(0.08, 0.096);
 }
 
 /** Critical/strong hit */
 export function sfxCriticalHit() {
   if (sfxMuted) return;
   sfxHit();
-  setTimeout(() => playTone(200, 0.1, 'square', 0.1), 50);
+  setTimeout(() => playTone(200, 0.1, 'square', 0.08), 50);
 }
 
 /** Unit killed – dark thud + descending tone */
@@ -193,7 +193,7 @@ export function sfxKill() {
   osc.type = 'sine';
   osc.frequency.setValueAtTime(200, t);
   osc.frequency.exponentialRampToValueAtTime(30, t + 0.3);
-  gain.gain.setValueAtTime(0.3, t);
+  gain.gain.setValueAtTime(0.24, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
   osc.connect(gain);
   gain.connect(ctx.destination);
@@ -206,14 +206,14 @@ export function sfxKill() {
   osc2.type = 'triangle';
   osc2.frequency.setValueAtTime(800, t);
   osc2.frequency.exponentialRampToValueAtTime(100, t + 0.25);
-  gain2.gain.setValueAtTime(0.08, t);
+  gain2.gain.setValueAtTime(0.064, t);
   gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
   osc2.connect(gain2);
   gain2.connect(ctx.destination);
   osc2.start(t);
   osc2.stop(t + 0.25);
 
-  playNoise(0.1, 0.15);
+  playNoise(0.1, 0.12);
 }
 
 /** Round won – triumphant ascending arpeggio */
@@ -221,13 +221,13 @@ export function sfxVictory() {
   if (sfxMuted) return;
   const notes = [523, 659, 784, 1047]; // C5 E5 G5 C6
   notes.forEach((freq, i) => {
-    setTimeout(() => playTone(freq, 0.25, 'square', 0.12), i * 100);
+    setTimeout(() => playTone(freq, 0.25, 'square', 0.096), i * 100);
   });
   // Final chord
   setTimeout(() => {
-    playTone(523, 0.4, 'triangle', 0.08);
-    playTone(659, 0.4, 'triangle', 0.08);
-    playTone(784, 0.4, 'triangle', 0.08);
+    playTone(523, 0.4, 'triangle', 0.064);
+    playTone(659, 0.4, 'triangle', 0.064);
+    playTone(784, 0.4, 'triangle', 0.064);
   }, 450);
 }
 
@@ -236,15 +236,15 @@ export function sfxDefeat() {
   if (sfxMuted) return;
   const notes = [392, 349, 311, 262]; // G4 F4 Eb4 C4
   notes.forEach((freq, i) => {
-    setTimeout(() => playTone(freq, 0.3, 'triangle', 0.1), i * 150);
+    setTimeout(() => playTone(freq, 0.3, 'triangle', 0.08), i * 150);
   });
 }
 
 /** Confirm placement – ready sound */
 export function sfxConfirm() {
   if (sfxMuted) return;
-  playTone(880, 0.08, 'square', 0.1);
-  setTimeout(() => playTone(1100, 0.12, 'square', 0.1), 80);
+  playTone(880, 0.08, 'square', 0.08);
+  setTimeout(() => playTone(1100, 0.12, 'square', 0.08), 80);
 }
 
 /** Ranged projectile – pew sound */
@@ -258,7 +258,7 @@ export function sfxProjectile() {
   osc.type = 'sine';
   osc.frequency.setValueAtTime(1200, t);
   osc.frequency.exponentialRampToValueAtTime(300, t + 0.12);
-  gain.gain.setValueAtTime(0.1, t);
+  gain.gain.setValueAtTime(0.08, t);
   gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
   osc.connect(gain);
   gain.connect(ctx.destination);
@@ -278,8 +278,8 @@ export function sfxWarCry() {
   osc1.type = 'sawtooth';
   osc1.frequency.setValueAtTime(150, t);
   osc1.frequency.linearRampToValueAtTime(600, t + 0.25);
-  gain1.gain.setValueAtTime(0.18, t);
-  gain1.gain.setValueAtTime(0.18, t + 0.2);
+  gain1.gain.setValueAtTime(0.144, t);
+  gain1.gain.setValueAtTime(0.144, t + 0.2);
   gain1.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
   osc1.connect(gain1);
   gain1.connect(ctx.destination);
@@ -292,14 +292,14 @@ export function sfxWarCry() {
   osc2.type = 'square';
   osc2.frequency.setValueAtTime(220, t + 0.05);
   osc2.frequency.linearRampToValueAtTime(880, t + 0.3);
-  gain2.gain.setValueAtTime(0.1, t + 0.05);
+  gain2.gain.setValueAtTime(0.08, t + 0.05);
   gain2.gain.exponentialRampToValueAtTime(0.001, t + 0.45);
   osc2.connect(gain2);
   gain2.connect(ctx.destination);
   osc2.start(t + 0.05);
   osc2.stop(t + 0.45);
 
-  playNoise(0.15, 0.1);
+  playNoise(0.15, 0.08);
 }
 
 /** Freeze effect */
