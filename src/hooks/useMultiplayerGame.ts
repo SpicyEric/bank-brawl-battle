@@ -1390,18 +1390,14 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       // === Doppelganger phantom timers === handled before the mode split.
       // === Cloner: spawn clones every 6 ticks (max 3 lifetime) ===
       tickClonerSpawns(allUnits, newGrid, logs);
-      // === Mage impulse: every 7 ticks push enemies in 7x7 outward ===
-      tickMageImpulse(allUnits, newGrid, events, logs);
+      // (Mage impulse removed — Magier hat jetzt 10% Push-Spezial bei Treffer.)
       // === Magnetiker pull: every 4 ticks, yank all enemies in 7x7 to adjacency ===
       tickMagnetPull(allUnits, newGrid, events, logs);
-      // === Frost Nova: every 7 ticks freeze enemies in 3x3 for 5 ticks at 30% dmg ===
-      tickFrostNova(allUnits, newGrid, events, logs);
-      // === Rider horn: every 9 ticks, +50% dmg buff to allies in 5x5 for 2 ticks ===
+      // (Frost Nova removed — Frostmagier hat jetzt 20% Freeze-Chance bei Treffer.)
+      // === Rider horn: every 9 ticks, +80% dmg buff to allies in 3x3 for 2 ticks ===
       tickRiderHorn(allUnits, newGrid, events, logs);
-      // === Archer volley: every 4 ticks, 8-direction infinite-range arrow salvo ===
-      tickArcherVolley(allUnits, newGrid, events, logs);
-      // === Dragon fire-spin: every 10 ticks, dragon spins 8 ticks firing beams ===
-      tickDragonSpin(allUnits, newGrid, events, logs);
+      // (Archer volley removed — Bogenschütze hat jetzt 20% Crit-Chance.)
+      // (Dragon fire-spin removed — Drache hat nur noch 3×3 Splash bei jedem Angriff.)
       // === Terrain regen: waterwalker heals on water ===
       tickTerrainHeals(allUnits, newGrid, logs);
       // === v3: Obelisk aura/beam (refresh buffs each tick) ===
