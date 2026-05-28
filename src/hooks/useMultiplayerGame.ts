@@ -1336,16 +1336,23 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             }
           }
         };
-        // === Flank maneuver: 3-tick burst — Tick1: 2 back, Tick2: up to 5 sideways, Tick3: up to 5 forward.
-        // Multiplayer keeps this as a rigid formation shift, never per-unit movement.
-        let flankShifting = false;
+        // === Flank maneuver: 3-tick burst — Tick1: up to 2 back, Tick2: up to 5 sideways, Tick3: up to 5 forward.
+        // Each step moves the formation its full distance within a single tick.
+        // The opposing team is frozen for the duration of any active flank.
+        let myFlankShifting = false;
+        let oppFlankShifting = false;
         if (flankActiveRef.current) {
-          flankShifting = true;
+          myFlankShifting = true;
           const { dir, step } = flankActiveRef.current;
           const dr = step === 0 ? 1 : step === 2 ? -1 : 0;
           const dc = step === 1 ? dir : 0;
+          const maxSteps = step === 0 ? 2 : 5;
           const playerGroup = findFormations(allUnits, 'player').flat();
-          if (playerGroup.length > 0 && (dr !== 0 || dc !== 0)) applyFormationMove(playerGroup, dr, dc, newGrid);
+          if (playerGroup.length > 0 && (dr !== 0 || dc !== 0)) {
+            for (let s = 0; s < maxSteps; s++) {
+              if (!applyFormationMove(playerGroup, dr, dc, newGrid)) break;
+            }
+          }
           const nextStep = step + 1;
           if (nextStep >= 3) {
             flankActiveRef.current = null;
@@ -1354,8 +1361,35 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
             flankActiveRef.current = { dir, step: nextStep };
           }
         }
-        if (!flankShifting) moveTeamFormations('player');
-        moveTeamFormations('enemy');
+        if (opponentFlankRef.current) {
+          oppFlankShifting = true;
+          const { dir, step } = opponentFlankRef.current;
+          // Enemy team marches in mirrored direction (host perspective: enemy goes "down" = -1).
+          const dr = step === 0 ? -1 : step === 2 ? 1 : 0;
+          const dc = step === 1 ? -dir : 0;
+          const maxSteps = step === 0 ? 2 : 5;
+          const enemyGroup = findFormations(allUnits, 'enemy').flat();
+          if (enemyGroup.length > 0 && (dr !== 0 || dc !== 0)) {
+            for (let s = 0; s < maxSteps; s++) {
+              if (!applyFormationMove(enemyGroup, dr, dc, newGrid)) break;
+            }
+          }
+          const nextStep = step + 1;
+          if (nextStep >= 3) {
+            opponentFlankRef.current = null;
+          } else {
+            opponentFlankRef.current = { dir, step: nextStep };
+          }
+        }
+        // Freeze the opposing team during an active flank.
+        if (!myFlankShifting && !oppFlankShifting) {
+          moveTeamFormations('player');
+          moveTeamFormations('enemy');
+        } else {
+          if (!myFlankShifting) moveTeamFormations('player');
+          if (!oppFlankShifting) moveTeamFormations('enemy');
+        }
+
 
         // No individual arena catch-up in multiplayer: off-field units enter only as formations.
       } else {
