@@ -1301,8 +1301,8 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   const aColor = getUnitColor(attacker);
   const dColor = getUnitColor(defender);
   if (COLOR_BEATS[aColor] === dColor) {
-    // Warrior: +50% damage when countering (instead of +30%)
-    dmg *= attacker.type === 'warrior' ? 1.5 : COUNTER_MULTIPLIER;
+    // Warrior: +70% damage when countering (instead of +30%)
+    dmg *= attacker.type === 'warrior' ? 1.7 : COUNTER_MULTIPLIER;
   } else if (COLOR_BEATS[dColor] === aColor) {
     // Warrior: only -10% damage when weak (instead of -30%)
     dmg *= attacker.type === 'warrior' ? 0.9 : WEAKNESS_MULTIPLIER;
@@ -1313,21 +1313,11 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
   const dist = Math.abs(attacker.row - defender.row) + Math.abs(attacker.col - defender.col);
   const isRanged = dist > 1;
 
-  // Hill bonus: attacker on hill deals +15% damage
+  // Hill bonus: attacker on hill deals +15% damage (not a defender reduction)
   if (attackerTerrain === 'hill') dmg *= 1.15;
 
-  // Forest bonus: defender in forest takes -20% damage
-  if (defenderTerrain === 'forest') dmg *= 0.8;
-
-
-  // Waterwalker: -30% incoming damage on water
-  if (defender.type === 'waterwalker' && defenderTerrain === 'water') dmg *= 0.7;
-
-  // Shield aura: defender adjacent to friendly tank takes -20% damage
-  if (grid && hasAdjacentFriendlyTank(defender, grid)) dmg *= 0.8;
-
-  // Rider horn buff: +100% damage while hornBuff active
-  if ((attacker.hornBuff || 0) > 0) dmg *= 2;
+  // Rider horn buff: +80% damage while hornBuff active (buff, not a reduction)
+  if ((attacker.hornBuff || 0) > 0) dmg *= 1.8;
   // Obelisk buff: +50% damage while obeliskBuff active
   if ((attacker.obeliskBuff || 0) > 0) dmg *= 1.5;
 
@@ -1346,16 +1336,40 @@ export function calcDamage(attacker: Unit, defender: Unit, grid?: Cell[][]): num
     }
   }
 
-  // --- Aura: incoming damage reduction on defender (shieldbearer)
-  // MULTIPLICATIVE stacking — prevents 100% immunity (e.g. 2× −60% = −84%, not −120%)
-  if (defStacks && defStacks.incomingMinus60 > 0) {
-    dmg *= Math.pow(0.40, defStacks.incomingMinus60);
+  // --- Archer: 20% crit chance for +50% damage (built-in special) ---
+  if (attacker.type === 'archer' && Math.random() < 0.2) {
+    dmg *= 1.5;
+    attacker._justCrit = Date.now();
   }
 
+  // --- Healer: only damages targets below 70% HP, otherwise minimum 3 ---
+  if (attacker.type === 'healer' && defender.hp > defender.maxHp * 0.7) {
+    return 3;
+  }
+
+  // ─── Defender damage reductions (collected so assassin can halve them) ───
+  let defReducMul = 1;
+
+  // Forest bonus: defender in forest takes -20% damage
+  if (defenderTerrain === 'forest') defReducMul *= 0.8;
+  // Waterwalker: -30% incoming damage on water
+  if (defender.type === 'waterwalker' && defenderTerrain === 'water') defReducMul *= 0.7;
+  // Shield aura: defender adjacent to friendly tank takes -20% damage
+  if (grid && hasAdjacentFriendlyTank(defender, grid)) defReducMul *= 0.8;
+  // --- Aura: incoming damage reduction on defender (shieldbearer)
+  if (defStacks && defStacks.incomingMinus60 > 0) {
+    defReducMul *= Math.pow(0.40, defStacks.incomingMinus60);
+  }
   // --- Aura: weaken_50%_2t multiplier on defender's incoming dmg
   if (defender.auraDmgTakenMul && defender.auraDmgTakenMul !== 1) {
-    dmg *= defender.auraDmgTakenMul;
+    defReducMul *= defender.auraDmgTakenMul;
   }
+
+  // Assassin armor penetration: each reduction below 1 only counts half.
+  if (attacker.type === 'assassin' && defReducMul < 1) {
+    defReducMul = 1 - (1 - defReducMul) * 0.5;
+  }
+  dmg *= defReducMul;
 
   // --- Attacker nerfs: first-attack-only, damage-only-below-70
   if (aStacks) {
