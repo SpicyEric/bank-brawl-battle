@@ -41,6 +41,10 @@ const AdminIcons = () => {
   const [unitMap, setUnitMap] = useState<UnitIconMap>(() => ({ ...loadIconMap() }));
   const [attackMap, setAttackMap] = useState<UnitIconMap>(() => ({ ...loadAttackIconMap() }));
   const [cloneMap, setCloneMap] = useState<UnitIconMap>(() => ({ ...loadCloneIconMap() }));
+  const [soundMap, setSoundMap] = useState<UnitIconMap>(() => ({ ...loadSoundMap() }));
+  const [soundCategory, setSoundCategory] = useState<SoundCategory>('buffs');
+  const [soundManifest, setSoundManifest] = useState<{ buffs: string[]; magic: string[]; dungeon: string[] }>({ buffs: [], magic: [], dungeon: [] });
+  useEffect(() => { loadSoundManifest().then(m => setSoundManifest(m)); }, []);
   const [selectedUnit, setSelectedUnit] = useState<UnitType>(UNIT_TYPES[0]);
   const [slot, setSlot] = useState<Slot>('unit');
   const [filter, setFilter] = useState('');
