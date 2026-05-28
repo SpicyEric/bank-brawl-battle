@@ -176,12 +176,17 @@ const AdminIcons = () => {
             return (
               <button
                 key={t}
-                onClick={() => setSelectedUnit(t)}
-                className={`p-1.5 rounded-lg border-2 text-center transition-all ${isSel ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
+                onClick={() => { if (didLongPress.current) { didLongPress.current = false; return; } setSelectedUnit(t); }}
+                onPointerDown={() => startPress(t)}
+                onPointerUp={cancelPress}
+                onPointerLeave={cancelPress}
+                onPointerCancel={cancelPress}
+                onContextMenu={(e) => e.preventDefault()}
+                className={`p-1.5 rounded-lg border-2 text-center transition-all select-none ${isSel ? 'border-primary bg-primary/10' : 'border-border bg-card'}`}
               >
                 <div className="h-8 flex items-center justify-center">
                   {assigned
-                    ? <img src={iconUrl(assigned)} alt="" className="w-7 h-7" style={{ imageRendering: 'pixelated' }} />
+                    ? <img src={iconUrl(assigned)} alt="" className="w-7 h-7" style={{ imageRendering: 'pixelated' }} draggable={false} />
                     : <span className="text-xl">{UNIT_DEFS[t].emoji}</span>}
                 </div>
                 <p className="text-[9px] truncate mt-0.5">{UNIT_DEFS[t].label}</p>
