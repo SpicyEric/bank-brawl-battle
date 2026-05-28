@@ -247,13 +247,9 @@ export function saveIconMap(map: UnitIconMap) { setMap('unit', map); }
 export function saveAttackIconMap(map: UnitIconMap) { setMap('attack', map); }
 export function saveCloneIconMap(map: UnitIconMap) { setMap('clone', map); }
 export function saveAnimationMap(map: UnitIconMap) { setMap('animation', map); }
+export function saveSoundMap(map: UnitIconMap) { setMap('sound', map); }
 
 export function subscribeIconMap(cb: () => void): () => void {
   listeners.add(cb);
   return () => { listeners.delete(cb); };
 }
-export function saveIconMap(map: UnitIconMap) { setMap('unit', map); }
-export function saveAttackIconMap(map: UnitIconMap) { setMap('attack', map); }
-export function saveCloneIconMap(map: UnitIconMap) { setMap('clone', map); }
-export function saveAnimationMap(map: UnitIconMap) { setMap('animation', map); }
-export function saveSoundMap(map: UnitIconMap) { setMap('sound', map); }
