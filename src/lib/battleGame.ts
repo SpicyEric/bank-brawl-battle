@@ -96,6 +96,7 @@ export interface Unit {
   _justRegen?: number;
   _justDrain?: number;
   _justAuraTrigger?: number;
+  _healedThisTick?: number; // healing cap tracker (max 10 HP per tick)
   // Phase-2 temporary debuffs applied by aura triggers
   auraDmgTakenMul?: number;     // weaken_50%_2t: incoming dmg multiplier
   auraWeakenTicks?: number;
