@@ -949,7 +949,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
           if (unit.type === 'arsonist' && best.hp > 0 && !isImmuneToFire(best, newGrid)) {
             best.burning = [...(best.burning || []), { dmg: 5, turns: 4 }];
           }
-          if (unit.type === 'frost' && best.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(best, newGrid)) {
+          if (unit.type === 'frost' && best.hp > 0 && Math.random() < 0.2 && !isImmuneToFreeze(best, newGrid)) {
             best.frozen = 3;
             best.frozenDmgMul = 0.5;
           }
@@ -1467,7 +1467,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
 
           // Frost: 50% chance to freeze target for 3 ticks at 50% damage (skip immune)
           let didFreeze = false;
-          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.5 && !isImmuneToFreeze(target, newGrid)) {
+          if (unit.type === 'frost' && target.hp > 0 && Math.random() < 0.2 && !isImmuneToFreeze(target, newGrid)) {
             target.frozen = 3;
             target.frozenDmgMul = 0.5;
             didFreeze = true;
