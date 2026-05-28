@@ -42,6 +42,21 @@ const AdminIcons = () => {
   const [selectedUnit, setSelectedUnit] = useState<UnitType>(UNIT_TYPES[0]);
   const [slot, setSlot] = useState<Slot>('unit');
   const [filter, setFilter] = useState('');
+  const [infoUnit, setInfoUnit] = useState<UnitType | null>(null);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPress = useRef(false);
+
+  const startPress = (t: UnitType) => {
+    didLongPress.current = false;
+    if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    longPressTimer.current = setTimeout(() => {
+      didLongPress.current = true;
+      setInfoUnit(t);
+    }, LONG_PRESS_MS);
+  };
+  const cancelPress = () => {
+    if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+  };
 
   // Aura zones: per-unit
   const [auraMap, setAuraMap] = useState<Partial<Record<UnitType, Record<ZonePos, ZoneType>>>>({});
