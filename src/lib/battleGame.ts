@@ -2848,20 +2848,36 @@ export function tickBomberActions(
 ): void {
   const bombers = allUnits.filter(u => u.type === 'bomber' && u.hp > 0 && !u.dead);
   for (const b of bombers) {
-    // Place timer (every 5 ticks; obelisk-buffed bombers halve to every 3 ticks)
+    // Place timer (every 5 ticks; obelisk-buffed bombers shorten to every 4 ticks)
     const buffed = (b.obeliskBuff || 0) > 0;
-    const placeReset = buffed ? 3 : 5;
+    const placeReset = buffed ? 4 : 5;
     if (b.bombPlaceTimer === undefined) b.bombPlaceTimer = placeReset;
     b.bombPlaceTimer -= 1;
     if (b.bombPlaceTimer <= 0) {
       b.bombPlaceTimer = placeReset;
-      const cell = grid[b.row]?.[b.col];
-      if (cell && !cell.bomb) {
-        cell.bomb = { fuse: 2, dmg: 30, ownerTeam: b.team };
-        logs.push(`💣 Sprengmeister legt eine Bombe${buffed ? ' (Obelisk-Buff)' : ''}`);
+      // Pick nearest enemy and drop a single bomb on its cell (fuse 1 tick).
+      const enemies = allUnits.filter(u => u.team !== b.team && u.hp > 0 && !u.dead);
+      let target: Unit | null = null;
+      let bestD = Infinity;
+      for (const e of enemies) {
+        const d = Math.max(Math.abs(e.row - b.row), Math.abs(e.col - b.col));
+        if (d < bestD) { bestD = d; target = e; }
+      }
+      if (target) {
+        const cell = grid[target.row]?.[target.col];
+        if (cell && !cell.bomb) {
+          cell.bomb = { fuse: 1, dmg: 10, ownerTeam: b.team };
+          logs.push(`💣 Sprengmeister wirft Bombe auf ${UNIT_DEFS[target.type].emoji}${buffed ? ' (Obelisk-Buff)' : ''}`);
+          events.push({
+            type: 'spawn',
+            attackerId: b.id, attackerRow: b.row, attackerCol: b.col, attackerEmoji: '💣', attackerType: 'bomber',
+            targetId: target.id, targetRow: target.row, targetCol: target.col,
+            damage: 0, isStrong: false, isWeak: false, isRanged: true,
+          });
+        }
       }
     }
-    // Special timer
+    // Special: bomb hail every 12 ticks on ALL enemies, fuse 1, 10 dmg.
     if (b.bombSpecialTimer === undefined) b.bombSpecialTimer = 12;
     b.bombSpecialTimer -= 1;
     if (b.bombSpecialTimer <= 0) {
@@ -2871,7 +2887,7 @@ export function tickBomberActions(
       for (const e of enemies) {
         const cell = grid[e.row]?.[e.col];
         if (!cell) continue;
-        cell.bomb = { fuse: 1, dmg: 30, ownerTeam: b.team };
+        cell.bomb = { fuse: 1, dmg: 10, ownerTeam: b.team };
         count++;
         events.push({
           type: 'spawn',
