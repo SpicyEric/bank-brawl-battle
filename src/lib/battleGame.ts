@@ -492,7 +492,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // ===== NEW UNITS v3 =====
   bomber: {
     label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 23, cooldown: 5,
-    description: 'Greift nicht direkt an. Alle 5 Ticks: legt eine Bombe auf das eigene Feld – nach 2 Ticks Explosion (23 Dmg im Zentrum, 17 Dmg im 3×3 außenrum). Alle 12 Ticks: Bombenhagel auf alle Gegner (Fuse 1 Tick).',
+    description: 'Greift nicht selbst an. Alle 5 Ticks: wirft eine Bombe auf den nächsten Gegner – nach 1 Tick Fuse 10 Dmg auf das Ziel + 7 Dmg im 3×3-Splash. Alle 12 Ticks: Bombenhagel auf alle Gegner.',
     movePattern: ALL_ADJACENT,
     attackPattern: [],
     strongVs: [], weakVs: [],
@@ -1693,15 +1693,13 @@ export function applyPostAttackEffects(
   // Magnetiker pull is no longer per-attack — handled by tickMagnetPull every 4 ticks.
 
 
-  // Vulkanit: spawn lava in a 5-tile PLUS pattern on the target (center + 4 orthogonal), 8 ticks, 6 dmg/tick
+  // Vulkanit: setzt nur die Zielzelle für 6 Ticks in Brand (5 Dmg/Tick auf alle Einheiten, die drauf stehen).
   if (attacker.type === 'vulkanit') {
-    const plus: [number, number][] = [[0,0],[-1,0],[1,0],[0,-1],[0,1]];
-    for (const [dr, dc] of plus) {
-      const r = target.row + dr, c = target.col + dc;
-      if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) continue;
-      grid[r][c].lavaTicks = 8;
+    const r = target.row, c = target.col;
+    if (r >= 0 && r < GRID_SIZE && c >= 0 && c < GRID_SIZE) {
+      grid[r][c].lavaTicks = 6;
       grid[r][c].lavaOwnerTeam = attacker.team;
-      grid[r][c].lavaDmg = 6;
+      grid[r][c].lavaDmg = 5;
     }
   }
 }
@@ -2850,20 +2848,36 @@ export function tickBomberActions(
 ): void {
   const bombers = allUnits.filter(u => u.type === 'bomber' && u.hp > 0 && !u.dead);
   for (const b of bombers) {
-    // Place timer (every 5 ticks; obelisk-buffed bombers halve to every 3 ticks)
+    // Place timer (every 5 ticks; obelisk-buffed bombers shorten to every 4 ticks)
     const buffed = (b.obeliskBuff || 0) > 0;
-    const placeReset = buffed ? 3 : 5;
+    const placeReset = buffed ? 4 : 5;
     if (b.bombPlaceTimer === undefined) b.bombPlaceTimer = placeReset;
     b.bombPlaceTimer -= 1;
     if (b.bombPlaceTimer <= 0) {
       b.bombPlaceTimer = placeReset;
-      const cell = grid[b.row]?.[b.col];
-      if (cell && !cell.bomb) {
-        cell.bomb = { fuse: 2, dmg: 30, ownerTeam: b.team };
-        logs.push(`💣 Sprengmeister legt eine Bombe${buffed ? ' (Obelisk-Buff)' : ''}`);
+      // Pick nearest enemy and drop a single bomb on its cell (fuse 1 tick).
+      const enemies = allUnits.filter(u => u.team !== b.team && u.hp > 0 && !u.dead);
+      let target: Unit | null = null;
+      let bestD = Infinity;
+      for (const e of enemies) {
+        const d = Math.max(Math.abs(e.row - b.row), Math.abs(e.col - b.col));
+        if (d < bestD) { bestD = d; target = e; }
+      }
+      if (target) {
+        const cell = grid[target.row]?.[target.col];
+        if (cell && !cell.bomb) {
+          cell.bomb = { fuse: 1, dmg: 10, ownerTeam: b.team };
+          logs.push(`💣 Sprengmeister wirft Bombe auf ${UNIT_DEFS[target.type].emoji}${buffed ? ' (Obelisk-Buff)' : ''}`);
+          events.push({
+            type: 'spawn',
+            attackerId: b.id, attackerRow: b.row, attackerCol: b.col, attackerEmoji: '💣', attackerType: 'bomber',
+            targetId: target.id, targetRow: target.row, targetCol: target.col,
+            damage: 0, isStrong: false, isWeak: false, isRanged: true,
+          });
+        }
       }
     }
-    // Special timer
+    // Special: bomb hail every 12 ticks on ALL enemies, fuse 1, 10 dmg.
     if (b.bombSpecialTimer === undefined) b.bombSpecialTimer = 12;
     b.bombSpecialTimer -= 1;
     if (b.bombSpecialTimer <= 0) {
@@ -2873,7 +2887,7 @@ export function tickBomberActions(
       for (const e of enemies) {
         const cell = grid[e.row]?.[e.col];
         if (!cell) continue;
-        cell.bomb = { fuse: 1, dmg: 30, ownerTeam: b.team };
+        cell.bomb = { fuse: 1, dmg: 10, ownerTeam: b.team };
         count++;
         events.push({
           type: 'spawn',
@@ -2915,7 +2929,7 @@ export function tickBombFuses(
       if (!u || u.hp <= 0 || u.dead) continue;
       if (u.team === ex.ownerTeam) continue;
       const isCenter = dr === 0 && dc === 0;
-      const dmg = isCenter ? 23 : 17;
+      const dmg = isCenter ? ex.dmg : Math.max(1, Math.round(ex.dmg * 0.7));
       u.hp = Math.max(0, u.hp - dmg);
       logs.push(`💥 Bombe → ${UNIT_DEFS[u.type].emoji} ${dmg}${u.hp <= 0 ? ' ☠️' : ''}`);
       if (u.hp <= 0) (u as any).dead = true;
