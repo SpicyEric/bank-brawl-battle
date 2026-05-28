@@ -589,6 +589,25 @@ export const MULTI_PLACE_TIME_LIMIT = 60; // seconds for multiplayer placement p
 export const COUNTER_MULTIPLIER = 1.3;
 export const WEAKNESS_MULTIPLIER = 0.7;
 
+export const MAX_HEAL_PER_TICK = 10;
+
+/** Apply healing to a unit, respecting the per-tick cap.
+ *  Returns the actual amount healed (may be less than requested if cap reached). */
+export function applyHealing(unit: Unit, amount: number, logs?: string[], logPrefix?: string): number {
+  if (amount <= 0 || unit.hp <= 0 || (unit as any).dead || unit.unhealable) return 0;
+  const alreadyHealed = unit._healedThisTick || 0;
+  const remainingCap = Math.max(0, MAX_HEAL_PER_TICK - alreadyHealed);
+  const actualHeal = Math.min(amount, remainingCap, unit.maxHp - unit.hp);
+  if (actualHeal > 0) {
+    unit.hp += actualHeal;
+    unit._healedThisTick = alreadyHealed + actualHeal;
+    if (logs && logPrefix) {
+      logs.push(`${logPrefix} +${actualHeal} ❤️`);
+    }
+  }
+  return actualHeal;
+}
+
 export function createEmptyGrid(): Cell[][] {
   return Array.from({ length: GRID_SIZE }, (_, row) =>
     Array.from({ length: GRID_SIZE }, (_, col) => ({ row, col, unit: null, terrain: 'none' as TerrainType }))
