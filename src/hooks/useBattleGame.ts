@@ -947,7 +947,7 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
             }
           }
           if (unit.type === 'arsonist' && best.hp > 0 && !isImmuneToFire(best, newGrid)) {
-            best.burning = [...(best.burning || []), { dmg: 5, turns: 4 }];
+            best.burning = [...(best.burning || []), { dmg: 3, turns: 4 }];
           }
           if (unit.type === 'frost' && best.hp > 0 && Math.random() < 0.2 && !isImmuneToFreeze(best, newGrid)) {
             best.frozen = 3;
