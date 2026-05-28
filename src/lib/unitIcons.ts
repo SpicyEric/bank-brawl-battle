@@ -76,7 +76,6 @@ function writeLocalMirror() {
     localStorage.setItem(SOUND_KEY, JSON.stringify(cache.sound));
   } catch {}
 }
-}
 
 /** Loads assignments from backend. If backend is empty and we have local data, migrate it up. */
 export async function initIconAssignments(): Promise<void> {
@@ -88,6 +87,7 @@ export async function initIconAssignments(): Promise<void> {
   cache.attack = loadLocal(ATTACK_KEY);
   cache.clone = loadLocal(CLONE_KEY);
   cache.animation = loadLocal(ANIM_KEY);
+  cache.sound = loadLocal(SOUND_KEY);
   emit();
 
   loadingPromise = (async () => {
