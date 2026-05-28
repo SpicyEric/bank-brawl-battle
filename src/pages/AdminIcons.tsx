@@ -313,9 +313,6 @@ const AdminIcons = () => {
           </div>
         </>
       ) : effectiveSlot === 'buff' ? (
-
-      {/* BUFF PANEL */}
-      {effectiveSlot === 'buff' ? (
         <div className="flex-1 overflow-y-auto p-4 flex flex-col items-center gap-4">
           <p className="text-xs text-muted-foreground text-center">
             Klicke eine Zelle, um den Zustand zu wechseln:<br />
