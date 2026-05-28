@@ -525,7 +525,7 @@ export const UNIT_ATTACK_RANGE: Record<UnitType, number> = {
   stormrunner: 1, arsonist: 1, lightning: 2,
   mirror: 2, lamb: 1, judge: 1, icegolem: 1, cloner: 1,
   magnetiker: 2, spiderqueen: 2, waterwalker: 2,
-  doppelganger: 1, sniper: 3, chaindancer: 2,
+  doppelganger: 1, sniper: 4, chaindancer: 2,
   bomber: 2, shadowpriest: 2, obelisk: 1,
 };
 
