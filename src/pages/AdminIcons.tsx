@@ -2,20 +2,24 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Minus } from 'lucide-react';
 import { UNIT_TYPES, UNIT_DEFS, type UnitType } from '@/lib/battleGame';
+import { ChevronLeft, Plus, Minus, Play, Volume2 } from 'lucide-react';
+import { UNIT_TYPES, UNIT_DEFS, type UnitType } from '@/lib/battleGame';
 import {
   ALL_ICONS, iconUrl,
   loadIconMap, saveIconMap,
   loadAttackIconMap, saveAttackIconMap,
   loadCloneIconMap, saveCloneIconMap,
+  loadSoundMap, saveSoundMap,
   type UnitIconMap,
 } from '@/lib/unitIcons';
+import { loadSoundManifest, previewSound, type SoundCategory } from '@/lib/unitSounds';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
 
 const LONG_PRESS_MS = 400;
 
-type Slot = 'unit' | 'attack' | 'clone' | 'buff';
+type Slot = 'unit' | 'attack' | 'clone' | 'buff' | 'sound';
 type ZoneType = 'neutral' | 'buff' | 'nerf';
 type ZonePos =
   | 'top-left' | 'top' | 'top-right'
