@@ -1713,14 +1713,16 @@ export function applyDeathEffects(deadUnit: Unit, allUnits: Unit[], grid: Cell[]
       });
     }
   }
-  // Lamb: heal all allies +30% maxHp
+  // Lamb: heal all allies +30% maxHp (capped by per-tick max)
   if (deadUnit.type === 'lamb') {
     const allies = allUnits.filter(u => u.team === deadUnit.team && u.hp > 0 && !u.dead && u.id !== deadUnit.id && !u.unhealable);
+    let totalHealed = 0;
     for (const a of allies) {
       const heal = Math.round(a.maxHp * 0.30);
-      a.hp = Math.min(a.maxHp, a.hp + heal);
+      const actual = applyHealing(a, heal);
+      totalHealed += actual;
     }
-    if (allies.length > 0) logs.push(`🐑 Opferlamm heilt ${allies.length} Verbündete (+30%)`);
+    if (allies.length > 0) logs.push(`🐑 Opferlamm heilt ${allies.length} Verbündete (+30%, max ${MAX_HEAL_PER_TICK}/Tick)`);
   }
   return false;
 }

@@ -194,7 +194,8 @@ export function applyAuraTick(allUnits: Unit[], logs: string[]): void {
     const s = u.auraStacks;
     if (s.hpRegen3 > 0 && u.hp < u.maxHp) {
       const heal = Math.min(u.maxHp - u.hp, 3 * s.hpRegen3);
-      if (heal > 0) { u.hp += heal; u._justRegen = Date.now(); }
+      const actual = applyHealing(u, heal);
+      if (actual > 0) u._justRegen = Date.now();
     }
     if (s.hpDrain3 > 0) {
       const dmg = 3 * s.hpDrain3;
