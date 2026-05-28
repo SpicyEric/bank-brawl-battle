@@ -23,7 +23,7 @@ if (typeof window !== 'undefined') loadSoundManifest().catch(() => {});
 
 const audioCache = new Map<string, HTMLAudioElement>();
 
-export function playUnitSound(type: UnitType | string | undefined, volume = 0.4): boolean {
+export function playUnitSound(type: UnitType | string | undefined, volume = 0.32): boolean {
   if (isSfxMuted()) return false;
   const rel = getUnitSound(type);
   if (!rel) return false;
@@ -44,7 +44,7 @@ export function playUnitSound(type: UnitType | string | undefined, volume = 0.4)
   }
 }
 
-export function previewSound(rel: string, volume = 0.5): HTMLAudioElement | null {
+export function previewSound(rel: string, volume = 0.4): HTMLAudioElement | null {
   try {
     const a = new Audio(soundUrl(rel));
     a.volume = volume;
