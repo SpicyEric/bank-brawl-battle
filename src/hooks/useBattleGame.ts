@@ -1001,13 +1001,13 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
             chaindancerCells = applyChainAttack(unit, best, dmg, newGrid, logs);
           }
 
-          // Dragon: 3x3 AOE around the dragon (30% splash to other enemies).
+          // Dragon: 3x3 AOE around the TARGET (20% splash to nearby enemies, flames everywhere).
           let aoeCells: { row: number; col: number }[] | undefined;
           if (unit.type === 'dragon') {
             aoeCells = [];
-            const splashDmg = Math.round(dmg * 0.3);
+            const splashDmg = Math.max(3, Math.round(dmg * 0.2));
             for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-              const ar = unit.row + dr, ac = unit.col + dc;
+              const ar = best.row + dr, ac = best.col + dc;
               if (ar < 0 || ar >= newGrid.length || ac < 0 || ac >= newGrid[0].length) continue;
               aoeCells.push({ row: ar, col: ac });
               const cu = newGrid[ar][ac].unit;
@@ -1552,22 +1552,22 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
           const dist = Math.abs(unit.row - target.row) + Math.abs(unit.col - target.col);
           logs.push(`${def.emoji} ${unit.team === 'player' ? '👤' : '💀'} ${def.label} → ${tDef.emoji} ${dmg}${suffix}${target.frozen ? ' 🧊' : ''}${target.hp <= 0 ? ' ☠️' : ''}`);
 
-          // Dragon AOE: collect all cells in 3x3 around the dragon for fire effect
+          // Dragon AOE: 3×3 around the TARGET — flames on every cell, 20% splash to other enemies.
           let aoeCells: { row: number; col: number }[] | undefined;
           if (unit.type === 'dragon') {
             aoeCells = [];
             for (let dr = -1; dr <= 1; dr++) {
               for (let dc = -1; dc <= 1; dc++) {
-                const ar = unit.row + dr;
-                const ac = unit.col + dc;
+                const ar = target.row + dr;
+                const ac = target.col + dc;
                 if (ar >= 0 && ar < GRID_SIZE && ac >= 0 && ac < GRID_SIZE) {
                   aoeCells.push({ row: ar, col: ac });
                 }
               }
             }
 
-            // Splash damage: 30% to other enemies in the 3x3 area
-            const splashDmg = Math.round(dmg * 0.3);
+            // Splash damage: 20% to other enemies in the 3x3 area around target
+            const splashDmg = Math.max(3, Math.round(dmg * 0.2));
             for (const aoePos of aoeCells) {
               const cellUnit = newGrid[aoePos.row][aoePos.col].unit;
               if (cellUnit && cellUnit.hp > 0 && !cellUnit.dead && cellUnit.team !== unit.team && cellUnit.id !== target.id) {
@@ -1593,8 +1593,6 @@ export function useBattleGame(difficulty: number = 2, roster?: UnitType[], handi
                   (cellUnit as any).dead = true;
                 }
               }
-            }
-          }
 
           events.push({
             type: target.hp <= 0 ? 'kill' : 'hit',
