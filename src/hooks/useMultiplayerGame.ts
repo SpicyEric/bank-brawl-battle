@@ -556,11 +556,8 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
       else if (aura.nerf) playPlacementSound('nerf');
       else playPlacementSound('default');
     } catch {}
-
-      next[row][col] = { ...next[row][col], unit };
-      return next;
-    });
   }, [phase, isMyTurnToPlace, selectedUnit, selectedSlot, hasRoster, roster, playerUnits, grid, myTeam, playerBannedUnits, playerMaxUnits]);
+
 
   // Remove placed unit
   const removeUnit = useCallback((unitId: string) => {
