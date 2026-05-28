@@ -2258,6 +2258,20 @@ export function tickRiderHorn(
     if ((u.hornBuff || 0) > 0) {
       u.hornBuff = (u.hornBuff || 0) - 1;
       if ((u.hornBuff || 0) <= 0) u.hornBuff = undefined;
+    }
+  }
+
+  const riders = allUnits.filter(u => u.type === 'rider' && u.hp > 0 && !u.dead);
+  for (const r of riders) {
+    if (r.hornTimer === undefined || r.hornTimer <= 0) r.hornTimer = 9;
+    r.hornTimer -= 1;
+    if (r.hornTimer > 0) continue;
+    r.hornTimer = 9;
+
+    const innerCells: { row: number; col: number }[] = [];
+    const outerCells: { row: number; col: number }[] = [];
+    let buffed = 0;
+
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
       const rr = r.row + dr, cc = r.col + dc;
       if (rr < 0 || rr >= GRID_SIZE || cc < 0 || cc >= GRID_SIZE) continue;
