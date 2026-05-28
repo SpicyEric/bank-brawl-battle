@@ -10,7 +10,7 @@
 //          damage-only-below-70%, double dmg from fire/lit).
 // ============================================================
 import type { Unit, UnitType, Cell } from './battleGame';
-import { GRID_SIZE, UNIT_DEFS, applyShadowpriestCurse } from './battleGame';
+import { GRID_SIZE, UNIT_DEFS, applyShadowpriestCurse, applyHealing, MAX_HEAL_PER_TICK } from './battleGame';
 import { ZONE_POSITIONS, ZONE_DELTA, type AuraZoneMap, type AuraEffectMap } from './auraData';
 import type { BattleEvent } from './battleEvents';
 
