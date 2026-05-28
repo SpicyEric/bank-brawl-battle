@@ -492,7 +492,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // ===== NEW UNITS v3 =====
   bomber: {
     label: 'Sprengmeister', emoji: '💣', hp: 70, attack: 23, cooldown: 5,
-    description: 'Greift nicht selbst an. Alle 5 Ticks: wirft eine Bombe auf den nächsten Gegner – nach 1 Tick Fuse 10 Dmg auf das Ziel + 7 Dmg im 3×3-Splash. Alle 12 Ticks: Bombenhagel auf alle Gegner.',',
+    description: 'Greift nicht selbst an. Alle 5 Ticks: wirft eine Bombe auf den nächsten Gegner – nach 1 Tick Fuse 10 Dmg auf das Ziel + 7 Dmg im 3×3-Splash. Alle 12 Ticks: Bombenhagel auf alle Gegner.',
     movePattern: ALL_ADJACENT,
     attackPattern: [],
     strongVs: [], weakVs: [],
