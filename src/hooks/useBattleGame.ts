@@ -10,6 +10,7 @@ import {
   spawnDoppelgangerPhantoms, tickPhantomTimers, applyChainAttack, tickClonerSpawns, tickMageImpulse, tickFrostNova, tickRiderHorn, tickArcherVolley, tickDragonSpin, tickMagnetPull, handleShadowbladeTick, leaveArsonistTrail,
   handleTerrainSeeker, isImmuneToFreeze, isImmuneToFire, effectiveCooldown, tickTerrainHeals,
   tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest, applyShadowpriestCurse,
+  applyHealing, MAX_HEAL_PER_TICK,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { findFormations, applyFormationMove, findFormationContaining } from '@/lib/formations';
