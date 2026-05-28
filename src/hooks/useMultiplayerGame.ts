@@ -9,6 +9,7 @@ import {
   processLavaTick, processGhostTick, tickPhantomTimers,
   tickBomberActions, tickBombFuses, tickObeliskAura, tickShadowpriestHarvest,
   spawnDoppelgangerPhantoms, applyPostAttackEffects, applyDeathEffects, applyChainAttack, applyShadowpriestCurse, applyMirrorReflect,
+  applyHealing, MAX_HEAL_PER_TICK,
 } from '@/lib/battleGame';
 import { BattleEvent } from '@/lib/battleEvents';
 import { supabase } from '@/integrations/supabase/client';
