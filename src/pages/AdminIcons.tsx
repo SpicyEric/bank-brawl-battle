@@ -8,9 +8,11 @@ import {
   loadAttackIconMap, saveAttackIconMap,
   loadCloneIconMap, saveCloneIconMap,
   loadSoundMap, saveSoundMap,
-  type UnitIconMap,
+  getPlacementSound, setPlacementSound,
+  type UnitIconMap, type PlacementSoundKind,
 } from '@/lib/unitIcons';
 import { loadSoundManifest, previewSound, type SoundCategory } from '@/lib/unitSounds';
+
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { UnitInfoModal } from '@/components/battle/UnitInfoModal';
