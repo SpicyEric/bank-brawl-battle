@@ -537,6 +537,9 @@ export function useMultiplayerGame(config: MultiplayerConfig) {
     } else {
       if (!selectedUnit) return;
       if (playerBannedUnits.includes(selectedUnit)) return;
+      type = selectedUnit;
+    }
+
     const unit = createUnit(type, myTeam, row, col, color, slotIdx);
     setPlayerUnits(prev => [...prev, unit]);
     setGrid(prev => {
