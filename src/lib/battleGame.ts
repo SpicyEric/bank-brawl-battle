@@ -193,7 +193,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 105,
     attack: 23,
     cooldown: 2,
-    description: 'Solider Nahkämpfer. Bewegt sich orthogonal (1 Feld). Profitiert extrem vom Farbsystem: +50% Schaden gegen farblich schwächere Gegner (statt +30%) und nur −10% Schaden gegen farblich stärkere (statt −30%).',
+    description: 'Profitiert extrem vom Farbsystem: +70% Schaden gegen farblich schwächere Gegner (statt +30%) und nur −10% Schaden gegen farblich stärkere (statt −30%).',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: ['tank', 'mage', 'healer'],
@@ -205,7 +205,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 90,
     attack: 16,
     cooldown: 1,
-    description: 'Schneller Nahkämpfer. Bewegt sich diagonal (bis 2 Felder) und greift diagonal an. Cooldown 1.',
+    description: 'Rüstungsdurchdringung: Jede Schadensreduktion des Ziels (Tank-Aura, Wald, Schild-Buffs, Eisgolem-Buff …) wirkt nur zu 50% gegen seinen Angriff.',
     movePattern: [
       ...DIAGONAL,
       { row: -2, col: -2 }, { row: -2, col: 2 },
@@ -221,7 +221,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 95,
     attack: 24,
     cooldown: 3,
-    description: 'Fliegt über Hindernisse. Flächenangriff (3x3, 30% Splash). Alle 10 Ticks: bleibt stehen und dreht sich 8 Ticks lang im Kreis, speit pro Tick einen 3-Felder-Feuerstrahl in eine Richtung. Getroffene Gegner brennen 8 Ticks (5 Dmg/Tick).',
+    description: 'Flächenangriff: Trifft das Ziel voll, alle Einheiten im 3×3 um das Ziel bekommen zusätzlich 20% des Schadens (Flammen sichtbar auf jedem Splash-Feld).',
     movePattern: [
       ...ALL_ADJACENT,
       { row: -2, col: 0 }, { row: 2, col: 0 }, { row: 0, col: -2 }, { row: 0, col: 2 },
@@ -239,7 +239,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 70,
     attack: 18,
     cooldown: 2,
-    description: 'Extrem mobiler Springer. Springt bis zu 3 Felder in alle Richtungen und über Hindernisse. Wechselt nach jedem Angriff sein Ziel. Bläst alle 9 Ticks ins Horn: Verbündete in 5×5 um sich machen 2 Ticks lang +100% Schaden.',
+    description: 'Motivation: Bläst alle 9 Ticks ins Horn – alle Verbündeten im 3×3 um ihn herum bekommen 2 Ticks lang +80% Schaden.',
     movePattern: [
       // Large star pattern: 3 squares in all 8 directions (jumps over obstacles)
       // Cardinal: 2 and 3 steps
@@ -268,7 +268,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 55,
     attack: 18,
     cooldown: 2,
-    description: 'Bewegt sich in alle Richtungen (1 Feld). Greift orthogonal bis 3 Felder an. Alle 7 Ticks: 8-Pfeil-Salve in alle Richtungen (orthogonal + diagonal) mit unendlicher Reichweite – jeder Pfeil trifft den ersten Gegner auf seiner Linie.',
+    description: '20% Chance auf kritischen Treffer (+50% Schaden bei dieser Attack).',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
@@ -284,7 +284,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 75,
     attack: 14,
     cooldown: 2,
-    description: 'Friert Gegner 3 Ticks ein (50% Schaden, keine Bewegung). Alle 7 Ticks: Frost-Nova im 3×3 friert Feinde 5 Ticks (nur 30% Schaden). Greift orthogonal bis 2 Felder an.',
+    description: '20% Wahrscheinlichkeit: friert Gegner für 3 Ticks ein (eingefrorene Gegner machen 50% weniger Schaden, dürfen sich aber weiter bewegen).',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ORTHOGONAL,
@@ -299,7 +299,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 160,
     attack: 19,
     cooldown: 3,
-    description: 'Bewegt sich orthogonal (1 Feld). Schützt angrenzende Verbündete (-20% Schaden). Zieht Feinde an. Verbündete können sich an ihn binden.',
+    description: 'Schwerer Tank mit sehr viel HP. Stark durch seine Buff-Aura für angrenzende Verbündete.',
     movePattern: ORTHOGONAL,
     attackPattern: ORTHOGONAL,
     strongVs: ['rider', 'archer', 'frost'],
@@ -311,7 +311,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 75,
     attack: 22,
     cooldown: 2,
-    description: 'Versteckt sich hinter Verbündeten. Greift diagonal 1-3 Felder an. Alle 7 Ticks: Impulswelle stößt alle Feinde im 7×7-Umkreis nach außen.',
+    description: 'Formationsaufbruch: 10% Chance pro Treffer, das Ziel an den oberen Kartenrand der Gegnerseite zu schleudern und so dessen Formation zu zerreißen.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...DIAGONAL,
@@ -329,7 +329,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
     hp: 75,
     attack: 10,
     cooldown: 2,
-    description: 'Heilt Verbündete im Umkreis von 2 Feldern (+28 HP). Greift nur an, wenn niemand mehr zu heilen ist.',
+    description: 'Hinrichtung: Gegner über 70% HP bekommen nur 3 Schaden, Gegner unter 70% HP vollen Schaden.',
     movePattern: ALL_ADJACENT,
     attackPattern: [
       ...ALL_ADJACENT,
@@ -343,7 +343,7 @@ export const UNIT_DEFS: Record<UnitType, UnitDef> = {
   // Mechanics marked "(geplant)" in the description are currently approximated via stats/patterns.
   banshee: {
     label: 'Banshee', emoji: '👻', hp: 70, attack: 16, cooldown: 2,
-    description: 'Diagonale Bewegung. Stirbt einmalig nur scheinbar – steht nach 3 Runden mit 70 HP und 10 ATK wieder auf (zweiter Tod ist endgültig).',
+    description: 'Stirbt einmalig nur scheinbar – steht nach 3 Ticks am nächsten freien Feld mit 70 HP und 10 ATK wieder auf (zweiter Tod ist endgültig).',
     movePattern: [...DIAGONAL, { row: -2, col: -2 }, { row: -2, col: 2 }, { row: 2, col: -2 }, { row: 2, col: 2 }],
     attackPattern: DIAGONAL,
     strongVs: [], weakVs: [],
