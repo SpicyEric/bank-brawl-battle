@@ -45,8 +45,21 @@ const AdminIcons = () => {
   const [cloneMap, setCloneMap] = useState<UnitIconMap>(() => ({ ...loadCloneIconMap() }));
   const [soundMap, setSoundMap] = useState<UnitIconMap>(() => ({ ...loadSoundMap() }));
   const [soundCategory, setSoundCategory] = useState<SoundCategory>('buffs');
-  const [soundManifest, setSoundManifest] = useState<{ buffs: string[]; magic: string[]; dungeon: string[] }>({ buffs: [], magic: [], dungeon: [] });
-  useEffect(() => { loadSoundManifest().then(m => setSoundManifest(m)); }, []);
+  const [selectedUnit, setSelectedUnit] = useState<UnitType>(UNIT_TYPES[0]);
+  const [slot, setSlot] = useState<Slot>('unit');
+  // Placement-sound editor mode (speaker tile selected).
+  const [placementMode, setPlacementMode] = useState(false);
+  const [selectedPlaceKind, setSelectedPlaceKind] = useState<PlacementSoundKind>('default');
+  // Force re-render when placement sounds change.
+  const [, setPlaceTick] = useState(0);
+  const placeKinds: { key: PlacementSoundKind; label: string; emoji: string }[] = [
+    { key: 'default', label: 'Standard', emoji: '🎯' },
+    { key: 'buff',    label: 'Buff',     emoji: '✨' },
+    { key: 'nerf',    label: 'Nerf',     emoji: '💢' },
+    { key: 'mixed',   label: 'Gemischt', emoji: '🌀' },
+    { key: 'full',    label: 'Voll (max)', emoji: '🔒' },
+  ];
+
   const [selectedUnit, setSelectedUnit] = useState<UnitType>(UNIT_TYPES[0]);
   const [slot, setSlot] = useState<Slot>('unit');
   const [filter, setFilter] = useState('');
