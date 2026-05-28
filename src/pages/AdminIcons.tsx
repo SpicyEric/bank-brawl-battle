@@ -156,6 +156,7 @@ const AdminIcons = () => {
     effectiveSlot === 'unit' ? 'Einheit-Icon' :
     effectiveSlot === 'attack' ? 'Angriffs-/Projektil-Icon' :
     effectiveSlot === 'clone' ? 'Klon-Icon' :
+    effectiveSlot === 'sound' ? 'Angriffs-Sound' :
     'Buff-Zonen';
 
   return (
